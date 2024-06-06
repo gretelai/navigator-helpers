@@ -1,7 +1,7 @@
 import argparse
 import logging
-from datasets import load_dataset
 import json
+import pandas as pd
 from data_augmentation import DataAugmentationConfig, DataAugmenter
 
 def main(args):
@@ -13,38 +13,16 @@ def main(args):
     """
     logging.basicConfig(level=args.loglevel)
 
-    # Dataset configuration
-    DATASET_NAME = "databricks/databricks-dolly-15k"
-    MAX_WORDS = 400
-    NUM_EXAMPLES = 2
-
-    # Load and preprocess the dataset
-    dataset = load_dataset(DATASET_NAME, split="train")
-    df = (
-        dataset.to_pandas()
-        .map(
-            lambda x: x.replace("\n", " ")
-            .replace("\r", " ")
-            .encode("ascii", "ignore")
-            .decode("ascii")
-        )
-        .assign(
-            num_words=lambda df_: df_["context"]
-            .str.cat(df_["response"], sep=" ")
-            .str.split()
-            .apply(len)
-        )
-        .query("num_words < @MAX_WORDS")
-        .query("context != ''")
-        .drop(columns=["category", "num_words"])
-        .head(NUM_EXAMPLES)
-        .reset_index(drop=True)
-    )
-
     # Gretel API configuration
     GRETEL_API_KEY = "prompt"
-    GRETEL_PRIMARY_MODEL = "gretelai/gpt-auto"
-    MAX_CO_TEACH_LLMS = 3
+    GRETEL_PRIMARY_MODEL = 'gretelai/gpt-llama3-8b'
+    CO_TEACH_MODELS = ['gretelai/gpt-llama3-8b', 'gretelai/gpt-mistral7b']  # List of co-teaching models
+
+    # Dataset configuration
+    df = pd.read_csv(
+        "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv",
+        nrows=1,
+    )
 
     # Create the data augmentation configuration
     config = DataAugmentationConfig(
@@ -55,7 +33,9 @@ def main(args):
         max_tokens_response=150,
         api_key=GRETEL_API_KEY,
         primary_model=GRETEL_PRIMARY_MODEL,
-        max_co_teach_llms=MAX_CO_TEACH_LLMS,
+        co_teach_models=CO_TEACH_MODELS,
+        instruction_format_prompt="A well-formulated question or command in everyday English.",
+        response_format_prompt="A well-formulated response to the question in everyday English.",
     )
     config.add_field("context", field_type="context")
     config.add_field("instruction", field_type="instruction")
