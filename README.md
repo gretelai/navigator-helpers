@@ -88,23 +88,28 @@ The data augmentation process involves the interaction between the User, Navigat
 
 ![Navigator Agent Data Augmentation Process](docs/images/navigator_agent_augment_data_flow.png)
 
-1. The User provides the training dataset containing N records (context, instruction, response format) to the Navigator Agent.
-2. The Navigator Agent starts a loop to process each of the N records:
-   - Extracts the context, instruction, and prompt from the current record.
-   - Sends the extracted information to LLMs to generate diverse instructions.
-   - LLMs return the generated instructions to the Navigator Agent.
-   - The Navigator Agent evaluates the generated instructions and selects the best candidate.
-   - Sends the selected instruction to LLMs to generate diverse responses.
-   - LLMs return the generated responses to the Navigator Agent.
-   - The Navigator Agent evaluates the generated responses and selects the best candidate.
-   - Initiates the AI Alignment process for further improvement through co-teaching.
-   - Different LLMs provide their suggestions for co-teaching.
-   - The Navigator Agent incorporates the suggestions, evaluates the co-teaching results, and selects the best candidate.
-   - Proceeds with self-teaching for further improvement.
-   - LLMs provide self-teaching suggestions to the Navigator Agent.
-   - The Navigator Agent evaluates the self-teaching results and selects the best candidate.
-   - Adds the synthetically generated record to the augmented dataset.
-3. After processing all N records, the Navigator Agent returns the augmented dataset containing N diverse and high-quality synthetically generated records to the User.
+1. Data Extraction and Initial Generation:
+- Extract context, instruction, and response format from each record.
+- Generate diverse instructions using LLMs.
+- Evaluate and select the best candidate instruction.
+
+2. Instruction Improvement (AAA):
+- Apply Co-Teaching to the selected instruction using multiple LLMs.
+- Incorporate suggestions and evaluate Co-Teaching results.
+- Apply Self-Teaching to further improve the instruction.
+- Evaluate and select the best candidate instruction.
+
+3. Response Generation and Improvement:
+- Generate diverse responses for the selected instruction.
+- Evaluate and select the best candidate response.
+- Apply Co-Teaching to the selected response using multiple LLMs.
+- Incorporate suggestions and evaluate Co-Teaching results.
+- Apply Self-Teaching to further improve the response.
+- Evaluate and select the best candidate response.
+
+4. Final Augmentation:
+- Add the synthetically generated record to the augmented dataset.
+- Return the augmented dataset to the user.
 
 ## Contributing
 
