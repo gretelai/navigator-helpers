@@ -18,7 +18,7 @@ Navigator Self-Align is a Python library for augmenting training data via synthe
   - **Groundedness**: Evaluates the factual correctness of the generated text.
   
   A composite score is computed based on these dimensions, and the best-scoring text from each batch of generations is selected for the following steps.
-- **Gretel Navigator Compound AI system and LLMs**: Used for synthetic data generation and evaluation of generated text.
+- **Gretel Navigator Compound AI system and LLMs**: Used for synthetic data generation and evaluation of generated text. In fact, multiple LLMs and Navigator are leveraged to generate diverse and high quality results, leveraging the strengths and capabilities of any connected LLM to improve results.
 
 ## Installation
 
