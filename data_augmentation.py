@@ -6,6 +6,9 @@ from gretel_client import Gretel
 from tqdm.notebook import tqdm
 from langchain.prompts import PromptTemplate
 import os
+from colorama import Fore, Style, init
+
+init(autoreset=True)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +18,6 @@ class DataFieldConfig:
         self.name = name
         self.field_type = field_type
         self.order = order
-
 
 class DataAugmentationConfig:
     def __init__(
@@ -27,7 +29,9 @@ class DataAugmentationConfig:
         max_tokens_response=150,
         api_key="",
         primary_model="gretelai/gpt-auto",
-        max_co_teach_llms=3,
+        co_teach_models=None,
+        instruction_format_prompt=None,
+        response_format_prompt=None,
     ):
         self.fields = []
         self.current_order = 1
@@ -38,7 +42,9 @@ class DataAugmentationConfig:
         self.max_tokens_response = max_tokens_response
         self.api_key = api_key
         self.primary_model = primary_model
-        self.max_co_teach_llms = max_co_teach_llms
+        self.co_teach_models = co_teach_models or []
+        self.instruction_format_prompt = instruction_format_prompt
+        self.response_format_prompt = response_format_prompt
 
     def add_field(self, name: str, field_type: str):
         self.fields.append(DataFieldConfig(name, field_type, self.current_order))
@@ -69,18 +75,36 @@ class DataAugmenter:
             config
         )
         self.instruction_template = PromptTemplate(
-            input_variables=["context", "provided_instruction"],
-            template="Generate a new instruction based on the Ground Truth Data. Use the provided Example Instruction as a reference for format and semantics, but create a distinct and unique instruction that captures the essence of the Ground Truth Data.\n\nGround Truth Data:\n{context}\n\nExample Instruction (for reference only):\n{provided_instruction}\n\nNew Instruction:",
+            input_variables=[
+                "context",
+                "provided_instruction",
+                "instruction_format_prompt",
+            ],
+            template="Generate a new instruction based on the Ground Truth Data. "
+            "Instruction Format: {instruction_format_prompt}\n\n"
+            "Ground Truth Data:\n{context}\n\n"
+            "Example Instruction (for reference only):\n{provided_instruction}\n\n"
+            "New Instruction (not in question format):",
         )
         self.response_template = PromptTemplate(
-            input_variables=["context", "instruction", "provided_response"],
-            template="Generate a new response to the given Instruction based on the Ground Truth Data. Use the provided Example Response as a reference for format and semantics, but create a distinct and unique response that addresses the Instruction while considering the Ground Truth Data.\n\nGround Truth Data:\n{context}\n\nInstruction:\n{instruction}\n\nExample Response (for reference only):\n{provided_response}\n\nNew Response:",
+            input_variables=[
+                "context",
+                "instruction",
+                "provided_response",
+                "response_format_prompt",
+            ],
+            template="Generate a new response to the given Instruction based on the Ground Truth Data.\n\n"
+            "Response Format: {response_format_prompt}\n\n"
+            "Ground Truth Data:\n{context}\n\n"
+            "Instruction:\n{instruction}\n\n"
+            "Example Response (for reference only):\n{provided_response}\n\n"
+            "New Response (in statement format):",
         )
         self.eval_template = PromptTemplate(
             input_variables=[],
             template="""
 Add the following columns to the provided table:
-* conformance_score: A score from 0-100 indicating the conformance of the generated text to the tags and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
+* conformance_score: A score from 0-100 indicating the conformance of the generated text to the requested format, tags, and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
 * quality_score: A score from 0-100 based on the grammatical correctness, coherence, and relevance of the generated text, with 100 being the highest quality and 0 being the lowest quality.
 * toxicity_score: A score from 0-100 indicating the level of toxic content in the generated text, with 0 being non-toxic and 100 being highly toxic.
 * bias_score: A score from 0-100 indicating the level of unintended biases in the generated text, with 0 being unbiased and 100 being heavily biased.
@@ -88,11 +112,8 @@ Add the following columns to the provided table:
 """,
         )
 
-    def construct_context(self, row, context_fields: List[DataFieldConfig]) -> str:
-        context = ""
-        for field in context_fields:
-            context += f"{field.name}: {row[field.name]}\n"
-        return context.strip()
+    def log_with_color(self, message, color=Fore.WHITE):
+        print(color + message + Style.RESET_ALL)
 
     def augment(self) -> pd.DataFrame:
         context_fields = self.config.get_fields_by_order("context")
@@ -138,7 +159,12 @@ Add the following columns to the provided table:
             if self.use_aaa:
                 logging.info("Applying AI Align AI (AAA) to instructions")
                 improved_instruction_df = self.apply_aaa(
-                    new_instructions, instruction_scores, context, provided_instruction
+                    new_instructions,
+                    instruction_scores,
+                    context,
+                    provided_instruction,
+                    self.config.instruction_format_prompt,
+                    data_type="instruction",
                 )
                 best_instruction = self.select_best_instruction(
                     context, improved_instruction_df["text"], improved_instruction_df
@@ -156,7 +182,12 @@ Add the following columns to the provided table:
             if self.use_aaa:
                 logging.info("Applying AI Align AI (AAA) to responses")
                 improved_response_df = self.apply_aaa(
-                    new_responses, response_scores, context, provided_response
+                    new_responses,
+                    response_scores,
+                    context,
+                    provided_response,
+                    self.config.response_format_prompt,
+                    data_type="response",
                 )
                 best_response = self.select_best_response(
                     context,
@@ -194,38 +225,74 @@ Add the following columns to the provided table:
         new_df = pd.DataFrame(new_rows)
         return new_df
 
-    def apply_aaa(self, texts, scores, context, original_text):
+    def apply_aaa(self, texts, scores, context, original_text, format_prompt, data_type):
         """
         Apply AI Align AI (AAA) to improve the generated texts.
         This method is inspired by the AI Align AI component from the WizardLM-2 paper.
         """
+        color = Fore.BLUE if data_type == "instruction" else Fore.GREEN
         improved_texts = []
+
+        # Co-Teaching
         for text in texts:
-            # Co-Teaching
+            self.log_with_color(f"Starting Co-Teaching for {data_type}: '{text}'", color)
             co_teaching_text = text
-            logging.info(f"Starting Co-Teaching for text: '{text}'")
             for llm in self.co_teach_llms:
-                prompt = f"Improve the following instruction while keeping its structure and intent intact:\n\nOriginal instruction:\n{original_text}\n\nImproved instruction:"
-                co_teaching_text = llm.generate(prompt=prompt)
-                logging.info(f"Intermediate Co-Teaching result: '{co_teaching_text}'")
-            logging.info(f"Final Co-Teaching result: '{co_teaching_text}'")
+                prompt = PromptTemplate(
+                    input_variables=["original_text", "format_prompt"],
+                    template=f"Improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:",
+                )
+                co_teaching_text = llm.generate(
+                    prompt=prompt.format(
+                        original_text=original_text,
+                        format_prompt=format_prompt
+                    )
+                )
+                self.log_with_color(f"Intermediate Co-Teaching result: '{co_teaching_text}'", color)
+            self.log_with_color(f"Final Co-Teaching result: '{co_teaching_text}'", color)
 
             # Self-Teaching
-            logging.info(
-                f"Starting Self-Teaching for Co-Teaching result: '{co_teaching_text}'"
+            self.log_with_color(
+                f"Starting Self-Teaching for Co-Teaching result: '{co_teaching_text}'", color
             )
-            prompt = f"Provide suggestions to improve the following instruction while keeping its structure and intent intact:\n\nOriginal instruction:\n{original_text}\n\nImproved instruction:\n{co_teaching_text}\n\nImprovement suggestions:"
-            suggestions = self.primary_llm.generate(prompt=prompt)
-            logging.info(f"Self-Teaching suggestions: '{suggestions}'")
+            suggestions_prompt = PromptTemplate(
+                input_variables=[
+                    "original_text",
+                    "co_teaching_text",
+                    "format_prompt",
+                ],
+                template=f"Provide suggestions to improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:\n{{co_teaching_text}}\n\nImprovement suggestions:",
+            )
+            suggestions = self.primary_llm.generate(
+                prompt=suggestions_prompt.format(
+                    original_text=original_text,
+                    co_teaching_text=co_teaching_text,
+                    format_prompt=format_prompt
+                )
+            )
+            self.log_with_color(f"Self-Teaching suggestions: '{suggestions}'", color)
 
-            prompt = f"Apply the following suggestions to improve the instruction while keeping its structure and intent intact:\n\nInstruction: {co_teaching_text}\n\nSuggestions: {suggestions}\n\nImproved instruction:"
-            self_teaching_text = self.primary_llm.generate(prompt=prompt)
-            logging.info(f"Final Self-Teaching result: '{self_teaching_text}'")
+            self_teaching_prompt = PromptTemplate(
+                input_variables=[
+                    "co_teaching_text",
+                    "suggestions",
+                    "format_prompt",
+                ],
+                template=f"Apply the following suggestions to improve the {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\n{data_type.capitalize()}: {{co_teaching_text}}\n\nSuggestions: {{suggestions}}\n\nImproved {data_type.capitalize()}:",
+            )
+            self_teaching_text = self.primary_llm.generate(
+                prompt=self_teaching_prompt.format(
+                    co_teaching_text=co_teaching_text,
+                    suggestions=suggestions,
+                    format_prompt=format_prompt
+                )
+            )
+            self.log_with_color(f"Final Self-Teaching result: '{self_teaching_text}'", color)
 
             improved_texts.append(self_teaching_text)
 
         # Re-evaluate the improved texts using the Navigator
-        logging.info("Re-evaluating improved texts using Navigator")
+        self.log_with_color(f"Re-evaluating improved {data_type} texts using Navigator", color)
         improved_scores = self.evaluate_texts(
             improved_texts, "text", "context", context
         )
@@ -245,6 +312,12 @@ Add the following columns to the provided table:
 
         return improved_df
 
+    def construct_context(self, row, context_fields: List[DataFieldConfig]) -> str:
+        context = ""
+        for field in context_fields:
+            context += f"{field.name}: {row[field.name]}\n"
+        return context.strip()
+
     def generate_diverse_instructions(self, context, provided_instruction=None):
         """
         Generate diverse instructions based on the provided context and optionally a provided instruction.
@@ -253,7 +326,10 @@ Add the following columns to the provided table:
         instructions = []
         for _ in range(self.config.num_instructions):
             prompt = self.instruction_template.format(
-                context=context, provided_instruction=provided_instruction
+                context=context,
+                provided_instruction=provided_instruction,
+                instruction_format_prompt=self.config.instruction_format_prompt
+                or "Use the provided Example Instruction as a reference for format and semantics, but create a distinct and unique instruction that captures the essence of the Ground Truth Data.",
             )
             generated_text = self.primary_llm.generate(
                 prompt=prompt,
@@ -281,6 +357,8 @@ Add the following columns to the provided table:
                 context=context,
                 instruction=instruction,
                 provided_response=provided_response,
+                response_format_prompt=self.config.response_format_prompt
+                or "Use the provided Example Response as a reference for format and semantics, but create a distinct and unique response that addresses the Instruction while considering the Ground Truth Data.",
             )
             generated_text = self.primary_llm.generate(
                 prompt=prompt,
@@ -382,8 +460,16 @@ Add the following columns to the provided table:
         """
         improved_text = text
         for llm in self.co_teach_llms:
-            prompt = f"Improve the following text:\n\n{improved_text}\n\nImproved text:"
-            improved_text = llm.generate(prompt=prompt)
+            prompt = PromptTemplate(
+                input_variables=["improved_text", "instruction_format_prompt"],
+                template="Improve the following text while adhering to the requested format:\n\nRequested Format: {instruction_format_prompt}\n\nText:\n{improved_text}\n\nImproved text:",
+            )
+            improved_text = llm.generate(
+                prompt=prompt.format(
+                    improved_text=improved_text,
+                    instruction_format_prompt=self.config.instruction_format_prompt,
+                )
+            )
 
         return improved_text
 
@@ -392,11 +478,28 @@ Add the following columns to the provided table:
         Use the primary LLM to generate improvements for the text through self-teaching.
         This method is inspired by the Self-Teaching technique from the WizardLM-2 paper.
         """
-        prompt = f"Provide suggestions to improve the following text:\n\n{text}\n\nImprovement suggestions:"
-        suggestions = self.primary_llm.generate(prompt=prompt)
+        suggestions_prompt = PromptTemplate(
+            input_variables=["text", "instruction_format_prompt"],
+            template="Provide suggestions to improve the following text while adhering to the requested format:\n\nRequested Format: {instruction_format_prompt}\n\nText:\n{text}\n\nImprovement suggestions:",
+        )
+        suggestions = self.primary_llm.generate(
+            prompt=suggestions_prompt.format(
+                text=text,
+                instruction_format_prompt=self.config.instruction_format_prompt,
+            )
+        )
 
-        prompt = f"Apply the following suggestions to improve the text:\n\nText: {text}\n\nSuggestions: {suggestions}\n\nImproved text:"
-        improved_text = self.primary_llm.generate(prompt=prompt)
+        self_teaching_prompt = PromptTemplate(
+            input_variables=["text", "suggestions", "instruction_format_prompt"],
+            template="Apply the following suggestions to improve the text while adhering to the requested format:\n\nRequested Format: {instruction_format_prompt}\n\nText: {text}\n\nSuggestions: {suggestions}\n\nImproved text:",
+        )
+        improved_text = self.primary_llm.generate(
+            prompt=self_teaching_prompt.format(
+                text=text,
+                suggestions=suggestions,
+                instruction_format_prompt=self.config.instruction_format_prompt,
+            )
+        )
 
         return improved_text
 
@@ -414,7 +517,6 @@ Add the following columns to the provided table:
             "score": scores.loc[best_idx, "average_score"],
         }
 
-
 def initialize_navigator(config):
     gretel = Gretel(api_key=config.api_key)
 
@@ -430,8 +532,7 @@ def initialize_navigator(config):
         gretel.factories.initialize_inference_api(
             "natural_language", backend_model=model
         )
-        for model in primary_llm.backend_model_list
-        if model != config.primary_model
-    ][: config.max_co_teach_llms]
+        for model in config.co_teach_models
+    ]
 
     return primary_llm, navigator, co_teach_llms
