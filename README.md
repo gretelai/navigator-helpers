@@ -40,7 +40,7 @@ The input to this program is LLM training data in a pandas DataFrame format. You
 ### Command-line Arguments ️
 
 - `--loglevel`: Set the logging level (default: `INFO`).
-- `--no_aaa`: Disable AI Align AI (AAA) to improve runtime (default: `False`).
+- `--disable_aaa`: Disable AI Align AI (AAA) to improve runtime (default: `False`).
 
 ### Example Command 
 
