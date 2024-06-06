@@ -4,6 +4,7 @@ import json
 import pandas as pd
 from data_augmentation import DataAugmentationConfig, DataAugmenter
 
+
 def main(args):
     """
     Main function to run the data augmentation process.
@@ -15,14 +16,20 @@ def main(args):
 
     # Gretel API configuration
     GRETEL_API_KEY = "prompt"
-    GRETEL_PRIMARY_MODEL = 'gretelai/gpt-llama3-8b'
-    CO_TEACH_MODELS = ['gretelai/gpt-llama3-8b', 'gretelai/gpt-mistral7b']  # List of co-teaching models
+    GRETEL_PRIMARY_MODEL = "gretelai/gpt-llama3-8b"
+    CO_TEACH_MODELS = [
+        "gretelai/gpt-llama3-8b",
+        "gretelai/gpt-mistral7b",
+    ]  # List of co-teaching models
 
     # Dataset configuration
     df = pd.read_csv(
         "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv",
         nrows=1,
     )
+
+    print("Example record")
+    print(json.dumps(df.head(1).to_dict(orient="records"), indent=2))
 
     # Create the data augmentation configuration
     config = DataAugmentationConfig(
@@ -53,6 +60,7 @@ def main(args):
 
     # Print the augmented data as JSON
     print(json.dumps(new_df.to_dict(orient="records"), indent=2))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
