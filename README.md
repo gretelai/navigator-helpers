@@ -116,4 +116,11 @@ This project is licensed under the Gretel License. See the `LICENSE` file for de
 
 ## Acknowledgements
 
-This project was inspired by the techniques described in the WizardLM-2 paper and leverages a compound AI system for synthetic data generation and evaluation.
+This project was inspired by the techniques described in the following papers and blog posts:
+
+- Shazeer et al. "WizardLM-2: Empowering Large Language Models with Diverse Knowledge and Progressive Learning." WizardLM 2, 15 Apr. 2024, https://wizardlm.github.io/WizardLM2/.
+- Yuan et al. "Self-Rewarding Language Models." arXiv preprint arXiv:2401.10020 (2024).
+- Wei et al. "StarCoder2-Instruct: Fully Transparent and Permissive Self-Alignment for Code Generation." Hugging Face Blog, 29 Apr. 2024, https://huggingface.co/blog/sc2-instruct.
+- Li et al. "Textbooks Are All You Need II: phi-1.5 technical report." arXiv preprint arXiv:2309.05463 (2023).
+
+We would like to express our gratitude to the authors of these works for their valuable insights and contributions to the field of large language model training and data augmentation.
