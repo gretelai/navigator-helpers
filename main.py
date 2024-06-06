@@ -70,11 +70,11 @@ class DataAugmenter:
         self.output_file = output_file
         self.instruction_template = PromptTemplate(
             input_variables=["context", "provided_instruction"],
-            template="Generate a variation of the following instruction based on the Ground Truth Data:\n\nGround Truth Data:\n{context}\n\nExample Instruction:\n{provided_instruction}\n\nNew Instruction:",
+            template="Generate a new instruction based on the Ground Truth Data. Use the provided Example Instruction as a reference for format and semantics, but create a distinct and unique instruction that captures the essence of the Ground Truth Data.\n\nGround Truth Data:\n{context}\n\nExample Instruction (for reference only):\n{provided_instruction}\n\nNew Instruction:",
         )
         self.response_template = PromptTemplate(
             input_variables=["context", "instruction", "provided_response"],
-            template="Generate a variation of the following response based on the Ground Truth Data and the instruction:\n\nGround Truth Data:\n{context}\n\nInstruction:\n{instruction}\n\nExample Response:\n{provided_response}\n\nNew Response:",
+            template="Generate a new response to the given Instruction based on the Ground Truth Data. Use the provided Example Response as a reference for format and semantics, but create a distinct and unique response that addresses the Instruction while considering the Ground Truth Data.\n\nGround Truth Data:\n{context}\n\nInstruction:\n{instruction}\n\nExample Response (for reference only):\n{provided_response}\n\nNew Response:",
         )
         self.eval_template = PromptTemplate(
             input_variables=[],
@@ -458,7 +458,9 @@ def main(args):
 
     co_teach_llms = []
     MAX_CO_TEACH_LLMS = 3
-    available_models = [model for model in llm.backend_model_list if model != GRETEL_MODEL]
+    available_models = [
+        model for model in llm.backend_model_list if model != GRETEL_MODEL
+    ]
     selected_models = available_models[:MAX_CO_TEACH_LLMS]
 
     for model in selected_models:
