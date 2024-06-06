@@ -457,12 +457,15 @@ def main(args):
     )
 
     co_teach_llms = []
-    for model in llm.backend_model_list:
-        if model != GRETEL_MODEL:
-            llm_instance = gretel.factories.initialize_inference_api(
-                "natural_language", backend_model=model
-            )
-            co_teach_llms.append(llm_instance)
+    MAX_CO_TEACH_LLMS = 3
+    available_models = [model for model in llm.backend_model_list if model != GRETEL_MODEL]
+    selected_models = available_models[:MAX_CO_TEACH_LLMS]
+
+    for model in selected_models:
+        llm_instance = gretel.factories.initialize_inference_api(
+            "natural_language", backend_model=model
+        )
+        co_teach_llms.append(llm_instance)
 
     config = DataAugmentationConfig(
         num_instructions=5,
@@ -487,11 +490,7 @@ def main(args):
     new_df = augmenter.augment()
     new_df.to_csv("results.csv", index=False)
 
-    print(
-        json.dumps(
-            new_df[["instruction", "response"]].to_dict(orient="records", indent=2)
-        )
-    )
+    print(json.dumps(new_df.to_dict(orient="records"), indent=2))
 
 
 if __name__ == "__main__":
