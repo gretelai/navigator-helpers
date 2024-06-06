@@ -76,6 +76,9 @@ config = DataAugmentationConfig(
     api_key=API_KEY,
     primary_model=PRIMARY_MODEL,
     max_co_teach_llms=MAX_CO_TEACH_LLMS,
+    co_teach_models=CO_TEACH_MODELS,
+    instruction_format_prompt="A well-formulated question or command in everyday English.",
+    response_format_prompt="A well-formulated response to the question in everyday English.",
 )
 config.add_field("context", field_type="context")
 config.add_field("instruction", field_type="instruction")
