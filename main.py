@@ -1,18 +1,13 @@
-import argparse
-import logging
 import json
 import pandas as pd
 from data_augmentation import DataAugmentationConfig, DataAugmenter
 
-
-def main(args):
+def main():
     """
     Main function to run the data augmentation process.
-
-    Args:
-        args: Command-line arguments.
     """
-    logging.basicConfig(level=args.loglevel)
+    # AI Align AI (AAA) configuration
+    USE_AAA = True # Disable to improve runtime
 
     # Gretel API configuration
     GRETEL_API_KEY = "prompt"
@@ -27,7 +22,6 @@ def main(args):
         "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv",
         nrows=1,
     )
-
     print("Example record")
     print(json.dumps(df.head(1).to_dict(orient="records"), indent=2))
 
@@ -53,7 +47,7 @@ def main(args):
         df,
         config,
         use_examples=True,
-        use_aaa=args.use_aaa,
+        use_aaa=USE_AAA,
         output_file="results.csv",
     )
     new_df = augmenter.augment()
@@ -61,24 +55,5 @@ def main(args):
     # Print the augmented data as JSON
     print(json.dumps(new_df.to_dict(orient="records"), indent=2))
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Data Augmentation with Evol-Instruct and Evol-Answer"
-    )
-    parser.add_argument(
-        "--loglevel",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set the logging level (default: INFO)",
-    )
-    parser.add_argument(
-        "--disable_aaa",
-        dest="use_aaa",
-        action="store_false",
-        help="Disable AI Align AI (AAA) to improve runtime (default: False)",
-        default=True,
-    )
-    args = parser.parse_args()
-    args.loglevel = getattr(logging, args.loglevel)
-    main(args)
+    main()
