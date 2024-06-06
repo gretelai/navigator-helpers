@@ -1,13 +1,12 @@
 # Navigator Self-Align 🚀
 
-Navigator Self-Align is a Python library for augmenting training data via synthetic data generation for large language models (LLMs). It leverages techniques such as Evol-Lab 🌟✨ (Evol-Instruct and Evol-Answer) and AI Align AI (AAA) 🧠 as described in the WizardLM-2 paper, to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages Gretel evaluations for quality, adherence, toxicity, and bias.
+Navigator Self-Align is a Python library for augmenting training data via synthetic data generation for large language models (LLMs). It leverages techniques such as diverse instruction and response generation, and an AI alignment process as described in the WizardLM-2 paper, to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
 
 ## Features
 
-- **Evol-Lab 🌟✨**: Evol-Lab combines Evol-Instruct and Evol-Answer techniques to generate diverse instructions and responses based on given context and optionally provided examples.
-  - **Evol-Instruct**: Generates diverse instructions based on given context and optionally provided instructions.
-  - **Evol-Answer**: Generates diverse responses based on given context and instructions.
-- **AI Align AI (AAA) 🧠**: Optionally improves generated instructions and responses using a co-teaching and self-teaching approach. While AAA can add significant compute time, it generates the highest quality results in practice.
+- **Diverse Instruction Generation**: Generates diverse instructions based on given context and optionally provided instructions.
+- **Diverse Response Generation**: Generates diverse responses based on given context and instructions.
+- **AI Alignment Process**: Optionally improves generated instructions and responses using a co-teaching and self-teaching approach. While this process can add significant compute time, it generates the highest quality results in practice.
   - **Co-Teaching**: Iteratively improves the text using multiple language models.
   - **Self-Teaching**: Generates improvement suggestions and applies them to the text.
 - **Quality and Fairness Judgements**: Navigator Self-Align evaluates the generated text on five dimensions:
@@ -18,7 +17,7 @@ Navigator Self-Align is a Python library for augmenting training data via synthe
   - **Groundedness**: Evaluates the factual correctness of the generated text.
   
   A composite score is computed based on these dimensions, and the best-scoring text from each batch of generations is selected for the following steps.
-- **Gretel Navigator Compound AI system and LLMs**: Used for synthetic data generation and evaluation of generated text.
+- **Compound AI system and LLMs**: Used for synthetic data generation and evaluation of generated text. Multiple LLMs are leveraged to generate diverse and high-quality results, utilizing the strengths and capabilities of any connected LLM to improve results.
 
 ## Installation
 
@@ -51,7 +50,7 @@ The input to this program is LLM training data in a pandas DataFrame format. You
 ### Command-line Arguments
 
 - `--loglevel`: Set the logging level (default: `INFO`).
-- `--disable_aaa`: Disable AI Align AI (AAA) to improve runtime (default: `False`).
+- `--disable_aaa`: Disable the AI Alignment process to improve runtime (default: `False`).
 
 ### Example Command
 
@@ -61,7 +60,7 @@ python main.py --loglevel INFO --disable_aaa
 
 ## Configuration
 
-The data augmentation configuration is created using the `DataAugmentationConfig` class. This includes setting the number of instructions and responses to generate, temperature, token limits, and specifying the Gretel API key, primary model, and maximum number of co-teaching LLMs.
+The data augmentation configuration is created using the `DataAugmentationConfig` class. This includes setting the number of instructions and responses to generate, temperature, token limits, and specifying the API key, primary model, and maximum number of co-teaching LLMs.
 
 Fields are added to the configuration to specify the context, instruction, and response columns.
 
@@ -74,8 +73,8 @@ config = DataAugmentationConfig(
     temperature=0.8,
     max_tokens_instruction=100,
     max_tokens_response=150,
-    api_key=GRETEL_API_KEY,
-    primary_model=GRETEL_PRIMARY_MODEL,
+    api_key=API_KEY,
+    primary_model=PRIMARY_MODEL,
     max_co_teach_llms=MAX_CO_TEACH_LLMS,
 )
 config.add_field("context", field_type="context")
@@ -85,13 +84,27 @@ config.add_field("response", field_type="response")
 
 ## Data Augmentation Process
 
-1. The `DataAugmenter` class is used to perform data augmentation. It takes the preprocessed dataset, configuration, and other options such as using examples, enabling AI Align AI (AAA), and specifying the output file.
+The data augmentation process involves the interaction between the User, Navigator Agent, and LLMs. Here's a sequence diagram illustrating the process:
 
-2. The `augment()` method is called to generate synthetic examples. It constructs the context based on the specified context fields, generates diverse instructions using Evol-Instruct, optionally applies AAA to improve the instructions, selects the best instruction, generates diverse responses using Evol-Answer, optionally applies AAA to improve the responses, and selects the best response.
+![Navigator Agent Data Augmentation Process](docs/images/navigator_agent_augment_data.png)
 
-3. At each stage of generation, the generated texts are evaluated using Gretel Navigator on five dimensions: conformance, quality, toxicity, bias, and groundedness. A composite score is computed based on these dimensions, and the best-scoring text from each batch of generations is selected for the following steps.
-
-4. The augmented data is saved to the specified output file in CSV format and printed as JSON for further processing or analysis.
+1. The User provides the training dataset containing N records (context, instruction, response format) to the Navigator Agent.
+2. The Navigator Agent starts a loop to process each of the N records:
+   - Extracts the context, instruction, and prompt from the current record.
+   - Sends the extracted information to LLMs to generate diverse instructions.
+   - LLMs return the generated instructions to the Navigator Agent.
+   - The Navigator Agent evaluates the generated instructions and selects the best candidate.
+   - Sends the selected instruction to LLMs to generate diverse responses.
+   - LLMs return the generated responses to the Navigator Agent.
+   - The Navigator Agent evaluates the generated responses and selects the best candidate.
+   - Initiates the AI Alignment process for further improvement through co-teaching.
+   - Different LLMs provide their suggestions for co-teaching.
+   - The Navigator Agent incorporates the suggestions, evaluates the co-teaching results, and selects the best candidate.
+   - Proceeds with self-teaching for further improvement.
+   - LLMs provide self-teaching suggestions to the Navigator Agent.
+   - The Navigator Agent evaluates the self-teaching results and selects the best candidate.
+   - Adds the synthetically generated record to the augmented dataset.
+3. After processing all N records, the Navigator Agent returns the augmented dataset containing N diverse and high-quality synthetically generated records to the User.
 
 ## Contributing
 
@@ -103,4 +116,4 @@ This project is licensed under the Gretel License. See the `LICENSE` file for de
 
 ## Acknowledgements
 
-This project was inspired by the techniques described in the WizardLM-2 paper and leverages Gretel Navigator for synthetic data generation and evaluation.
+This project was inspired by the techniques described in the WizardLM-2 paper and leverages a compound AI system for synthetic data generation and evaluation.
