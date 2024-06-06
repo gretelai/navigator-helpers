@@ -3,3 +3,4 @@ langchain==0.2.2
 pandas==2.2.1
 tqdm==4.66.4
 gretel-client==0.18.3
+colorama==0.4.6
