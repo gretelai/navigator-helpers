@@ -86,7 +86,7 @@ config.add_field("response", field_type="response")
 
 The data augmentation process involves the interaction between the User, Navigator Agent, and LLMs. Here's a sequence diagram illustrating the process:
 
-![Navigator Agent Data Augmentation Process](docs/images/navigator_agent_augment_data.png)
+![Navigator Agent Data Augmentation Process](docs/images/navigator_agent_augment_data_flow.png)
 
 1. The User provides the training dataset containing N records (context, instruction, response format) to the Navigator Agent.
 2. The Navigator Agent starts a loop to process each of the N records:
