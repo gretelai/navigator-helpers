@@ -12,8 +12,8 @@ def main():
 
     # Gretel API configuration
     GRETEL_API_KEY = "prompt"
-    GRETEL_PRIMARY_TABULAR = "gretelai/auto"
-    GRETEL_PRIMARY_LLM = "gretelai/gpt-auto"
+    NAVIGATOR_TABULAR = "gretelai/auto"
+    NAVIGATOR_LLM = "gretelai/gpt-auto"
     CO_TEACH_LLMS = [
         "gretelai/gpt-llama3-8b",
         "gretelai/gpt-mistral7b",
@@ -35,8 +35,8 @@ def main():
         max_tokens_instruction=100,
         max_tokens_response=150,
         api_key=GRETEL_API_KEY,
-        primary_tabular=GRETEL_PRIMARY_TABULAR,
-        primary_llm=GRETEL_PRIMARY_LLM,
+        navigator_tabular=NAVIGATOR_TABULAR,
+        navigator_llm=NAVIGATOR_LLM,
         co_teach_llms=CO_TEACH_LLMS,
         instruction_format_prompt="A well-formulated question or command in everyday English.",
         response_format_prompt="A well-formulated response to the question in everyday English.",

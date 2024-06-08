@@ -29,8 +29,8 @@ class DataAugmentationConfig:
         max_tokens_instruction=100,
         max_tokens_response=150,
         api_key="",
-        primary_llm="gretelai/gpt-auto",
-        primary_tabular="gretelai/auto",
+        navigator_llm="gretelai/gpt-auto",
+        navigator_tabular="gretelai/auto",
         co_teach_llms=None,
         instruction_format_prompt=None,
         response_format_prompt=None,
@@ -43,8 +43,8 @@ class DataAugmentationConfig:
         self.max_tokens_instruction = max_tokens_instruction
         self.max_tokens_response = max_tokens_response
         self.api_key = api_key
-        self.primary_llm = primary_llm
-        self.primary_tabular = primary_tabular
+        self.navigator_llm = navigator_llm
+        self.navigator_tabular = navigator_tabular
         self.co_teach_llms = co_teach_llms or []
         self.instruction_format_prompt = instruction_format_prompt
         self.response_format_prompt = response_format_prompt
@@ -74,7 +74,7 @@ class DataAugmenter:
         self.use_examples = use_examples
         self.use_aaa = use_aaa
         self.output_file = output_file
-        self.primary_llm, self.navigator, self.co_teach_llms = initialize_navigator(
+        self.navigator_llm, self.navigator, self.co_teach_llms = initialize_navigator(
             config
         )
         self.instruction_template = PromptTemplate(
@@ -274,7 +274,7 @@ Add the following columns to the provided table:
                 ],
                 template=f"Provide suggestions to improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:\n{{co_teaching_text}}\n\nImprovement suggestions:",
             )
-            suggestions = self.primary_llm.generate(
+            suggestions = self.navigator_llm.generate(
                 prompt=suggestions_prompt.format(
                     original_text=original_text,
                     co_teaching_text=co_teaching_text,
@@ -291,7 +291,7 @@ Add the following columns to the provided table:
                 ],
                 template=f"Apply the following suggestions to improve the {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\n{data_type.capitalize()}: {{co_teaching_text}}\n\nSuggestions: {{suggestions}}\n\nImproved {data_type.capitalize()}:",
             )
-            self_teaching_text = self.primary_llm.generate(
+            self_teaching_text = self.navigator_llm.generate(
                 prompt=self_teaching_prompt.format(
                     co_teaching_text=co_teaching_text,
                     suggestions=suggestions,
@@ -346,7 +346,7 @@ Add the following columns to the provided table:
                 instruction_format_prompt=self.config.instruction_format_prompt
                 or "Use the provided Example Instruction as a reference for format and semantics, but create a distinct and unique instruction that captures the essence of the Ground Truth Data.",
             )
-            generated_text = self.primary_llm.generate(
+            generated_text = self.navigator_llm.generate(
                 prompt=prompt,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens_instruction,
@@ -375,7 +375,7 @@ Add the following columns to the provided table:
                 response_format_prompt=self.config.response_format_prompt
                 or "Use the provided Example Response as a reference for format and semantics, but create a distinct and unique response that addresses the Instruction while considering the Ground Truth Data.",
             )
-            generated_text = self.primary_llm.generate(
+            generated_text = self.navigator_llm.generate(
                 prompt=prompt,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens_response,
@@ -497,7 +497,7 @@ Add the following columns to the provided table:
             input_variables=["text", "instruction_format_prompt"],
             template="Provide suggestions to improve the following text while adhering to the requested format:\n\nRequested Format: {instruction_format_prompt}\n\nText:\n{text}\n\nImprovement suggestions:",
         )
-        suggestions = self.primary_llm.generate(
+        suggestions = self.navigator_llm.generate(
             prompt=suggestions_prompt.format(
                 text=text,
                 instruction_format_prompt=self.config.instruction_format_prompt,
@@ -508,7 +508,7 @@ Add the following columns to the provided table:
             input_variables=["text", "suggestions", "instruction_format_prompt"],
             template="Apply the following suggestions to improve the text while adhering to the requested format:\n\nRequested Format: {instruction_format_prompt}\n\nText: {text}\n\nSuggestions: {suggestions}\n\nImproved text:",
         )
-        improved_text = self.primary_llm.generate(
+        improved_text = self.navigator_llm.generate(
             prompt=self_teaching_prompt.format(
                 text=text,
                 suggestions=suggestions,
@@ -536,12 +536,12 @@ Add the following columns to the provided table:
 def initialize_navigator(config):
     gretel = Gretel(api_key=config.api_key, validate=True, cache="yes")
 
-    primary_llm = gretel.factories.initialize_navigator_api(
-        "natural_language", backend_model=config.primary_llm
+    navigator_llm = gretel.factories.initialize_navigator_api(
+        "natural_language", backend_model=config.navigator_llm
     )
 
-    navigator = gretel.factories.initialize_navigator_api(
-        "tabular", backend_model=config.primary_tabular
+    navigator_tabular = gretel.factories.initialize_navigator_api(
+        "tabular", backend_model=config.navigator_tabular
     )
 
     co_teach_llms = [
@@ -551,4 +551,4 @@ def initialize_navigator(config):
         for model in config.co_teach_llms
     ]
 
-    return primary_llm, navigator, co_teach_llms
+    return navigator_llm, navigator_tabular, co_teach_llms
