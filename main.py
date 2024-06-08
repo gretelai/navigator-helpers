@@ -1,6 +1,6 @@
 import json
 import pandas as pd
-from data_augmentation import DataAugmentationConfig, DataAugmenter
+from navigator_helpers import DataAugmentationConfig, DataAugmenter
 
 def main():
     """

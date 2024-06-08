@@ -19,6 +19,7 @@ class DataFieldConfig:
         self.field_type = field_type
         self.order = order
 
+
 class DataAugmentationConfig:
     def __init__(
         self,
@@ -225,7 +226,9 @@ Add the following columns to the provided table:
         new_df = pd.DataFrame(new_rows)
         return new_df
 
-    def apply_aaa(self, texts, scores, context, original_text, format_prompt, data_type):
+    def apply_aaa(
+        self, texts, scores, context, original_text, format_prompt, data_type
+    ):
         """
         Apply AI Align AI (AAA) to improve the generated texts.
         This method is inspired by the AI Align AI component from the WizardLM-2 paper.
@@ -235,7 +238,9 @@ Add the following columns to the provided table:
 
         # Co-Teaching
         for text in texts:
-            self.log_with_color(f"Starting Co-Teaching for {data_type}: '{text}'", color)
+            self.log_with_color(
+                f"Starting Co-Teaching for {data_type}: '{text}'", color
+            )
             co_teaching_text = text
             for llm in self.co_teach_llms:
                 prompt = PromptTemplate(
@@ -244,16 +249,20 @@ Add the following columns to the provided table:
                 )
                 co_teaching_text = llm.generate(
                     prompt=prompt.format(
-                        original_text=original_text,
-                        format_prompt=format_prompt
+                        original_text=original_text, format_prompt=format_prompt
                     )
                 )
-                self.log_with_color(f"Intermediate Co-Teaching result: '{co_teaching_text}'", color)
-            self.log_with_color(f"Final Co-Teaching result: '{co_teaching_text}'", color)
+                self.log_with_color(
+                    f"Intermediate Co-Teaching result: '{co_teaching_text}'", color
+                )
+            self.log_with_color(
+                f"Final Co-Teaching result: '{co_teaching_text}'", color
+            )
 
             # Self-Teaching
             self.log_with_color(
-                f"Starting Self-Teaching for Co-Teaching result: '{co_teaching_text}'", color
+                f"Starting Self-Teaching for Co-Teaching result: '{co_teaching_text}'",
+                color,
             )
             suggestions_prompt = PromptTemplate(
                 input_variables=[
@@ -267,7 +276,7 @@ Add the following columns to the provided table:
                 prompt=suggestions_prompt.format(
                     original_text=original_text,
                     co_teaching_text=co_teaching_text,
-                    format_prompt=format_prompt
+                    format_prompt=format_prompt,
                 )
             )
             self.log_with_color(f"Self-Teaching suggestions: '{suggestions}'", color)
@@ -284,15 +293,19 @@ Add the following columns to the provided table:
                 prompt=self_teaching_prompt.format(
                     co_teaching_text=co_teaching_text,
                     suggestions=suggestions,
-                    format_prompt=format_prompt
+                    format_prompt=format_prompt,
                 )
             )
-            self.log_with_color(f"Final Self-Teaching result: '{self_teaching_text}'", color)
+            self.log_with_color(
+                f"Final Self-Teaching result: '{self_teaching_text}'", color
+            )
 
             improved_texts.append(self_teaching_text)
 
         # Re-evaluate the improved texts using the Navigator
-        self.log_with_color(f"Re-evaluating improved {data_type} texts using Navigator", color)
+        self.log_with_color(
+            f"Re-evaluating improved {data_type} texts using Navigator", color
+        )
         improved_scores = self.evaluate_texts(
             improved_texts, "text", "context", context
         )
@@ -517,19 +530,20 @@ Add the following columns to the provided table:
             "score": scores.loc[best_idx, "average_score"],
         }
 
+
 def initialize_navigator(config):
     gretel = Gretel(api_key=config.api_key)
 
-    primary_llm = gretel.factories.initialize_inference_api(
+    primary_llm = gretel.factories.initialize_navigator_api(
         "natural_language", backend_model=config.primary_model
     )
 
-    navigator = gretel.factories.initialize_inference_api(
-        "navigator", backend_model="gretelai/auto"
+    navigator = gretel.factories.initialize_navigator_api(
+        "tabular", backend_model="gretelai/auto"
     )
 
     co_teach_llms = [
-        gretel.factories.initialize_inference_api(
+        gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=model
         )
         for model in config.co_teach_models
