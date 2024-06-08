@@ -2,17 +2,19 @@ import json
 import pandas as pd
 from navigator_helpers import DataAugmentationConfig, DataAugmenter
 
+
 def main():
     """
     Main function to run the data augmentation process.
     """
     # AI Align AI (AAA) configuration
-    USE_AAA = True # Disable to improve runtime
+    USE_AAA = True  # Disable to improve runtime
 
     # Gretel API configuration
     GRETEL_API_KEY = "prompt"
-    GRETEL_PRIMARY_MODEL = "gretelai/gpt-llama3-8b"
-    CO_TEACH_MODELS = [
+    GRETEL_PRIMARY_TABULAR = "gretelai/auto"
+    GRETEL_PRIMARY_LLM = "gretelai/gpt-auto"
+    CO_TEACH_LLMS = [
         "gretelai/gpt-llama3-8b",
         "gretelai/gpt-mistral7b",
     ]  # List of co-teaching models
@@ -33,8 +35,9 @@ def main():
         max_tokens_instruction=100,
         max_tokens_response=150,
         api_key=GRETEL_API_KEY,
-        primary_model=GRETEL_PRIMARY_MODEL,
-        co_teach_models=CO_TEACH_MODELS,
+        primary_tabular=GRETEL_PRIMARY_TABULAR,
+        primary_llm=GRETEL_PRIMARY_LLM,
+        co_teach_llms=CO_TEACH_LLMS,
         instruction_format_prompt="A well-formulated question or command in everyday English.",
         response_format_prompt="A well-formulated response to the question in everyday English.",
     )
@@ -54,6 +57,7 @@ def main():
 
     # Print the augmented data as JSON
     print(json.dumps(new_df.to_dict(orient="records"), indent=2))
+
 
 if __name__ == "__main__":
     main()

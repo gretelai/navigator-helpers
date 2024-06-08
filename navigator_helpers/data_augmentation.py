@@ -29,8 +29,9 @@ class DataAugmentationConfig:
         max_tokens_instruction=100,
         max_tokens_response=150,
         api_key="",
-        primary_model="gretelai/gpt-auto",
-        co_teach_models=None,
+        primary_llm="gretelai/gpt-auto",
+        primary_tabular="gretelai/auto",
+        co_teach_llms=None,
         instruction_format_prompt=None,
         response_format_prompt=None,
     ):
@@ -42,8 +43,9 @@ class DataAugmentationConfig:
         self.max_tokens_instruction = max_tokens_instruction
         self.max_tokens_response = max_tokens_response
         self.api_key = api_key
-        self.primary_model = primary_model
-        self.co_teach_models = co_teach_models or []
+        self.primary_llm = primary_llm
+        self.primary_tabular = primary_tabular
+        self.co_teach_llms = co_teach_llms or []
         self.instruction_format_prompt = instruction_format_prompt
         self.response_format_prompt = response_format_prompt
 
@@ -532,21 +534,21 @@ Add the following columns to the provided table:
 
 
 def initialize_navigator(config):
-    gretel = Gretel(api_key=config.api_key)
+    gretel = Gretel(api_key=config.api_key, validate=True, cache="yes")
 
     primary_llm = gretel.factories.initialize_navigator_api(
-        "natural_language", backend_model=config.primary_model
+        "natural_language", backend_model=config.primary_llm
     )
 
     navigator = gretel.factories.initialize_navigator_api(
-        "tabular", backend_model="gretelai/auto"
+        "tabular", backend_model=config.primary_tabular
     )
 
     co_teach_llms = [
         gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=model
         )
-        for model in config.co_teach_models
+        for model in config.co_teach_llms
     ]
 
     return primary_llm, navigator, co_teach_llms
