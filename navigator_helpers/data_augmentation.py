@@ -131,12 +131,7 @@ Add the following columns to the provided table:
             else None
         )
 
-        # Check if the output file already exists
-        if os.path.exists(self.output_file):
-            existing_df = pd.read_csv(self.output_file)
-            new_rows = existing_df.to_dict("records")
-        else:
-            new_rows = []
+        new_rows = []
 
         index = 1
         for _, row in tqdm(
@@ -216,12 +211,9 @@ Add the following columns to the provided table:
 
             new_rows.append(new_row)
 
-            # Append the new row to the CSV file
-            new_row_df = pd.DataFrame([new_row])
-            if os.path.exists(self.output_file):
-                new_row_df.to_csv(self.output_file, mode="a", header=False, index=False)
-            else:
-                new_row_df.to_csv(self.output_file, mode="w", header=True, index=False)
+            # Overwrite the CSV file with the new data
+            new_df = pd.DataFrame(new_rows)
+            new_df.to_csv(self.output_file, mode="w", header=True, index=False)
 
             index += 1
 
