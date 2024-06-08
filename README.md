@@ -1,14 +1,14 @@
-# Navigator Self-Align 🚀
+# Navigator Helpers 🚀
 
-Navigator Self-Align is a Python library for augmenting training data via synthetic data generation for large language models (LLMs). It leverages techniques such as diverse instruction and response generation, and an AI alignment process as described in the WizardLM-2 paper, to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
+Navigator Helpers is a Python library for augmenting training data via synthetic data generation for large language models (LLMs) via Gretel Navigator. It leverages techniques such as diverse instruction and response generation, and an AI alignment process as described in the WizardLM-2 paper, to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
 
 ## Installation
 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/gretelai/navigator-self-align.git
-   cd navigator-self-align
+   git clone https://github.com/gretelai/navigator-helpers.git
+   cd navigator-helpers
    ```
 
 2. Create a virtual environment and activate it:
