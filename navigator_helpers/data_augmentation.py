@@ -10,9 +10,6 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-logging.basicConfig(level=logging.INFO)
-
-
 class DataFieldConfig:
     def __init__(self, name: str, field_type: str, order: int):
         self.name = name
