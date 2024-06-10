@@ -7,8 +7,30 @@ from tqdm.notebook import tqdm
 from langchain.prompts import PromptTemplate
 import os
 from colorama import Fore, Style, init
+import sys
 
 init(autoreset=True)
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def log_and_style(message, color=""):
+    logger.info(color + message + Style.RESET_ALL)
+    sys.stdout.flush()
+    time.sleep(1)
+
+
+class StreamlitLogHandler(logging.Handler):
+    def __init__(self, widget_update_func):
+        super().__init__()
+        self.widget_update_func = widget_update_func
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.widget_update_func(msg)
+
 
 class DataFieldConfig:
     def __init__(self, name: str, field_type: str, order: int):
@@ -57,6 +79,19 @@ class DataAugmentationConfig:
         )
 
 
+import time
+import logging
+import pandas as pd
+from typing import List
+from gretel_client import Gretel
+from tqdm.notebook import tqdm
+from langchain.prompts import PromptTemplate
+import os
+import sys
+
+logger = logging.getLogger(__name__)
+
+
 class DataAugmenter:
     def __init__(
         self,
@@ -65,12 +100,14 @@ class DataAugmenter:
         use_examples=False,
         use_aaa=True,
         output_file="results.csv",
+        verbose=False,
     ):
         self.df = df
         self.config = config
         self.use_examples = use_examples
         self.use_aaa = use_aaa
         self.output_file = output_file
+        self.verbose = verbose
         self.navigator_llm, self.navigator, self.co_teach_llms = initialize_navigator(
             config
         )
@@ -112,9 +149,6 @@ Add the following columns to the provided table:
 """,
         )
 
-    def log_with_color(self, message, color=Fore.WHITE):
-        print(color + message + Style.RESET_ALL)
-
     def augment(self) -> pd.DataFrame:
         context_fields = self.config.get_fields_by_order("context")
         instruction_field = (
@@ -132,7 +166,7 @@ Add the following columns to the provided table:
 
         index = 1
         for _, row in tqdm(
-            self.df.iterrows(), total=self.df.shape[0], desc="Augmenting Data"
+            self.df.iterrows(), total=self.df.shape[0], desc="Augmenting Data", leave=True
         ):
             context = self.construct_context(row, context_fields)
             provided_instruction = (
@@ -146,59 +180,60 @@ Add the following columns to the provided table:
                 else None
             )
 
-            logging.info(f"Synthesizing instructions at index: {index}")
+            if self.verbose:
+                logger.info(f"Starting the process of generating a new augmented record.")
+                logger.info(f"Generating a diverse set of instructions based on the original record at index {index}.")
+
             new_instructions, instruction_scores = self.generate_diverse_instructions(
                 context, provided_instruction
             )
 
+            top_instruction_idx = instruction_scores["average_score"].idxmax()
+            top_instruction = new_instructions[top_instruction_idx]
+            top_instruction_score = instruction_scores.loc[top_instruction_idx, "average_score"]
+
             if self.use_aaa:
-                logging.info("Applying AI Align AI (AAA) to instructions")
-                improved_instruction_df = self.apply_aaa(
-                    new_instructions,
-                    instruction_scores,
+                if self.verbose:
+                    logger.info("Applying AI Align AI (AAA) to refine the top-scoring instruction candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the instruction.")
+                improved_instruction = self.apply_aaa(
+                    [top_instruction],
+                    instruction_scores.loc[[top_instruction_idx]],
                     context,
                     provided_instruction,
                     self.config.instruction_format_prompt,
                     data_type="instruction",
                 )
-                best_instruction = self.select_best_instruction(
-                    context, improved_instruction_df["text"], improved_instruction_df
-                )
+                best_instruction = {"instruction": improved_instruction["text"].iloc[0], "score": top_instruction_score}
             else:
-                best_instruction = self.select_best_instruction(
-                    context, new_instructions, instruction_scores
-                )
+                best_instruction = {"instruction": top_instruction, "score": top_instruction_score}
 
-            logging.info("Applying Evol-Answer to instruction candidate")
+            if self.verbose:
+                logger.info("Generating diverse responses to the refined top instruction candidate.")
             new_responses, response_scores = self.generate_diverse_responses(
                 context, best_instruction["instruction"], provided_response
             )
 
+            top_response_idx = response_scores["average_score"].idxmax()
+            top_response = new_responses[top_response_idx]
+            top_response_score = response_scores.loc[top_response_idx, "average_score"]
+
             if self.use_aaa:
-                logging.info("Applying AI Align AI (AAA) to responses")
-                improved_response_df = self.apply_aaa(
-                    new_responses,
-                    response_scores,
+                if self.verbose:
+                    logger.info("Applying AI Align AI (AAA) to refine the top-scoring response candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the response.")
+                improved_response = self.apply_aaa(
+                    [top_response],
+                    response_scores.loc[[top_response_idx]],
                     context,
                     provided_response,
                     self.config.response_format_prompt,
                     data_type="response",
                 )
-                best_response = self.select_best_response(
-                    context,
-                    best_instruction["instruction"],
-                    improved_response_df["text"],
-                    improved_response_df,
-                )
+                best_response = {"response": improved_response["text"].iloc[0], "score": top_response_score}
             else:
-                best_response = self.select_best_response(
-                    context,
-                    best_instruction["instruction"],
-                    new_responses,
-                    response_scores,
-                )
+                best_response = {"response": top_response, "score": top_response_score}
 
-            logging.info(f"Selected response: {best_response}")
+            if self.verbose:
+                logger.info(f"Selected response: {best_response['response']} (Score: {best_response['score']})")
 
             new_row = row.copy()
             new_row[instruction_field.name] = best_instruction["instruction"]
@@ -224,16 +259,14 @@ Add the following columns to the provided table:
         Apply AI Align AI (AAA) to improve the generated texts.
         This method is inspired by the AI Align AI component from the WizardLM-2 paper.
         """
-        color = Fore.BLUE if data_type == "instruction" else Fore.GREEN
         improved_texts = []
 
         # Co-Teaching
         for text in texts:
-            self.log_with_color(
-                f"Starting Co-Teaching for {data_type}: '{text}'", color
-            )
+            if self.verbose:
+                logger.info(f"Initializing Co-Teaching for {data_type}: '{text}'")
             co_teaching_text = text
-            for llm in self.co_teach_llms:
+            for i, llm in enumerate(self.co_teach_llms, start=1):
                 prompt = PromptTemplate(
                     input_variables=["original_text", "format_prompt"],
                     template=f"Improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:",
@@ -243,18 +276,14 @@ Add the following columns to the provided table:
                         original_text=original_text, format_prompt=format_prompt
                     )
                 )
-                self.log_with_color(
-                    f"Intermediate Co-Teaching result: '{co_teaching_text}'", color
-                )
-            self.log_with_color(
-                f"Final Co-Teaching result: '{co_teaching_text}'", color
-            )
+                if self.verbose:
+                    logger.info(f"Co-Teaching step {i} result: '{co_teaching_text}'")
+            if self.verbose:
+                logger.info(f"Co-Teaching complete. Final result: '{co_teaching_text}'")
 
             # Self-Teaching
-            self.log_with_color(
-                f"Starting Self-Teaching for Co-Teaching result: '{co_teaching_text}'",
-                color,
-            )
+            if self.verbose:
+                logger.info(f"Initializing Self-Teaching for Co-Teaching result: '{co_teaching_text}'")
             suggestions_prompt = PromptTemplate(
                 input_variables=[
                     "original_text",
@@ -270,7 +299,8 @@ Add the following columns to the provided table:
                     format_prompt=format_prompt,
                 )
             )
-            self.log_with_color(f"Self-Teaching suggestions: '{suggestions}'", color)
+            if self.verbose:
+                logger.info(f"Self-Teaching suggestions: '{suggestions}'")
 
             self_teaching_prompt = PromptTemplate(
                 input_variables=[
@@ -287,16 +317,14 @@ Add the following columns to the provided table:
                     format_prompt=format_prompt,
                 )
             )
-            self.log_with_color(
-                f"Final Self-Teaching result: '{self_teaching_text}'", color
-            )
+            if self.verbose:
+                logger.info(f"Self-Teaching complete. Final result: '{self_teaching_text}'")
 
             improved_texts.append(self_teaching_text)
 
         # Re-evaluate the improved texts using the Navigator
-        self.log_with_color(
-            f"Re-evaluating improved {data_type} texts using Navigator", color
-        )
+        if self.verbose:
+            logger.info(f"Re-evaluating improved {data_type} texts using Navigator")
         improved_scores = self.evaluate_texts(
             improved_texts, "text", "context", context
         )
@@ -323,10 +351,6 @@ Add the following columns to the provided table:
         return context.strip()
 
     def generate_diverse_instructions(self, context, provided_instruction=None):
-        """
-        Generate diverse instructions based on the provided context and optionally a provided instruction.
-        This method is part of the Evol-Instruct approach from the WizardLM-2 paper.
-        """
         instructions = []
         for _ in range(self.config.num_instructions):
             prompt = self.instruction_template.format(
@@ -341,20 +365,18 @@ Add the following columns to the provided table:
                 max_tokens=self.config.max_tokens_instruction,
             )
             instructions.append(generated_text)
+
         instruction_scores = self.evaluate_texts(
             instructions, "instruction", "context", context
         )
-        for instruction, score in zip(
-            instructions, instruction_scores["average_score"]
-        ):
-            logging.info(f'- "{instruction}" Score: {score}')
+
+        if self.verbose:
+            for instruction, score in zip(instructions, instruction_scores["average_score"]):
+                logger.info(f'   - "{instruction}" (Score: {score:.1f})')
+
         return instructions, instruction_scores
 
     def generate_diverse_responses(self, context, instruction, provided_response=None):
-        """
-        Generate diverse responses based on the provided context and instruction.
-        This method is part of the Evol-Answer approach from the WizardLM-2 paper.
-        """
         responses = []
         for _ in range(self.config.num_responses):
             prompt = self.response_template.format(
@@ -370,11 +392,15 @@ Add the following columns to the provided table:
                 max_tokens=self.config.max_tokens_response,
             )
             responses.append(generated_text)
+
         response_scores = self.evaluate_texts(
             responses, "response", "instruction", instruction
         )
-        for response, score in zip(responses, response_scores["average_score"]):
-            logging.info(f'- "{response}" Score: {score}')
+
+        if self.verbose:
+            for response, score in zip(responses, response_scores["average_score"]):
+                logger.info(f'   - "{response}" (Score: {score:.1f})')
+
         return responses, response_scores
 
     def evaluate_texts(
@@ -430,12 +456,12 @@ Add the following columns to the provided table:
                 ) / 5
                 return text_scores
             except KeyError as e:
-                logging.error(f"KeyError during evaluation: {e}")
+                logger.error(f"KeyError during evaluation: {e}")
             except Exception as e:
-                logging.error(f"Unexpected error during evaluation: {e}")
+                logger.error(f"Unexpected error during evaluation: {e}")
 
             attempt += 1
-            logging.info(f"Retrying evaluation (attempt {attempt}/{max_retries})...")
+            log_and_style(f"Retrying evaluation (attempt {attempt}/{max_retries})...")
             time.sleep(2)  # Wait before retrying
 
         raise Exception("Max retries exceeded during text evaluation")
@@ -451,11 +477,11 @@ Add the following columns to the provided table:
             step_type (str): The type of step (Input, Result, or Suggestions).
         """
         if step_type == "Input":
-            logging.info(f"{teaching_type} Input: {text}")
+            log_and_style(f"{teaching_type} Input: {text}")
         elif step_type == "Result":
-            logging.info(f"{teaching_type} Result: {text}")
+            log_and_style(f"{teaching_type} Result: {text}")
         elif step_type == "Suggestions":
-            logging.info(f"{teaching_type} Suggestions: {text}")
+            log_and_style(f"{teaching_type} Suggestions: {text}")
 
     def co_teach(self, text):
         """
@@ -509,17 +535,21 @@ Add the following columns to the provided table:
 
     def select_best_instruction(self, context, instructions, scores):
         best_idx = scores["average_score"].idxmax()
-        return {
-            "instruction": instructions[best_idx],
-            "score": scores.loc[best_idx, "average_score"],
-        }
+        best_score = scores.loc[best_idx, "average_score"]
+        log_and_style(
+            f"Selected optimal instruction at index {best_idx}. Score: {best_score}"
+        )
+
+        return {"instruction": instructions[best_idx], "score": best_score}
 
     def select_best_response(self, context, instruction, responses, scores):
         best_idx = scores["average_score"].idxmax()
-        return {
-            "response": responses[best_idx],
-            "score": scores.loc[best_idx, "average_score"],
-        }
+        best_score = scores.loc[best_idx, "average_score"]
+
+        log_and_style(
+            f"Selected optimal response at index {best_idx}. Score: {best_score}"
+        )
+        return {"response": responses[best_idx], "score": best_score}
 
 
 def initialize_navigator(config):

@@ -1,4 +1,5 @@
 import json
+import logging
 import pandas as pd
 from navigator_helpers import DataAugmentationConfig, DataAugmenter
 
@@ -7,6 +8,12 @@ def main():
     """
     Main function to run the data augmentation process.
     """
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s - %(message)s",
+    )
+
     # AI Align AI (AAA) configuration
     USE_AAA = True  # Disable to improve runtime
 
@@ -52,6 +59,7 @@ def main():
         use_examples=True,
         use_aaa=USE_AAA,
         output_file="results.csv",
+        verbose=True,
     )
     new_df = augmenter.augment()
 
