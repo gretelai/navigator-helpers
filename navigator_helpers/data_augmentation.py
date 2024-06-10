@@ -1,17 +1,16 @@
-import time
 import logging
-import pandas as pd
-from typing import List
-from gretel_client import Gretel
-from tqdm.notebook import tqdm
-from langchain.prompts import PromptTemplate
-import os
-from colorama import Fore, Style, init
 import sys
+import time
+from typing import List
+
+import pandas as pd
+from colorama import Fore, Style, init
+from gretel_client import Gretel
+from langchain.prompts import PromptTemplate
+from tqdm.notebook import tqdm
 
 init(autoreset=True)
 
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -79,19 +78,6 @@ class DataAugmentationConfig:
         )
 
 
-import time
-import logging
-import pandas as pd
-from typing import List
-from gretel_client import Gretel
-from tqdm.notebook import tqdm
-from langchain.prompts import PromptTemplate
-import os
-import sys
-
-logger = logging.getLogger(__name__)
-
-
 class DataAugmenter:
     def __init__(
         self,
@@ -141,6 +127,7 @@ class DataAugmenter:
             input_variables=[],
             template="""
 Add the following columns to the provided table:
+* instruction_score: A score from 0-100 indicating adherence to the user requested format.
 * conformance_score: A score from 0-100 indicating the conformance of the generated text to the requested format, tags, and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
 * quality_score: A score from 0-100 based on the grammatical correctness, coherence, and relevance of the generated text, with 100 being the highest quality and 0 being the lowest quality.
 * toxicity_score: A score from 0-100 indicating the level of toxic content in the generated text, with 0 being non-toxic and 100 being highly toxic.
@@ -166,7 +153,10 @@ Add the following columns to the provided table:
 
         index = 1
         for _, row in tqdm(
-            self.df.iterrows(), total=self.df.shape[0], desc="Augmenting Data", leave=True
+            self.df.iterrows(),
+            total=self.df.shape[0],
+            desc="Augmenting Data",
+            leave=True,
         ):
             context = self.construct_context(row, context_fields)
             provided_instruction = (
@@ -181,8 +171,12 @@ Add the following columns to the provided table:
             )
 
             if self.verbose:
-                logger.info(f"Starting the process of generating a new augmented record.")
-                logger.info(f"Generating a diverse set of instructions based on the original record at index {index}.")
+                logger.info(
+                    f"Starting the process of generating a new augmented record."
+                )
+                logger.info(
+                    f"Generating a diverse set of instructions based on the original record at index {index}."
+                )
 
             new_instructions, instruction_scores = self.generate_diverse_instructions(
                 context, provided_instruction
@@ -190,11 +184,15 @@ Add the following columns to the provided table:
 
             top_instruction_idx = instruction_scores["average_score"].idxmax()
             top_instruction = new_instructions[top_instruction_idx]
-            top_instruction_score = instruction_scores.loc[top_instruction_idx, "average_score"]
+            top_instruction_score = instruction_scores.loc[
+                top_instruction_idx, "average_score"
+            ]
 
             if self.use_aaa:
                 if self.verbose:
-                    logger.info("Applying AI Align AI (AAA) to refine the top-scoring instruction candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the instruction.")
+                    logger.info(
+                        "Applying AI Align AI (AAA) to refine the top-scoring instruction candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the instruction."
+                    )
                 improved_instruction = self.apply_aaa(
                     [top_instruction],
                     instruction_scores.loc[[top_instruction_idx]],
@@ -203,12 +201,20 @@ Add the following columns to the provided table:
                     self.config.instruction_format_prompt,
                     data_type="instruction",
                 )
-                best_instruction = {"instruction": improved_instruction["text"].iloc[0], "score": top_instruction_score}
+                best_instruction = {
+                    "instruction": improved_instruction["text"].iloc[0],
+                    "score": top_instruction_score,
+                }
             else:
-                best_instruction = {"instruction": top_instruction, "score": top_instruction_score}
+                best_instruction = {
+                    "instruction": top_instruction,
+                    "score": top_instruction_score,
+                }
 
             if self.verbose:
-                logger.info("Generating diverse responses to the refined top instruction candidate.")
+                logger.info(
+                    "Generating diverse responses to the refined top instruction candidate."
+                )
             new_responses, response_scores = self.generate_diverse_responses(
                 context, best_instruction["instruction"], provided_response
             )
@@ -219,7 +225,9 @@ Add the following columns to the provided table:
 
             if self.use_aaa:
                 if self.verbose:
-                    logger.info("Applying AI Align AI (AAA) to refine the top-scoring response candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the response.")
+                    logger.info(
+                        "Applying AI Align AI (AAA) to refine the top-scoring response candidate. AAA uses multiple AI models to iteratively improve the quality and coherence of the response."
+                    )
                 improved_response = self.apply_aaa(
                     [top_response],
                     response_scores.loc[[top_response_idx]],
@@ -228,12 +236,17 @@ Add the following columns to the provided table:
                     self.config.response_format_prompt,
                     data_type="response",
                 )
-                best_response = {"response": improved_response["text"].iloc[0], "score": top_response_score}
+                best_response = {
+                    "response": improved_response["text"].iloc[0],
+                    "score": top_response_score,
+                }
             else:
                 best_response = {"response": top_response, "score": top_response_score}
 
             if self.verbose:
-                logger.info(f"Selected response: {best_response['response']} (Score: {best_response['score']})")
+                logger.info(
+                    f"Selected response: {best_response['response']} (Score: {best_response['score']})"
+                )
 
             new_row = row.copy()
             new_row[instruction_field.name] = best_instruction["instruction"]
@@ -283,7 +296,9 @@ Add the following columns to the provided table:
 
             # Self-Teaching
             if self.verbose:
-                logger.info(f"Initializing Self-Teaching for Co-Teaching result: '{co_teaching_text}'")
+                logger.info(
+                    f"Initializing Self-Teaching for Co-Teaching result: '{co_teaching_text}'"
+                )
             suggestions_prompt = PromptTemplate(
                 input_variables=[
                     "original_text",
@@ -318,7 +333,9 @@ Add the following columns to the provided table:
                 )
             )
             if self.verbose:
-                logger.info(f"Self-Teaching complete. Final result: '{self_teaching_text}'")
+                logger.info(
+                    f"Self-Teaching complete. Final result: '{self_teaching_text}'"
+                )
 
             improved_texts.append(self_teaching_text)
 
@@ -326,13 +343,14 @@ Add the following columns to the provided table:
         if self.verbose:
             logger.info(f"Re-evaluating improved {data_type} texts using Navigator")
         improved_scores = self.evaluate_texts(
-            improved_texts, "text", "context", context
+            improved_texts, "text", "context", context, format_prompt
         )
 
         # Ensure proper dataframe structure
         improved_df = pd.DataFrame(
             {
                 "text": improved_texts,
+                "instruction_score": improved_scores["instruction_score"],
                 "conformance_score": improved_scores["conformance_score"],
                 "quality_score": improved_scores["quality_score"],
                 "toxicity_score": improved_scores["toxicity_score"],
@@ -341,7 +359,6 @@ Add the following columns to the provided table:
                 "average_score": improved_scores["average_score"],
             }
         )
-
         return improved_df
 
     def construct_context(self, row, context_fields: List[DataFieldConfig]) -> str:
@@ -367,11 +384,17 @@ Add the following columns to the provided table:
             instructions.append(generated_text)
 
         instruction_scores = self.evaluate_texts(
-            instructions, "instruction", "context", context
+            instructions,
+            "instruction",
+            "context",
+            context,
+            self.config.instruction_format_prompt,
         )
 
         if self.verbose:
-            for instruction, score in zip(instructions, instruction_scores["average_score"]):
+            for instruction, score in zip(
+                instructions, instruction_scores["average_score"]
+            ):
                 logger.info(f'   - "{instruction}" (Score: {score:.1f})')
 
         return instructions, instruction_scores
@@ -394,7 +417,11 @@ Add the following columns to the provided table:
             responses.append(generated_text)
 
         response_scores = self.evaluate_texts(
-            responses, "response", "instruction", instruction
+            responses,
+            "response",
+            "instruction",
+            instruction,
+            self.config.response_format_prompt,
         )
 
         if self.verbose:
@@ -409,6 +436,7 @@ Add the following columns to the provided table:
         column_name: str,
         additional_column: str,
         additional_value: str,
+        format_prompt: str,
         max_retries: int = 3,
     ) -> pd.DataFrame:
         """
@@ -419,6 +447,7 @@ Add the following columns to the provided table:
             column_name (str): The name of the column to store the texts.
             additional_column (str): The name of the additional column to store the context or instruction.
             additional_value (str): The value of the additional column.
+            format_prompt (str): The user-requested format prompt.
             max_retries (int): Maximum number of retries for evaluation.
 
         Returns:
@@ -432,11 +461,20 @@ Add the following columns to the provided table:
         while attempt < max_retries:
             try:
                 text_scores = self.navigator.edit(
-                    prompt=self.eval_template.template,
+                    prompt=f"""
+                    Add the following columns to the provided table:
+                    * instruction_score: A score from 0-100 indicating adherence to the user requested format: "{format_prompt}".
+                    * conformance_score: A score from 0-100 indicating the conformance of the generated text to the requested format, tags, and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
+                    * quality_score: A score from 0-100 based on the grammatical correctness, coherence, and relevance of the generated text, with 100 being the highest quality and 0 being the lowest quality.
+                    * toxicity_score: A score from 0-100 indicating the level of toxic content in the generated text, with 0 being non-toxic and 100 being highly toxic.
+                    * bias_score: A score from 0-100 indicating the level of unintended biases in the generated text, with 0 being unbiased and 100 being heavily biased.
+                    * groundedness_score: A score from 0-100 indicating the level of factual correctness in the generated text, with 100 being fully grounded in facts and 0 being completely ungrounded.
+                    """,
                     seed_data=text_df,
                     disable_progress_bar=True,
                 )
                 for col in [
+                    "instruction_score",
                     "conformance_score",
                     "quality_score",
                     "toxicity_score",
@@ -448,12 +486,13 @@ Add the following columns to the provided table:
                     else:
                         text_scores[col] = 0.0  # Default score if column is missing
                 text_scores["average_score"] = (
-                    text_scores["conformance_score"]
+                    text_scores["instruction_score"] * 2
+                    + text_scores["conformance_score"]
                     + text_scores["quality_score"]
                     + (100 - text_scores["toxicity_score"])
                     + (100 - text_scores["bias_score"])
                     + text_scores["groundedness_score"]
-                ) / 5
+                ) / 7
                 return text_scores
             except KeyError as e:
                 logger.error(f"KeyError during evaluation: {e}")
@@ -461,7 +500,7 @@ Add the following columns to the provided table:
                 logger.error(f"Unexpected error during evaluation: {e}")
 
             attempt += 1
-            log_and_style(f"Retrying evaluation (attempt {attempt}/{max_retries})...")
+            logger.info(f"Retrying evaluation (attempt {attempt}/{max_retries})...")
             time.sleep(2)  # Wait before retrying
 
         raise Exception("Max retries exceeded during text evaluation")
