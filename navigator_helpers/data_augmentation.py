@@ -109,6 +109,7 @@ class DataAugmenter:
             "Example Instruction (for reference only):\n{provided_instruction}\n\n"
             "New Instruction (not in question format):",
         )
+
         self.response_template = PromptTemplate(
             input_variables=[
                 "context",
@@ -123,6 +124,36 @@ class DataAugmenter:
             "Example Response (for reference only):\n{provided_response}\n\n"
             "New Response (in statement format):",
         )
+
+        self.co_teach_template = PromptTemplate(
+            input_variables=["original_text", "format_prompt"],
+            template=f"Improve the following {{data_type}} while closely following the requested format. "
+            f"Failure to adhere to the format requirements will result in a low score and rejection of the generated text.\n\n"
+            f"Requested Format (non-negotiable): {{format_prompt}}\n\n"
+            f"Original {{data_type}}:\n{{original_text}}\n\n"
+            f"Improved {{data_type}} (must conform to the requested format):",
+        )
+
+        self.suggestions_template = PromptTemplate(
+            input_variables=["original_text", "co_teaching_text", "format_prompt"],
+            template=f"Provide suggestions to improve the following {{data_type}} while closely adhering to the requested format. "
+            f"The generated text will be rejected if it does not strictly follow the format requirements.\n\n"
+            f"Requested Format (mandatory): {{format_prompt}}\n\n"
+            f"Original {{data_type}}:\n{{original_text}}\n\n"
+            f"Improved {{data_type}}:\n{{co_teaching_text}}\n\n"
+            f"Improvement suggestions (focusing on format adherence):",
+        )
+
+        self.self_teaching_template = PromptTemplate(
+            input_variables=["co_teaching_text", "suggestions", "format_prompt"],
+            template=f"Apply the following suggestions to improve the {{data_type}} while strictly adhering to the requested format. "
+            f"The improved text must align perfectly with the format requirements to be accepted.\n\n"
+            f"Requested Format (non-negotiable): {{format_prompt}}\n\n"
+            f"{{data_type.capitalize}}: {{co_teaching_text}}\n\n"
+            f"Suggestions: {{suggestions}}\n\n"
+            f"Improved {{data_type.capitalize}} (must conform precisely to the format):",
+        )
+
         self.eval_template = PromptTemplate(
             input_variables=[],
             template="""
@@ -279,10 +310,18 @@ Add the following columns to the provided table:
             if self.verbose:
                 logger.info(f"Initializing Co-Teaching for {data_type}: '{text}'")
             co_teaching_text = text
+
+            prompt = self.co_teach_template.format(
+                original_text=original_text,
+                format_prompt=format_prompt,
+                data_type=data_type,
+            )
+            co_teaching_text = self.navigator_llm.generate(prompt=prompt)
+
             for i, llm in enumerate(self.co_teach_llms, start=1):
                 prompt = PromptTemplate(
                     input_variables=["original_text", "format_prompt"],
-                    template=f"Improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:",
+                    template=f"Improve the following {data_type} while closely following the requested format. Failure to adhere to the format requirements will result in a low score and rejection of the generated text.\n\nRequested Format (non-negotiable): {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type} (must conform to the requested format):",
                 )
                 co_teaching_text = llm.generate(
                     prompt=prompt.format(
@@ -299,39 +338,27 @@ Add the following columns to the provided table:
                 logger.info(
                     f"Initializing Self-Teaching for Co-Teaching result: '{co_teaching_text}'"
                 )
-            suggestions_prompt = PromptTemplate(
-                input_variables=[
-                    "original_text",
-                    "co_teaching_text",
-                    "format_prompt",
-                ],
-                template=f"Provide suggestions to improve the following {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\nOriginal {data_type}:\n{{original_text}}\n\nImproved {data_type}:\n{{co_teaching_text}}\n\nImprovement suggestions:",
+            suggestions_prompt = self.suggestions_template.format(
+                original_text=original_text,
+                co_teaching_text=co_teaching_text,
+                format_prompt=format_prompt,
+                data_type=data_type,
             )
-            suggestions = self.navigator_llm.generate(
-                prompt=suggestions_prompt.format(
-                    original_text=original_text,
-                    co_teaching_text=co_teaching_text,
-                    format_prompt=format_prompt,
-                )
-            )
+            suggestions = self.navigator_llm.generate(prompt=suggestions_prompt)
+
             if self.verbose:
                 logger.info(f"Self-Teaching suggestions: '{suggestions}'")
 
-            self_teaching_prompt = PromptTemplate(
-                input_variables=[
-                    "co_teaching_text",
-                    "suggestions",
-                    "format_prompt",
-                ],
-                template=f"Apply the following suggestions to improve the {data_type} while keeping its structure and intent intact, and adhering to the requested format:\n\nRequested Format: {{format_prompt}}\n\n{data_type.capitalize()}: {{co_teaching_text}}\n\nSuggestions: {{suggestions}}\n\nImproved {data_type.capitalize()}:",
+            self_teaching_prompt = self.self_teaching_template.format(
+                co_teaching_text=co_teaching_text,
+                suggestions=suggestions,
+                format_prompt=format_prompt,
+                data_type=data_type,
             )
             self_teaching_text = self.navigator_llm.generate(
-                prompt=self_teaching_prompt.format(
-                    co_teaching_text=co_teaching_text,
-                    suggestions=suggestions,
-                    format_prompt=format_prompt,
-                )
+                prompt=self_teaching_prompt
             )
+
             if self.verbose:
                 logger.info(
                     f"Self-Teaching complete. Final result: '{self_teaching_text}'"
@@ -341,7 +368,9 @@ Add the following columns to the provided table:
 
         # Re-evaluate the improved texts using the Navigator
         if self.verbose:
-            logger.info(f"Re-evaluating improved {data_type} texts using Navigator")
+            logger.info(
+                f"Re-evaluating improved {data_type} texts using Navigator for Ranking"
+            )
         improved_scores = self.evaluate_texts(
             improved_texts, "text", "context", context, format_prompt
         )
