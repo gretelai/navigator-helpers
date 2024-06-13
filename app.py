@@ -27,43 +27,45 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-
 def main():
 
     st.set_page_config(page_title="Navigator Training Data Augmentation", layout="wide")
 
     st.title("Navigator Training Data Augmentation")
 
-    # API key input
-    api_key = st.text_input(
-        "Enter your Gretel API key",
-        value="",
-        type="password",
-    )
+    col1, col2 = st.columns([1, 3])
 
-    if "gretel" not in st.session_state:
-        st.session_state.gretel = None
+    with col1:
+        st.header("Configuration")
 
-    if st.button("Validate"):
-        if api_key:
-            try:
-                st.session_state.gretel = Gretel(api_key=api_key, validate=True)
-                st.success("API key validated. Connection successful!")
-            except Exception as e:
-                st.error(f"Error connecting to Gretel: {str(e)}")
-        else:
-            st.warning("Please enter your Gretel API key to proceed.")
+        # API key input
+        api_key = st.text_input(
+            "Enter your Gretel API key",
+            value="",
+            type="password",
+            help="Your Gretel API key for authentication"
+        )
 
-    if st.session_state.gretel is None:
-        st.stop()
+        if "gretel" not in st.session_state:
+            st.session_state.gretel = None
 
-    # File upload
-    uploaded_file = None
+        if st.button("Validate API Key"):
+            if api_key:
+                try:
+                    st.session_state.gretel = Gretel(api_key=api_key, validate=True)
+                    st.success("API key validated. Connection successful!")
+                except Exception as e:
+                    st.error(f"Error connecting to Gretel: {str(e)}")
+            else:
+                st.warning("Please enter your Gretel API key to proceed.")
 
-    if st.session_state.gretel is not None:
+        if st.session_state.gretel is None:
+            st.stop()
+
         # File upload
         uploaded_file = st.file_uploader(
-            "Upload a CSV or JSON file", type=["csv", "json"]
+            "Upload a CSV or JSON file", type=["csv", "json"],
+            help="Upload the dataset file in CSV or JSON format"
         )
 
         if uploaded_file is not None:
@@ -75,8 +77,9 @@ def main():
             )
 
             # Data preview
-            st.subheader("Data Preview")
-            st.dataframe(df.head())
+            with col2:
+                st.subheader("Data Preview")
+                st.dataframe(df.head())
 
             # Auto-select columns based on names
             default_context = [col for col in df.columns if "context" in col]
@@ -87,17 +90,20 @@ def main():
 
             # Column selection
             context_fields = st.multiselect(
-                "Select context fields", df.columns, default=default_context
+                "Select context fields", df.columns, default=default_context,
+                help="Select columns to be used as context fields"
             )
             instruction_field = st.selectbox(
                 "Select instruction field",
                 df.columns,
                 index=df.columns.get_loc(default_instruction) if default_instruction else 0,
+                help="Select the column to be used as the instruction field"
             )
             response_field = st.selectbox(
                 "Select response field",
                 df.columns,
                 index=df.columns.get_loc(default_response) if default_response else 0,
+                help="Select the column to be used as the response field"
             )
 
             # Record selection
@@ -106,61 +112,73 @@ def main():
                 min_value=1,
                 max_value=len(df),
                 value=len(df),
+                help="Specify the number of records to process"
             )
 
             # Configuration options
             st.subheader("Configuration Options")
-            col1, col2 = st.columns(2)
-            with col1:
-                num_instructions = st.number_input(
-                    "Number of instructions", min_value=1, value=5
-                )
-                num_responses = st.number_input("Number of responses", min_value=1, value=5)
-                temperature = st.slider(
-                    "Temperature", min_value=0.0, max_value=1.0, value=0.8, step=0.1
-                )
-            with col2:
-                max_tokens_instruction = st.number_input(
-                    "Max tokens (instruction)", min_value=1, value=100
-                )
-                max_tokens_response = st.number_input(
-                    "Max tokens (response)", min_value=1, value=150
-                )
-                use_aaa = st.checkbox(
-                    "Use AI Align AI (AAA)", value=False
-                )  # Set AAA off by default
+            num_instructions = st.number_input(
+                "Number of instructions", min_value=1, value=5,
+                help="Specify the number of instructions to generate"
+            )
+            num_responses = st.number_input(
+                "Number of responses", min_value=1, value=5,
+                help="Specify the number of responses to generate"
+            )
+            temperature = st.slider(
+                "Temperature", min_value=0.0, max_value=1.0, value=0.8, step=0.1,
+                help="Adjust the temperature for response generation"
+            )
+            max_tokens_instruction = st.number_input(
+                "Max tokens (instruction)", min_value=1, value=100,
+                help="Specify the maximum number of tokens for instructions"
+            )
+            max_tokens_response = st.number_input(
+                "Max tokens (response)", min_value=1, value=150,
+                help="Specify the maximum number of tokens for responses"
+            )
+            use_aaa = st.checkbox(
+                "Use AI Align AI (AAA)", value=False,
+                help="Enable or disable the use of AI Align AI"
+            )
 
-            # New configuration options
+            # Model configuration options
             st.subheader("Model Configuration")
-
             # Load tabular models
             tabular_models = st.session_state.gretel.factories.get_navigator_model_list(
                 "tabular"
             )
             navigator_tabular = st.selectbox(
-                "Navigator Tabular", options=tabular_models, index=0
+                "Navigator Tabular", options=tabular_models, index=0,
+                help="Select the tabular model to use for navigation"
             )
 
             # Load natural language models
             nl_models = st.session_state.gretel.factories.get_navigator_model_list(
                 "natural_language"
             )
-            navigator_llm = st.selectbox("Navigator LLM", options=nl_models, index=0)
+            navigator_llm = st.selectbox(
+                "Navigator LLM", options=nl_models, index=0,
+                help="Select the language model to use for navigation"
+            )
 
             # Select co-teach models
             co_teach_llms = st.multiselect(
                 "Co-teaching LLMs",
                 options=nl_models,
                 default=nl_models[1:3] if len(nl_models) >= 3 else [],
+                help="Select co-teaching models to use for navigation"
             )
 
             instruction_format_prompt = st.text_area(
                 "Instruction Format Prompt",
                 value="A well-formulated question or command in everyday English.",
+                help="Specify the format prompt for instructions"
             )
             response_format_prompt = st.text_area(
                 "Response Format Prompt",
                 value="A well-formulated response to the question in everyday English.",
+                help="Specify the format prompt for responses"
             )
 
             # Set a flag indicating that the configuration options have been presented
@@ -170,129 +188,130 @@ def main():
         if st.session_state.get("config_presented", False):
             if st.button("Start Augmentation"):
                 # Create a new screen or area for augmentation results
-                augmentation_screen = st.empty()
+                with col2:
+                    augmentation_screen = st.empty()
 
-                with augmentation_screen.container():
-                    st.subheader("Augmentation Results")
+                    with augmentation_screen.container():
+                        st.subheader("Augmentation Results")
 
-                    # Create a progress bar
-                    progress_bar = st.progress(0)
+                        # Create a progress bar
+                        progress_bar = st.progress(0)
 
-                    # Create tabs for logs and augmented data
-                    tab1, tab2 = st.tabs(["Logs", "Augmented Data"])
-                    logs = ""
-                    log_entries = []
+                        # Create tabs for logs and augmented data
+                        tab1, tab2 = st.tabs(["Logs", "Augmented Data"])
+                        logs = ""
+                        log_entries = []
 
-                    with tab1:
-                        # Placeholder for logging output
-                        log_text_area = st.empty()
-                        log_text_area.text_area("Logs", height=600)
+                        with tab1:
+                            # Placeholder for logging output
+                            log_text_area = st.empty()
+                            log_text_area.text_area("Logs", height=600)
 
-                    with tab2:
-                        # Placeholder for augmented data
-                        augmented_data_placeholder = st.empty()
+                        with tab2:
+                            # Placeholder for augmented data
+                            augmented_data_placeholder = st.empty()
 
-                    # Custom log handler that appends logs to the text area
-                    text_area_id = "logs_text_area"
+                        # Custom log handler that appends logs to the text area
+                        text_area_id = "logs_text_area"
 
-                    scroll_script = f"""
-                    <script>
-                    var textArea = document.getElementById("{text_area_id}");
-                    textArea.scrollTop = textArea.scrollHeight;
-                    </script>
-                    """
-
-                    # Custom log handler that appends logs to the text area
-                    def custom_log_handler(msg):
-                        nonlocal logs
-                        logs += msg + "\n"
-
-                        # Generate a unique ID for each log message
-                        log_id = str(uuid.uuid4())
-
-                        # Define the JavaScript code to scroll the text area to the bottom
                         scroll_script = f"""
                         <script>
-                        var textArea = document.getElementById("{log_id}");
+                        var textArea = document.getElementById("{text_area_id}");
                         textArea.scrollTop = textArea.scrollHeight;
                         </script>
                         """
 
-                        # Update the log text area with the new log message and unique ID
-                        log_text_area.text_area("Logs", value=logs, height=600, key=log_id)
+                        # Custom log handler that appends logs to the text area
+                        def custom_log_handler(msg):
+                            nonlocal logs
+                            logs += msg + "\n"
 
-                        # Include the script to scroll the text area to the bottom
-                        st.markdown(scroll_script, unsafe_allow_html=True)
+                            # Generate a unique ID for each log message
+                            log_id = str(uuid.uuid4())
 
-                    # Create a custom log handler and attach it to the logger
-                    handler = StreamlitLogHandler(custom_log_handler)
-                    logger = logging.getLogger("navigator_helpers")
-                    logger.addHandler(handler)
+                            # Define the JavaScript code to scroll the text area to the bottom
+                            scroll_script = f"""
+                            <script>
+                            var textArea = document.getElementById("{log_id}");
+                            textArea.scrollTop = textArea.scrollHeight;
+                            </script>
+                            """
 
-                    # Data augmentation configuration
-                    config = DataAugmentationConfig(
-                        num_instructions=num_instructions,
-                        num_responses=num_responses,
-                        temperature=temperature,
-                        max_tokens_instruction=max_tokens_instruction,
-                        max_tokens_response=max_tokens_response,
-                        api_key=api_key,
-                        navigator_tabular=navigator_tabular,
-                        navigator_llm=navigator_llm,
-                        co_teach_llms=co_teach_llms,
-                        instruction_format_prompt=instruction_format_prompt,
-                        response_format_prompt=response_format_prompt,
-                    )
+                            # Update the log text area with the new log message and unique ID
+                            log_text_area.text_area("Logs", value=logs, height=600, key=log_id)
 
-                    for field in context_fields:
-                        config.add_field(field, field_type="context")
-                    config.add_field(instruction_field, field_type="instruction")
-                    config.add_field(response_field, field_type="response")
+                            # Include the script to scroll the text area to the bottom
+                            st.markdown(scroll_script, unsafe_allow_html=True)
 
-                    augmented_data = []
+                        # Create a custom log handler and attach it to the logger
+                        handler = StreamlitLogHandler(custom_log_handler)
+                        logger = logging.getLogger("navigator_helpers")
+                        logger.addHandler(handler)
 
-                    # Process data row by row
-                    for index in range(num_records):
-                        # Get a single row from the DataFrame
-                        row = df.iloc[index]
-
-                        # Initialize the data augmenter for the current row
-                        augmenter = DataAugmenter(
-                            pd.DataFrame([row]),
-                            config,
-                            use_aaa=use_aaa,
-                            use_examples=True,
-                            output_file="results.csv",
-                            verbose=True,
+                        # Data augmentation configuration
+                        config = DataAugmentationConfig(
+                            num_instructions=num_instructions,
+                            num_responses=num_responses,
+                            temperature=temperature,
+                            max_tokens_instruction=max_tokens_instruction,
+                            max_tokens_response=max_tokens_response,
+                            api_key=api_key,
+                            navigator_tabular=navigator_tabular,
+                            navigator_llm=navigator_llm,
+                            co_teach_llms=co_teach_llms,
+                            instruction_format_prompt=instruction_format_prompt,
+                            response_format_prompt=response_format_prompt,
                         )
 
-                        # Perform data augmentation for the current row
-                        new_df = augmenter.augment()
+                        for field in context_fields:
+                            config.add_field(field, field_type="context")
+                        config.add_field(instruction_field, field_type="instruction")
+                        config.add_field(response_field, field_type="response")
 
-                        # Append the augmented data to the list
-                        augmented_data.append(new_df)
+                        augmented_data = []
 
-                        # Update the output data table
-                        augmented_data_placeholder.subheader("Augmented Data")
-                        augmented_data_placeholder.dataframe(
-                            pd.concat(augmented_data, ignore_index=True)
-                        )
+                        # Process data row by row
+                        for index in range(num_records):
+                            # Get a single row from the DataFrame
+                            row = df.iloc[index]
 
-                        # Update the progress bar
-                        progress_bar.progress((index + 1) / num_records)
+                            # Initialize the data augmenter for the current row
+                            augmenter = DataAugmenter(
+                                pd.DataFrame([row]),
+                                config,
+                                use_aaa=use_aaa,
+                                use_examples=True,
+                                output_file="results.csv",
+                                verbose=True,
+                            )
 
-                        # Sleep for a short duration to allow the UI to update
-                        import time
+                            # Perform data augmentation for the current row
+                            new_df = augmenter.augment()
 
-                        time.sleep(0.1)
+                            # Append the augmented data to the list
+                            augmented_data.append(new_df)
 
-                        # Clear the log entries for the next iteration
-                        log_entries.clear()
+                            # Update the output data table
+                            augmented_data_placeholder.subheader("Augmented Data")
+                            augmented_data_placeholder.dataframe(
+                                pd.concat(augmented_data, ignore_index=True)
+                            )
 
-                    # Remove the logging handler
-                    logger.removeHandler(handler)
+                            # Update the progress bar
+                            progress_bar.progress((index + 1) / num_records)
 
-                    st.success("Data augmentation completed!")
+                            # Sleep for a short duration to allow the UI to update
+                            import time
+
+                            time.sleep(0.1)
+
+                            # Clear the log entries for the next iteration
+                            log_entries.clear()
+
+                        # Remove the logging handler
+                        logger.removeHandler(handler)
+
+                        st.success("Data augmentation completed!")
 
 
 if __name__ == "__main__":
