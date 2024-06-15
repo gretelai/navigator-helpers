@@ -11,7 +11,7 @@ def main():
 
     logging.basicConfig(
         level=logging.INFO,
-        format="%(levelname)s - %(message)s",
+        format="%(message)s",
     )
 
     # AI Align AI (AAA) configuration
@@ -36,6 +36,9 @@ def main():
 
     # Create the data augmentation configuration
     config = DataAugmentationConfig(
+        input_fields=["context", "instruction", "response"],
+        output_instruction_field="gen_instruction",
+        output_response_field="gen_response",
         num_instructions=5,
         num_responses=5,
         temperature=0.8,
@@ -46,17 +49,13 @@ def main():
         navigator_llm=NAVIGATOR_LLM,
         co_teach_llms=CO_TEACH_LLMS,
         instruction_format_prompt="A well-formulated question or command in everyday English.",
-        response_format_prompt="A well-formulated response to the question in everyday English.",
+        response_format_prompt="A well-formulated response to the question in everyday English."
     )
-    config.add_field("context", field_type="context")
-    config.add_field("instruction", field_type="instruction")
-    config.add_field("response", field_type="response")
 
     # Create the data augmenter and perform augmentation
     augmenter = DataAugmenter(
         df,
         config,
-        use_examples=True,
         use_aaa=USE_AAA,
         output_file="results.csv",
         verbose=True,
