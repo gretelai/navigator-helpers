@@ -1,20 +1,22 @@
-import logging
-import sys
-import time
 from typing import List
 
 import pandas as pd
 from gretel_client import Gretel
 from langchain.prompts import PromptTemplate
 from tqdm.notebook import tqdm
+import logging
+import sys
+import time
 
 logger = logging.getLogger(__name__)
+
 
 def log_message(message):
     """Logs and flushes messages to stdout for Streamlit support"""
     logger.info(message)
     sys.stdout.flush()
-    time.sleep(1)
+    time.sleep(0.1)
+
 
 class StreamlitLogHandler(logging.Handler):
     def __init__(self, widget_update_func):
@@ -25,10 +27,12 @@ class StreamlitLogHandler(logging.Handler):
         msg = self.format(record)
         self.widget_update_func(msg)
 
+
 class DataFieldConfig:
     def __init__(self, name: str, order: int):
         self.name = name
         self.order = order
+
 
 class DataAugmentationConfig:
     def __init__(
@@ -65,6 +69,7 @@ class DataAugmentationConfig:
         self.instruction_format_prompt = instruction_format_prompt
         self.response_format_prompt = response_format_prompt
 
+
 class DataAugmenter:
     def __init__(
         self,
@@ -83,11 +88,13 @@ class DataAugmenter:
         if not self.config.input_fields:
             raise ValueError("At least one input field must be provided.")
 
-        self.navigator_llm, self.navigator_tabular, self.co_teach_llms = initialize_navigator(config)
+        self.navigator_llm, self.navigator_tabular, self.co_teach_llms = (
+            initialize_navigator(config)
+        )
 
         self.instruction_template = PromptTemplate(
             input_variables=["context", "instruction_format_prompt"],
-            template="Generate a new instruction based on the provided Ground Truth Data.\n\n"
+            template="Generate a new instruction that can be answered based on the provided Ground Truth Data.\n\n"
             "Instruction Format: {instruction_format_prompt}\n\n"
             "User Provided Ground Truth Data:```{context}```\n\n"
             "New Instruction:",
@@ -105,73 +112,102 @@ class DataAugmenter:
         self.co_teach_template = PromptTemplate(
             input_variables=["original_text", "format_prompt", "context", "data_type"],
             template="Improve the following {data_type} while closely following the requested format. "
-            "The {data_type} should be based on the provided context.\n\n"
             "Context:\n```\n{context}\n```\n\n"
+            "The {data_type} should be based on the provided context.\n\n"
             "Requested Format (non-negotiable): {format_prompt}\n\n"
-            "Original {data_type}:\n{original_text}\n\n"
-            "Improved {data_type} (must conform to the requested format and be based on the context):",
+            "{data_type} to be improved:\n{original_text}\n\n"
+            "Improved {data_type}:",
         )
 
         self.suggestions_template = PromptTemplate(
-            input_variables=["original_text", "co_teaching_text", "format_prompt", "context", "data_type"],
-            template="Provide suggestions to improve the following {data_type} while closely adhering to the requested format. "
-            "The generated text will be rejected if it does not strictly follow the format requirements.\n\n"
+            input_variables=[
+                "original_text",
+                "co_teaching_text",
+                "format_prompt",
+                "context",
+                "data_type",
+            ],
+            template="Provide suggestions to improve the following {data_type} while strictly adhering to the requested format. "
+            "Ensure the suggestions are relevant to the user provided ground truth and do not deviate from the original {data_type}.\n\n"
+            "User Provided Ground Truth:\n```\n{context}\n```\n\n"
             "Requested Format (mandatory): {format_prompt}\n\n"
-            "Context:\n```\n{context}\n```\n\n"
             "Original {data_type}:\n{original_text}\n\n"
             "Improved {data_type}:\n{co_teaching_text}\n\n"
-            "Improvement suggestions (focusing on format adherence):",
+            "Suggestions for further improvement:",
         )
 
+
         self.self_teaching_template = PromptTemplate(
-            input_variables=["co_teaching_text", "suggestions", "format_prompt", "context", "original_text", "data_type"],
-            template="Apply the following suggestions to improve the {data_type} while strictly adhering to the requested format and maintaining relevance to the original instruction and provided context. "
-            "The improved text must align perfectly with the format requirements and accurately answer the original instruction based on the context.\n\n"
-            "Context:\n```\n{context}\n```\n\n"
-            "Original Instruction: {original_text}\n\n"
+            input_variables=[
+                "co_teaching_text",
+                "suggestions",
+                "format_prompt",
+                "context",
+                "original_text",
+                "data_type",
+            ],
+            template="Apply the following suggestions to improve the {data_type} while strictly adhering to the requested format. "
+            "Ensure that the improved {data_type} remains relevant to the user provided ground truth and does not introduce new information.\n\n"
+            "User Provided Ground Truth:\n{context}\n\n"
+            "Original {data_type}:\n{original_text}\n\n"
             "Requested Format (non-negotiable): {format_prompt}\n\n"
-            "{data_type.capitalize}: {co_teaching_text}\n\n"
-            "Suggestions: {suggestions}\n\n"
-            "Improved {data_type.capitalize} (must conform precisely to the format, stay relevant to the original instruction, and accurately answer based on the context):",
+            "Suggestions:\n{suggestions}\n\n"
+            "Generate an improved {data_type} based on the provided suggestions:",
         )
+
 
         self.eval_template = PromptTemplate(
             input_variables=[],
-            template="""
-Add the following columns to the provided table:
-* instruction_score: A score from 0-100 indicating adherence to the user requested format.
-* conformance_score: A score from 0-100 indicating the conformance of the generated text to the requested format, tags, and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
-* quality_score: A score from 0-100 based on the grammatical correctness, coherence, and relevance of the generated text, with 100 being the highest quality and 0 being the lowest quality.
-* toxicity_score: A score from 0-100 indicating the level of toxic content in the generated text, with 0 being non-toxic and 100 being highly toxic.
-* bias_score: A score from 0-100 indicating the level of unintended biases in the generated text, with 0 being unbiased and 100 being heavily biased.
-* groundedness_score: A score from 0-100 indicating the level of factual correctness in the generated text, with 100 being fully grounded in facts and 0 being completely ungrounded.
-""",
+            template="Add the following columns to the provided table with scores ranging from 0 to 100:\n\n"
+            "* instruction_score: Adherence to the user-requested format, evaluating how well the instruction meets the specified format criteria.\n"
+            "* conformance_score: Conformance to the requested format, tags, and descriptions, assessing the degree to which the generated text aligns with these elements.\n"
+            "* quality_score: Grammatical correctness, coherence, and relevance, reflecting the overall quality of the text.\n"
+            "* toxicity_score: Level of toxic content, measuring the presence of harmful or offensive language.\n"
+            "* bias_score: Level of unintended biases, indicating any bias present in the generated text.\n"
+            "* groundedness_score: Level of factual correctness, assessing how well the text is supported by facts and accurate information.\n",
         )
 
     def augment(self) -> pd.DataFrame:
         new_rows = []
         index = 1
 
-        for _, row in tqdm(self.df.iterrows(), total=self.df.shape[0], desc="Augmenting Data", leave=True):
+        for _, row in tqdm(
+            self.df.iterrows(),
+            total=self.df.shape[0],
+            desc="Augmenting Data",
+            leave=True,
+        ):
             context = self.construct_context(row, self.config.input_fields)
 
             if self.verbose:
-                log_message("🆕 Starting the process of generating a new augmented record.")
+                log_message(
+                    "🆕 Starting the process of generating a new augmented record."
+                )
                 log_message("=" * 50)
-                log_message(f"🔍 Generating diverse instructions based on the inputs at index {index}.")
+                log_message(
+                    f"🔍 Generating diverse instructions based on the inputs at index {index}."
+                )
 
-            new_instructions, instruction_scores = self.generate_diverse_instructions(context)
+            new_instructions, instruction_scores = self.generate_diverse_instructions(
+                context
+            )
 
             top_instruction_idx = instruction_scores["average_score"].idxmax()
             top_instruction = new_instructions[top_instruction_idx]
-            top_instruction_score = instruction_scores.loc[top_instruction_idx, "average_score"]
+            top_instruction_score = instruction_scores.loc[
+                top_instruction_idx, "average_score"
+            ]
 
             if self.verbose:
-                log_message(f"Selected highest ranking instruction. Index: {top_instruction_idx}. Score: {top_instruction_score}")
+                log_message(
+                    f"Selected highest ranking instruction. Index: {top_instruction_idx}. Score: {top_instruction_score}"
+                )
 
             if self.use_aaa:
                 if self.verbose:
-                    log_message("🤖 Applying AI Align AI (AAA) to improve the quality and coherence of the instruction.")
+                    log_message(
+                        "🤖 Applying AI Align AI (AAA) to improve the quality and coherence of the instruction."
+                    )
                 improved_instruction = self.apply_aaa(
                     texts=[top_instruction],
                     scores=instruction_scores.loc[[top_instruction_idx]],
@@ -184,13 +220,22 @@ Add the following columns to the provided table:
                     "score": improved_instruction["average_score"].iloc[0],
                 }
             else:
-                best_instruction = {"instruction": top_instruction, "score": top_instruction_score}
+                best_instruction = {
+                    "instruction": top_instruction,
+                    "score": top_instruction_score,
+                }
 
             if self.verbose:
-                log_message(f"🌟 Selected instruction:\n  - {best_instruction['instruction']} (Score: {best_instruction['score']})")
-                log_message("📝 Generating diverse responses to the top synthetic instruction.")
+                log_message(
+                    f"🌟 Selected instruction:\n  - {best_instruction['instruction']} (Score: {best_instruction['score']})"
+                )
+                log_message(
+                    "📝 Generating diverse responses to the top synthetic instruction."
+                )
 
-            new_responses, response_scores = self.generate_diverse_responses(context, best_instruction["instruction"])
+            new_responses, response_scores = self.generate_diverse_responses(
+                context, best_instruction["instruction"]
+            )
 
             top_response_idx = response_scores["average_score"].idxmax()
             top_response = new_responses[top_response_idx]
@@ -198,7 +243,9 @@ Add the following columns to the provided table:
 
             if self.use_aaa:
                 if self.verbose:
-                    log_message("🤖 Applying AI Align AI (AAA) to iteratively improve the quality and coherence of the response.")
+                    log_message(
+                        "🤖 Applying AI Align AI (AAA) to iteratively improve the quality and coherence of the response."
+                    )
                 improved_response = self.apply_aaa(
                     [top_response],
                     response_scores.loc[[top_response_idx]],
@@ -206,21 +253,32 @@ Add the following columns to the provided table:
                     self.config.response_format_prompt,
                     data_type="response",
                 )
-                best_response = {"response": improved_response["text"].iloc[0], "score": top_response_score}
+                best_response = {
+                    "response": improved_response["text"].iloc[0],
+                    "score": top_response_score,
+                }
             else:
                 best_response = {"response": top_response, "score": top_response_score}
 
             if self.verbose:
-                log_message(f"🌟 Selected response:\n  - {best_response['response']} (Score: {best_response['score']})")
+                log_message(
+                    f"🌟 Selected response:\n  - {best_response['response']} (Score: {best_response['score']})"
+                )
 
             selected_fields = [field.name for field in self.config.input_fields]
             new_row = {field: row[field] for field in selected_fields if field in row}
 
-            new_row[self.config.output_instruction_field] = best_instruction["instruction"]
-            new_row[f"{self.config.output_instruction_field}_score"] = best_instruction["score"]
+            new_row[self.config.output_instruction_field] = best_instruction[
+                "instruction"
+            ]
+            new_row[f"{self.config.output_instruction_field}_score"] = best_instruction[
+                "score"
+            ]
 
             new_row[self.config.output_response_field] = best_response["response"]
-            new_row[f"{self.config.output_response_field}_score"] = best_response["score"]
+            new_row[f"{self.config.output_response_field}_score"] = best_response[
+                "score"
+            ]
 
             new_rows.append(new_row)
 
@@ -238,6 +296,12 @@ Add the following columns to the provided table:
         new_df = pd.DataFrame(new_rows)
         return new_df
 
+    def construct_context(self, row, fields: List[DataFieldConfig]) -> str:
+        context = ""
+        for field in fields:
+            context += f"{field.name}: {row[field.name]} "
+        return context.strip()
+
     def apply_aaa(self, texts, scores, context, format_prompt, data_type):
         improved_texts = []
 
@@ -251,19 +315,25 @@ Add the following columns to the provided table:
                 co_teaching_prompt = self.co_teach_template.format(
                     original_text=co_teaching_text,
                     format_prompt=format_prompt,
-                    context=context,
-                    data_type=data_type
+                    context=None,  # context, # Sometimes the presence of context throws off the LLM
+                    data_type=data_type.capitalize(),
                 )
                 co_teaching_text = llm.generate(prompt=co_teaching_prompt)
                 if self.verbose:
-                    log_message(f"Co-Teaching step {i} result:\n  - '{co_teaching_text}'")
+                    log_message(
+                        f"Co-Teaching step {i} result:\n  - '{co_teaching_text}'"
+                    )
 
             if self.verbose:
-                log_message(f"Co-Teaching complete. Final result:\n  - '{co_teaching_text}'")
+                log_message(
+                    f"Co-Teaching complete. Final result:\n  - '{co_teaching_text}'"
+                )
 
             # Self-Teaching
             if self.verbose:
-                log_message(f"💡 Initializing Self-Teaching for Co-Teaching result:\n  - '{co_teaching_text}'")
+                log_message(
+                    f"💡 Initializing Self-Teaching for Co-Teaching result:\n  - '{co_teaching_text}'"
+                )
 
             suggestions_prompt = self.suggestions_template.format(
                 original_text=text,
@@ -285,17 +355,29 @@ Add the following columns to the provided table:
                 original_text=text,
                 data_type=data_type,
             )
-            self_teaching_text = self.navigator_llm.generate(prompt=self_teaching_prompt)
+            self_teaching_text = self.navigator_llm.generate(
+                prompt=self_teaching_prompt
+            )
 
             if self.verbose:
-                log_message(f"Self-Teaching complete. Final result:\n  - '{self_teaching_text}'")
+                log_message(
+                    f"Self-Teaching complete. Final result:\n  - '{self_teaching_text}'"
+                )
+
+            # Ensure the self-teaching result is valid
+            if data_type == "instruction" and "Response:" in self_teaching_text:
+                self_teaching_text = text  # Revert to original if invalid
 
             improved_texts.append(self_teaching_text)
 
         # Re-evaluate the improved texts using the Navigator
         if self.verbose:
-            log_message(f"Re-evaluating improved {data_type} texts using Navigator for Ranking")
-        improved_scores = self.evaluate_texts(improved_texts, "text", "context", context, format_prompt)
+            log_message(
+                f"Re-evaluating improved {data_type} texts using Navigator for Ranking"
+            )
+        improved_scores = self.evaluate_texts(
+            improved_texts, "text", "context", context, format_prompt
+        )
 
         improved_df = pd.DataFrame(
             {
@@ -310,12 +392,6 @@ Add the following columns to the provided table:
             }
         )
         return improved_df
-
-    def construct_context(self, row, fields: List[DataFieldConfig]) -> str:
-        context = ""
-        for field in fields:
-            context += f"{field.name}: {row[field.name]} "
-        return context.strip()
 
     def generate_diverse_instructions(self, context):
         instructions = []
@@ -340,7 +416,9 @@ Add the following columns to the provided table:
         )
 
         if self.verbose:
-            for instruction, score in zip(instructions, instruction_scores["average_score"]):
+            for instruction, score in zip(
+                instructions, instruction_scores["average_score"]
+            ):
                 log_message(f'   - "{instruction}" (Score: {score:.1f})')
 
         return instructions, instruction_scores
@@ -363,8 +441,8 @@ Add the following columns to the provided table:
         response_scores = self.evaluate_texts(
             responses,
             "response",
-            "instruction",
-            instruction,
+            "context",
+            context,
             self.config.response_format_prompt,
         )
 
@@ -444,45 +522,12 @@ Add the following columns to the provided table:
         elif step_type == "Suggestions":
             log_message(f"{teaching_type} Suggestion:\n  - {text}")
 
-    def co_teach(self, text):
-        improved_text = text
-        for llm in self.co_teach_llms:
-            co_teaching_prompt = self.co_teach_template.format(
-                original_text=improved_text,
-                format_prompt=self.config.instruction_format_prompt,
-                context="",  # Add your context if needed
-                data_type="instruction",  # or "response"
-            )
-            improved_text = llm.generate(prompt=co_teaching_prompt)
-
-        return improved_text
-
-    def self_teach(self, text):
-        suggestions_prompt = self.suggestions_template.format(
-            original_text=text,
-            co_teaching_text=text,
-            format_prompt=self.config.instruction_format_prompt,
-            context="",  # Add your context if needed
-            data_type="instruction",  # or "response"
-        )
-        suggestions = self.navigator_llm.generate(prompt=suggestions_prompt)
-
-        self_teaching_prompt = self.self_teaching_template.format(
-            co_teaching_text=text,
-            suggestions=suggestions,
-            format_prompt=self.config.instruction_format_prompt,
-            context="",  # Add your context if needed
-            original_text=text,
-            data_type="instruction",  # or "response"
-        )
-        improved_text = self.navigator_llm.generate(prompt=self_teaching_prompt)
-
-        return improved_text
-
     def select_best_instruction(self, context, instructions, scores):
         best_idx = scores["average_score"].idxmax()
         best_score = scores.loc[best_idx, "average_score"]
-        log_message(f"Selected optimal instruction at index {best_idx}. Score: {best_score}")
+        log_message(
+            f"Selected optimal instruction at index {best_idx}. Score: {best_score}"
+        )
 
         return {"instruction": instructions[best_idx], "score": best_score}
 
@@ -490,8 +535,11 @@ Add the following columns to the provided table:
         best_idx = scores["average_score"].idxmax()
         best_score = scores.loc[best_idx, "average_score"]
 
-        log_message(f"Selected optimal response at index {best_idx}. Score: {best_score}")
+        log_message(
+            f"Selected optimal response at index {best_idx}. Score: {best_score}"
+        )
         return {"response": responses[best_idx], "score": best_score}
+
 
 def initialize_navigator(config):
     gretel = Gretel(api_key=config.api_key, validate=True, cache="yes")
