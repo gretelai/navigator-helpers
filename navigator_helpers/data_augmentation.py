@@ -1,12 +1,13 @@
+import logging
+import sys
+import time
+from dataclasses import asdict, dataclass
 from typing import List
 
 import pandas as pd
 from gretel_client import Gretel
 from langchain.prompts import PromptTemplate
 from tqdm.notebook import tqdm
-import logging
-import sys
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,14 @@ class StreamlitLogHandler(logging.Handler):
         self.widget_update_func(msg)
 
 
+@dataclass
 class DataFieldConfig:
     def __init__(self, name: str, order: int):
         self.name = name
         self.order = order
 
 
+@dataclass
 class DataAugmentationConfig:
     def __init__(
         self,
@@ -69,6 +72,13 @@ class DataAugmentationConfig:
         self.instruction_format_prompt = instruction_format_prompt
         self.response_format_prompt = response_format_prompt
 
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, config_dict):
+        return cls(**config_dict)
+
 
 class DataAugmenter:
     def __init__(
@@ -88,9 +98,11 @@ class DataAugmenter:
         if not self.config.input_fields:
             raise ValueError("At least one input field must be provided.")
 
-        self.navigator_llm, self.navigator_tabular, self.co_teach_llms = (
-            initialize_navigator(config)
-        )
+        (
+            self.navigator_llm,
+            self.navigator_tabular,
+            self.co_teach_llms,
+        ) = initialize_navigator(config)
 
         self.instruction_template = PromptTemplate(
             input_variables=["context", "instruction_format_prompt"],
@@ -136,7 +148,6 @@ class DataAugmenter:
             "Suggestions for further improvement:",
         )
 
-
         self.self_teaching_template = PromptTemplate(
             input_variables=[
                 "co_teaching_text",
@@ -154,7 +165,6 @@ class DataAugmenter:
             "Suggestions:\n{suggestions}\n\n"
             "Generate an improved {data_type} based on the provided suggestions:",
         )
-
 
         self.eval_template = PromptTemplate(
             input_variables=[],
@@ -200,7 +210,7 @@ class DataAugmenter:
 
             if self.verbose:
                 log_message(
-                    f"Selected highest ranking instruction. Index: {top_instruction_idx}. Score: {top_instruction_score}"
+                    f"    Selected highest ranking instruction. Index: {top_instruction_idx}. Score: {top_instruction_score}"
                 )
 
             if self.use_aaa:
@@ -227,7 +237,7 @@ class DataAugmenter:
 
             if self.verbose:
                 log_message(
-                    f"🌟 Selected instruction:\n  - {best_instruction['instruction']} (Score: {best_instruction['score']})"
+                    f"🌟 Selected instruction:\n    - {best_instruction['instruction']} (Score: {best_instruction['score']})"
                 )
                 log_message(
                     "📝 Generating diverse responses to the top synthetic instruction."
@@ -288,8 +298,8 @@ class DataAugmenter:
 
             log_message(
                 f"✅ Completed synthetic record\n"
-                f'  - {self.config.output_instruction_field}:{best_instruction["instruction"]}\n'
-                f'  - {self.config.output_response_field}:{best_response["response"]}'
+                f'    - {self.config.output_instruction_field}:{best_instruction["instruction"]}\n'
+                f'    - {self.config.output_response_field}:{best_response["response"]}'
             )
             index += 1
 
@@ -321,18 +331,18 @@ class DataAugmenter:
                 co_teaching_text = llm.generate(prompt=co_teaching_prompt)
                 if self.verbose:
                     log_message(
-                        f"Co-Teaching step {i} result:\n  - '{co_teaching_text}'"
+                        f"    Co-Teaching step {i} result:\n        - '{co_teaching_text}'"
                     )
 
             if self.verbose:
                 log_message(
-                    f"Co-Teaching complete. Final result:\n  - '{co_teaching_text}'"
+                    f"    Co-Teaching complete. Final result:\n        - '{co_teaching_text}'"
                 )
 
             # Self-Teaching
             if self.verbose:
                 log_message(
-                    f"💡 Initializing Self-Teaching for Co-Teaching result:\n  - '{co_teaching_text}'"
+                    f"💡 Initializing Self-Teaching for Co-Teaching result:\n    - '{co_teaching_text}'"
                 )
 
             suggestions_prompt = self.suggestions_template.format(
@@ -345,7 +355,9 @@ class DataAugmenter:
             suggestions = self.navigator_llm.generate(prompt=suggestions_prompt)
 
             if self.verbose:
-                log_message(f"Self-Teaching suggestions: '{suggestions}'")
+                log_message(
+                    f"    Self-Teaching suggestions:\n        - '{suggestions}'"
+                )
 
             self_teaching_prompt = self.self_teaching_template.format(
                 co_teaching_text=co_teaching_text,
@@ -361,7 +373,7 @@ class DataAugmenter:
 
             if self.verbose:
                 log_message(
-                    f"Self-Teaching complete. Final result:\n  - '{self_teaching_text}'"
+                    f"    Self-Teaching complete. Final result:\n        - '{self_teaching_text}'"
                 )
 
             # Ensure the self-teaching result is valid
@@ -373,7 +385,7 @@ class DataAugmenter:
         # Re-evaluate the improved texts using the Navigator
         if self.verbose:
             log_message(
-                f"Re-evaluating improved {data_type} texts using Navigator for Ranking"
+                f"    Re-evaluating improved {data_type} texts using Navigator for Ranking"
             )
         improved_scores = self.evaluate_texts(
             improved_texts, "text", "context", context, format_prompt
