@@ -1,15 +1,16 @@
 import json
 import logging
-import requests
 import time
 from io import StringIO
 
 import pandas as pd
+import requests
 import streamlit as st
 from datasets import load_dataset
 from gretel_client import Gretel
 
-from navigator_helpers import DataAugmentationConfig, DataAugmenter, StreamlitLogHandler
+from navigator_helpers import (DataAugmentationConfig, DataAugmenter,
+                               StreamlitLogHandler)
 
 # Create a StringIO buffer to capture the logging output
 log_buffer = StringIO()
@@ -184,18 +185,14 @@ def main():
 
             output_instruction_field = st.text_input(
                 "Synthetic instruction field",
-                value=st.session_state.get(
-                    "output_instruction_field", "instruction"
-                ),
+                value=st.session_state.get("output_instruction_field", "instruction"),
                 help="Specify the name of the output field for generated instructions",
             )
             st.session_state.output_instruction_field = output_instruction_field
 
             output_response_field = st.text_input(
                 "Synthetic response field",
-                value=st.session_state.get(
-                    "output_response_field", "response"
-                ),
+                value=st.session_state.get("output_response_field", "response"),
                 help="Specify the name of the output field for generated responses",
             )
             st.session_state.output_response_field = output_response_field
@@ -371,7 +368,6 @@ def main():
                 mime="text/plain",
             )
 
-
         start_stop_container = st.empty()
 
         col1, col2 = st.columns(2)
@@ -394,6 +390,7 @@ def main():
                     log_container = st.empty()
                     logs = []
                     max_log_lines = 50
+
                 def custom_log_handler(msg):
                     nonlocal logs
                     logs.append(msg)
@@ -401,6 +398,7 @@ def main():
                         logs = logs[-max_log_lines:]
                     log_text = "\n".join(logs)
                     log_container.text(log_text)
+
                 handler = StreamlitLogHandler(custom_log_handler)
                 logger = logging.getLogger("navigator_helpers")
                 logger.addHandler(handler)
@@ -440,16 +438,20 @@ def main():
                         )
                         progress = (index + 1) / num_records
                         progress_bar.progress(progress)
-                        
+
                         elapsed_time = time.time() - start_time
                         records_processed = index + 1
                         records_remaining = num_records - records_processed
-                        est_time_per_record = elapsed_time / records_processed if records_processed > 0 else 0
+                        est_time_per_record = (
+                            elapsed_time / records_processed
+                            if records_processed > 0
+                            else 0
+                        )
                         est_time_remaining = est_time_per_record * records_remaining
-                        
+
                         progress_text = f"Progress: {progress:.2%} | Records Processed: {records_processed} | Records Remaining: {records_remaining} | Est. Time per Record: {est_time_per_record:.2f}s | Est. Time Remaining: {est_time_remaining:.2f}s"
                         progress_bar.text(progress_text)
-                        
+
                         time.sleep(0.1)
                 logger.removeHandler(handler)
                 st.success("Data augmentation completed!")

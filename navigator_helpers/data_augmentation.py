@@ -556,7 +556,9 @@ class DataAugmenter:
 
 
 def initialize_navigator(config):
-    gretel = Gretel(api_key=config.api_key, endpoint=config.endpoint, validate=True, cache="yes")
+    gretel = Gretel(
+        api_key=config.api_key, endpoint=config.endpoint, validate=True, cache="yes"
+    )
 
     navigator_llm = gretel.factories.initialize_navigator_api(
         "natural_language", backend_model=config.navigator_llm
