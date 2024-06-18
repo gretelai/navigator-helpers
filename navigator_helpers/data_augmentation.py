@@ -49,6 +49,7 @@ class DataAugmentationConfig:
         max_tokens_instruction=100,
         max_tokens_response=150,
         api_key="",
+        endpoint="https://api.gretel.ai",
         navigator_llm="gretelai/gpt-auto",
         navigator_tabular="gretelai/auto",
         co_teach_llms=None,
@@ -66,6 +67,7 @@ class DataAugmentationConfig:
         self.max_tokens_instruction = max_tokens_instruction
         self.max_tokens_response = max_tokens_response
         self.api_key = api_key
+        self.endpoint = endpoint
         self.navigator_llm = navigator_llm
         self.navigator_tabular = navigator_tabular
         self.co_teach_llms = co_teach_llms or []
@@ -554,7 +556,7 @@ class DataAugmenter:
 
 
 def initialize_navigator(config):
-    gretel = Gretel(api_key=config.api_key, validate=True, cache="yes")
+    gretel = Gretel(api_key=config.api_key, endpoint=config.endpoint, validate=True, cache="yes")
 
     navigator_llm = gretel.factories.initialize_navigator_api(
         "natural_language", backend_model=config.navigator_llm
