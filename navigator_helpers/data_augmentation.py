@@ -7,7 +7,7 @@ from typing import List
 import pandas as pd
 from gretel_client import Gretel
 from langchain.prompts import PromptTemplate
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
