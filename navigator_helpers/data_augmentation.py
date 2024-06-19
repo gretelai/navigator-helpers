@@ -158,7 +158,7 @@ class DataAugmenter:
                 "Requested Format: {format_prompt}\n\n"
                 "Original {data_type}:\n{original_text}\n\n"
                 "Current Improved {data_type}:\n{co_teaching_text}\n\n"
-                "Suggestions for further improvement:"
+                "A list of suggestions on how to improve the synthetic {data_type}:"
             ),
         )
 
@@ -181,7 +181,7 @@ class DataAugmenter:
                 "Improved {data_type} from Co-Teaching:\n{co_teaching_text}\n\n"
                 "Requested Format: {format_prompt}\n\n"
                 "Suggestions for improvement:\n{suggestions}\n\n"
-                "Generate the improved {data_type} based on the context and suggestions:"
+                "Generate the final improved {data_type}:"
             ),
         )
 
