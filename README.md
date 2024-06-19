@@ -1,6 +1,6 @@
 # Navigator Helpers 🚀
 
-Navigator Helpers is a Python library for augmenting training data via synthetic data generation for large language models (LLMs) via Gretel Navigator. It leverages techniques such as diverse instruction and response generation, and an AI alignment process as described in the WizardLM-2 paper, to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
+Gretel Navigator is a compound AI-based system for generating high quality synthetic data generation that can be used for training AI and LLMs. Navigator leverages techniques such as diverse instruction and response generation, and an AI alignment process to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
 
 ## Installation
 
