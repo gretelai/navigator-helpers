@@ -118,7 +118,7 @@ class DataAugmenter:
             input_variables=["context", "instruction", "response_format_prompt"],
             template="Generate a new response to the given Instruction based on the provided Ground Truth Data.\n\n"
             "Response Format: {response_format_prompt}\n\n"
-            "User Provided Ground Truth Data:\n{context}\n\n"
+            "User Provided Ground Truth Data:```{context}```\n\n"
             "Instruction:\n{instruction}\n\n"
             "New Response:",
         )
@@ -129,14 +129,13 @@ class DataAugmenter:
                 "format_prompt",
                 "context",
                 "data_type",
-                "instruction",
+                "instruction_text",
             ],
             template=(
                 "Improve the following {data_type} while closely following the requested format.\n\n"
-                "User Provided Ground Truth:\n```\n{context}\n```\n\n"
-                "The {data_type} should be based on the provided context.\n\n"
-                "Requested Format (non-negotiable): {format_prompt}\n\n"
+                "Context:\n{context}\n\n"
                 "{instruction_text}"
+                "Requested Format: {format_prompt}\n\n"
                 "{data_type} to be improved:\n{original_text}\n\n"
                 "Improved {data_type}:"
             ),
@@ -152,13 +151,13 @@ class DataAugmenter:
                 "instruction_text",
             ],
             template=(
-                "Provide suggestions to improve the following {data_type} while strictly adhering to the requested format. "
-                "Ensure the suggestions are relevant to the user provided ground truth and do not deviate from the original {data_type}.\n\n"
-                "User Provided Ground Truth:\n```\n{context}\n```\n\n"
+                "Provide suggestions to further improve the {data_type} while strictly adhering to the requested format. "
+                "Ensure the suggestions are relevant to the provided context and align with the original {data_type}.\n\n"
+                "Context:\n{context}\n\n"
                 "{instruction_text}"
-                "Requested Format (mandatory): {format_prompt}\n\n"
+                "Requested Format: {format_prompt}\n\n"
                 "Original {data_type}:\n{original_text}\n\n"
-                "Improved {data_type}:\n{co_teaching_text}\n\n"
+                "Current Improved {data_type}:\n{co_teaching_text}\n\n"
                 "Suggestions for further improvement:"
             ),
         )
@@ -174,17 +173,18 @@ class DataAugmenter:
                 "instruction_text",
             ],
             template=(
-                "Apply the following suggestions to improve the {data_type} while strictly adhering to the requested format and staying on topic. "
-                "Ensure that the improved {data_type} remains relevant to the original instruction or response and does not introduce irrelevant information.\n\n"
+                "Improve the {data_type} by incorporating the following suggestions while strictly adhering to the requested format and staying on topic. "
+                "Ensure that the improved {data_type} remains relevant to the provided context and does not introduce irrelevant information.\n\n"
+                "Context:\n{context}\n\n"
+                "{instruction_text}"
                 "Original {data_type}:\n{original_text}\n\n"
                 "Improved {data_type} from Co-Teaching:\n{co_teaching_text}\n\n"
-                "User Provided Ground Truth:\n{context}\n\n"
-                "{instruction_text}"
-                "Requested Format (non-negotiable): {format_prompt}\n\n"
-                "Suggestions:\n{suggestions}\n\n"
-                "Generate an improved {data_type} based on the provided suggestions and Ground Truth Data while staying on topic of the original and improved {data_type}s:"
+                "Requested Format: {format_prompt}\n\n"
+                "Suggestions for improvement:\n{suggestions}\n\n"
+                "Generate the improved {data_type} based on the context and suggestions:"
             ),
         )
+
 
     def format_instruction_text(self, data_type, instruction):
         if data_type == "response":
