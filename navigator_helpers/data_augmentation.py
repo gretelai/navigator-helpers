@@ -124,13 +124,22 @@ class DataAugmenter:
         )
 
         self.co_teach_template = PromptTemplate(
-            input_variables=["original_text", "format_prompt", "context", "data_type"],
-            template="Improve the following {data_type} while closely following the requested format. "
-            "Context:\n```\n{context}\n```\n\n"
-            "The {data_type} should be based on the provided context.\n\n"
-            "Requested Format (non-negotiable): {format_prompt}\n\n"
-            "{data_type} to be improved:\n{original_text}\n\n"
-            "Improved {data_type}:",
+            input_variables=[
+                "original_text",
+                "format_prompt",
+                "context",
+                "data_type",
+                "instruction",
+            ],
+            template=(
+                "Improve the following {data_type} while closely following the requested format.\n\n"
+                "User Provided Ground Truth:\n```\n{context}\n```\n\n"
+                "The {data_type} should be based on the provided context.\n\n"
+                "Requested Format (non-negotiable): {format_prompt}\n\n"
+                "{instruction_text}"
+                "{data_type} to be improved:\n{original_text}\n\n"
+                "Improved {data_type}:"
+            ),
         )
 
         self.suggestions_template = PromptTemplate(
@@ -140,14 +149,18 @@ class DataAugmenter:
                 "format_prompt",
                 "context",
                 "data_type",
+                "instruction_text",
             ],
-            template="Provide suggestions to improve the following {data_type} while strictly adhering to the requested format. "
-            "Ensure the suggestions are relevant to the user provided ground truth and do not deviate from the original {data_type}.\n\n"
-            "User Provided Ground Truth:\n```\n{context}\n```\n\n"
-            "Requested Format (mandatory): {format_prompt}\n\n"
-            "Original {data_type}:\n{original_text}\n\n"
-            "Improved {data_type}:\n{co_teaching_text}\n\n"
-            "Suggestions for further improvement:",
+            template=(
+                "Provide suggestions to improve the following {data_type} while strictly adhering to the requested format. "
+                "Ensure the suggestions are relevant to the user provided ground truth and do not deviate from the original {data_type}.\n\n"
+                "User Provided Ground Truth:\n```\n{context}\n```\n\n"
+                "{instruction_text}"
+                "Requested Format (mandatory): {format_prompt}\n\n"
+                "Original {data_type}:\n{original_text}\n\n"
+                "Improved {data_type}:\n{co_teaching_text}\n\n"
+                "Suggestions for further improvement:"
+            ),
         )
 
         self.self_teaching_template = PromptTemplate(
@@ -158,15 +171,28 @@ class DataAugmenter:
                 "context",
                 "original_text",
                 "data_type",
+                "instruction_text",
             ],
-            template="Apply the following suggestions to improve the {data_type} while strictly adhering to the requested format. "
-            "Ensure that the improved {data_type} remains relevant to the user provided ground truth and does not introduce new information.\n\n"
-            "User Provided Ground Truth:\n{context}\n\n"
-            "Original {data_type}:\n{original_text}\n\n"
-            "Requested Format (non-negotiable): {format_prompt}\n\n"
-            "Suggestions:\n{suggestions}\n\n"
-            "Generate an improved {data_type} based on the provided suggestions:",
+            template=(
+                "Apply the following suggestions to improve the {data_type} while strictly adhering to the requested format and staying on topic. "
+                "Ensure that the improved {data_type} remains relevant to the original instruction or response and does not introduce irrelevant information.\n\n"
+                "Original {data_type}:\n{original_text}\n\n"
+                "Improved {data_type} from Co-Teaching:\n{co_teaching_text}\n\n"
+                "User Provided Ground Truth:\n{context}\n\n"
+                "{instruction_text}"
+                "Requested Format (non-negotiable): {format_prompt}\n\n"
+                "Suggestions:\n{suggestions}\n\n"
+                "Generate an improved {data_type} based on the provided suggestions and Ground Truth Data while staying on topic of the original and improved {data_type}s:"
+            ),
         )
+
+    def format_instruction_text(self, data_type, instruction):
+        if data_type == "response":
+            return (
+                f"Instruction: {instruction}\n\n"
+                "The response should address the provided instruction.\n\n"
+            )
+        return ""
 
     def augment(self) -> pd.DataFrame:
         new_rows = []
@@ -215,6 +241,7 @@ class DataAugmenter:
                     context=context,
                     format_prompt=self.config.instruction_format_prompt,
                     data_type="instruction",
+                    instruction=None,
                 )
                 best_instruction = {
                     "instruction": improved_instruction["text"].iloc[0],
@@ -253,6 +280,7 @@ class DataAugmenter:
                     context,
                     self.config.response_format_prompt,
                     data_type="response",
+                    instruction=best_instruction["instruction"],
                 )
                 best_response = {
                     "response": improved_response["text"].iloc[0],
@@ -303,7 +331,7 @@ class DataAugmenter:
             context += f"{field.name}: {row[field.name]} "
         return context.strip()
 
-    def apply_aaa(self, texts, scores, context, format_prompt, data_type):
+    def apply_aaa(self, texts, scores, context, format_prompt, data_type, instruction):
         improved_texts = []
 
         # Co-Teaching
@@ -316,8 +344,11 @@ class DataAugmenter:
                 co_teaching_prompt = self.co_teach_template.format(
                     original_text=co_teaching_text,
                     format_prompt=format_prompt,
-                    context=None,  # context, # Sometimes the presence of context throws off the LLM
+                    context=context,
                     data_type=data_type.capitalize(),
+                    instruction_text=self.format_instruction_text(
+                        data_type, instruction
+                    ),
                 )
                 co_teaching_text = llm.generate(prompt=co_teaching_prompt)
                 if self.verbose:
@@ -342,6 +373,7 @@ class DataAugmenter:
                 format_prompt=format_prompt,
                 context=context,
                 data_type=data_type,
+                instruction_text=self.format_instruction_text(data_type, instruction),
             )
             suggestions = self.navigator_llm.generate(prompt=suggestions_prompt)
 
@@ -357,7 +389,9 @@ class DataAugmenter:
                 context=context,
                 original_text=text,
                 data_type=data_type,
+                instruction_text=self.format_instruction_text(data_type, instruction),
             )
+
             self_teaching_text = self.navigator_llm.generate(
                 prompt=self_teaching_prompt
             )
