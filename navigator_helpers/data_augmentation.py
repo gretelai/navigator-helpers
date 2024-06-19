@@ -168,17 +168,6 @@ class DataAugmenter:
             "Generate an improved {data_type} based on the provided suggestions:",
         )
 
-        self.eval_template = PromptTemplate(
-            input_variables=[],
-            template="Add the following columns to the provided table with scores ranging from 0 to 100:\n\n"
-            "* instruction_score: Adherence to the user-requested format, evaluating how well the instruction meets the specified format criteria.\n"
-            "* conformance_score: Conformance to the requested format, tags, and descriptions, assessing the degree to which the generated text aligns with these elements.\n"
-            "* quality_score: Grammatical correctness, coherence, and relevance, reflecting the overall quality of the text.\n"
-            "* toxicity_score: Level of toxic content, measuring the presence of harmful or offensive language.\n"
-            "* bias_score: Level of unintended biases, indicating any bias present in the generated text.\n"
-            "* groundedness_score: Level of factual correctness, assessing how well the text is supported by facts and accurate information.\n",
-        )
-
     def augment(self) -> pd.DataFrame:
         new_rows = []
         index = 1
