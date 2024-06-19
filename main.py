@@ -29,7 +29,7 @@ def main():
     # Dataset configuration
     df = pd.read_csv(
         "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv",
-        nrows=1,
+        nrows=10,
     )
     print("Example record")
     print(json.dumps(df.head(1).to_dict(orient="records"), indent=2))
@@ -37,8 +37,8 @@ def main():
     # Create the data augmentation configuration
     config = DataAugmentationConfig(
         input_fields=["context", "instruction", "response"],
-        output_instruction_field="gen_instruction",
-        output_response_field="gen_response",
+        output_instruction_field="instruction",
+        output_response_field="response",
         num_instructions=5,
         num_responses=5,
         temperature=0.8,
@@ -49,7 +49,7 @@ def main():
         navigator_llm=NAVIGATOR_LLM,
         co_teach_llms=CO_TEACH_LLMS,
         instruction_format_prompt="A well-formulated question or command in everyday English.",
-        response_format_prompt="A well-formulated response to the question in everyday English."
+        response_format_prompt="A well-formulated response to the question in everyday English.",
     )
 
     # Create the data augmenter and perform augmentation
