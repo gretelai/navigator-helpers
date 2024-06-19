@@ -5,11 +5,12 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "langchain==0.2.2",
-        "pandas==2.2.1",
-        "tqdm==4.66.4",
-        "gretel-client==0.19.0", 
-        "colorama==0.4.6",
+        datasets==2.19.0
+        gretel-client==0.19.0
+        langchain==0.2.2
+        pandas==2.2.1
+        streamlit==1.35.0
+        tqdm==4.66.4
     ],
     author="Gretel",
     author_email="hi@gretel.ai",
