@@ -99,7 +99,6 @@ class DataAugmenter:
 
         if not self.config.input_fields:
             raise ValueError("At least one input field must be provided.")
-
         (
             self.navigator_llm,
             self.navigator_tabular,
@@ -108,19 +107,25 @@ class DataAugmenter:
 
         self.instruction_template = PromptTemplate(
             input_variables=["context", "instruction_format_prompt"],
-            template="Generate a new instruction that can be answered based on the provided Ground Truth Data.\n\n"
-            "Instruction Format: {instruction_format_prompt}\n\n"
-            "User Provided Ground Truth Data:```{context}```\n\n"
-            "New Instruction:",
+            template=(
+                "Generate a new instruction that can be answered based on the provided context. "
+                "The instruction must be directly answerable using only the information given in the context.\n\n"
+                "Instruction Format: {instruction_format_prompt}\n\n"
+                "Context:\n{context}\n\n"
+                "New Instruction:"
+            ),
         )
 
         self.response_template = PromptTemplate(
             input_variables=["context", "instruction", "response_format_prompt"],
-            template="Generate a new response to the given Instruction based on the provided Ground Truth Data.\n\n"
-            "Response Format: {response_format_prompt}\n\n"
-            "User Provided Ground Truth Data:```{context}```\n\n"
-            "Instruction:\n{instruction}\n\n"
-            "New Response:",
+            template=(
+                "Generate a new response to the given Instruction based on the provided context. "
+                "The response must be directly derived from the information given in the context.\n\n"
+                "Response Format: {response_format_prompt}\n\n"
+                "Context:\n{context}\n\n"
+                "Instruction:\n{instruction}\n\n"
+                "New Response:"
+            ),
         )
 
         self.co_teach_template = PromptTemplate(
@@ -132,7 +137,8 @@ class DataAugmenter:
                 "instruction_text",
             ],
             template=(
-                "Improve the following {data_type} while closely following the requested format.\n\n"
+                "Improve the following {data_type} while closely following the requested format. "
+                "Ensure that the improved {data_type} can still be directly answered or derived from the provided context.\n\n"
                 "Context:\n{context}\n\n"
                 "{instruction_text}"
                 "Requested Format: {format_prompt}\n\n"
@@ -152,7 +158,8 @@ class DataAugmenter:
             ],
             template=(
                 "Provide suggestions to further improve the {data_type} while strictly adhering to the requested format. "
-                "Ensure the suggestions are relevant to the provided context and align with the original {data_type}.\n\n"
+                "Ensure the suggestions are relevant to the provided context and align with the original {data_type}. "
+                "The improved {data_type} must be directly answerable or derivable from the context.\n\n"
                 "Context:\n{context}\n\n"
                 "{instruction_text}"
                 "Requested Format: {format_prompt}\n\n"
@@ -174,7 +181,8 @@ class DataAugmenter:
             ],
             template=(
                 "Improve the {data_type} by incorporating the following suggestions while strictly adhering to the requested format and staying on topic. "
-                "Ensure that the improved {data_type} remains relevant to the provided context and does not introduce irrelevant information.\n\n"
+                "Ensure that the improved {data_type} remains relevant to the provided context and does not introduce irrelevant information. "
+                "The final {data_type} must be directly answerable or derivable from the context.\n\n"
                 "Context:\n{context}\n\n"
                 "{instruction_text}"
                 "Original {data_type}:\n{original_text}\n\n"
@@ -184,7 +192,6 @@ class DataAugmenter:
                 "Generate the final improved {data_type}:"
             ),
         )
-
 
     def format_instruction_text(self, data_type, instruction):
         if data_type == "response":
