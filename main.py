@@ -1,7 +1,7 @@
 import json
 import logging
 import pandas as pd
-from navigator_helpers import DataAugmentationConfig, DataAugmenter
+from navigator_helpers import DataSynthesisConfig, TrainingDataSynthesizer
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     print(json.dumps(df.head(1).to_dict(orient="records"), indent=2))
 
     # Create the data augmentation configuration
-    config = DataAugmentationConfig(
+    config = DataSynthesisConfig(
         input_fields=["context", "instruction", "response"],
         output_instruction_field="instruction",
         output_response_field="response",
@@ -53,7 +53,7 @@ def main():
     )
 
     # Create the data augmenter and perform augmentation
-    augmenter = DataAugmenter(
+    augmenter = TrainingDataSynthesizer(
         df,
         config,
         use_aaa=USE_AAA,
