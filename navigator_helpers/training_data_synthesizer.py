@@ -259,9 +259,10 @@ class TrainingDataSynthesizer:
             new_row = self.create_new_row(row, best_instruction, best_response)
             new_rows.append(new_row)
 
-            # Overwrite the CSV file with the new data
-            new_df = pd.DataFrame(new_rows)
-            new_df.to_csv(self.output_file, mode="w", header=True, index=False)
+            # Append the new row to the CSV file
+            new_df = pd.DataFrame([new_row])
+            if self.output_file:
+                new_df.to_csv(self.output_file, mode="a", header=not index, index=False)
 
             log_message(f"✅ Completed synthetic record for index {index}")
             log_message(f"🌟 Instruction:\n  - {best_instruction['instruction']}")
