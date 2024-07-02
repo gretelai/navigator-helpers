@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import List
+import random
 
 import pandas as pd
 from langchain.prompts import PromptTemplate
@@ -9,10 +10,13 @@ from tqdm.auto import tqdm
 from .aaa_utils import apply_aaa
 from .data_synthesis import DataFieldConfig, initialize_navigator, log_message
 from .evaluation_utils import evaluate_texts, rank_texts
-from .prompt_templates import (INSTRUCTION_TEMPLATE, RESPONSE_TEMPLATE,
-                               TRAIN_CO_TEACH_TEMPLATE,
-                               TRAIN_SELF_TEACHING_TEMPLATE,
-                               TRAIN_SUGGESTIONS_TEMPLATE)
+from .prompt_templates import (
+    INSTRUCTION_TEMPLATE,
+    RESPONSE_TEMPLATE,
+    TRAIN_CO_TEACH_TEMPLATE,
+    TRAIN_SELF_TEACHING_TEMPLATE,
+    TRAIN_SUGGESTIONS_TEMPLATE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +70,7 @@ class TrainingDataSynthesizer:
         # Re-evaluate the improved text using the Navigator
         if self.verbose:
             log_message(
-                f"    Re-evaluating improved {data_type} text using Navigator for Ranking"
+                f"    🔄 🏆 Re-evaluating improved {data_type} text using Navigator for Ranking"
             )
         improved_score = evaluate_texts(
             [improved_text],
@@ -97,14 +101,25 @@ class TrainingDataSynthesizer:
     def generate_diverse_instructions(self, context):
         instructions = []
         for _ in range(self.config.num_instructions):
+            # Randomize generation parameters
+            temperature = random.uniform(0.5, 1.2)
+            max_tokens = random.randint(
+                self.config.max_tokens_instruction // 2,
+                self.config.max_tokens_instruction,
+            )
+            top_k = random.randint(20, 100)
+            top_p = random.uniform(0.8, 1.0)
+
             prompt = self.instruction_template.format(
                 context=context,
                 instruction_format_prompt=self.config.instruction_format_prompt,
             )
             generated_text = self.navigator_llm.generate(
                 prompt=prompt,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens_instruction,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_k=top_k,
+                top_p=top_p,
             )
             instructions.append(generated_text)
 
@@ -163,6 +178,14 @@ class TrainingDataSynthesizer:
     def generate_diverse_responses(self, context, instruction):
         responses = []
         for _ in range(self.config.num_responses):
+            # Randomize generation parameters
+            temperature = random.uniform(0.5, 1.2)
+            max_tokens = random.randint(
+                self.config.max_tokens_response // 2, self.config.max_tokens_response
+            )
+            top_k = random.randint(20, 100)
+            top_p = random.uniform(0.8, 1.0)
+
             prompt = self.response_template.format(
                 context=context,
                 instruction=instruction,
@@ -170,8 +193,10 @@ class TrainingDataSynthesizer:
             )
             generated_text = self.navigator_llm.generate(
                 prompt=prompt,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens_response,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_k=top_k,
+                top_p=top_p,
             )
             responses.append(generated_text)
 
@@ -225,7 +250,9 @@ class TrainingDataSynthesizer:
                     f"🆕 Starting the process of synthesizing a new training record for index {index}."
                 )
                 log_message("=" * 50)
-                log_message(f"🔍 Synthesizing diverse instructions based on the inputs.")
+                log_message(
+                    f"🔍 Synthesizing diverse instructions based on the inputs."
+                )
 
             new_instructions, instruction_scores = self.generate_diverse_instructions(
                 context
