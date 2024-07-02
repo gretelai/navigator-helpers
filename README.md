@@ -32,14 +32,14 @@ The input to this program is LLM training data in a pandas DataFrame format. You
 
 ### Configuration
 
-The data augmentation configuration is created using the `DataAugmentationConfig` class. This includes setting the number of instructions and responses to generate, temperature, token limits, and specifying the API key, primary model, and co-teaching models.
+The data synthesis configuration is created using the `DataSynthesisConfig` class. This includes setting the number of instructions and responses to generate, temperature, token limits, and specifying the API key, primary model, and co-teaching models.
 
 Fields are added to the configuration to specify the context, instruction, and response columns.
 
 Example:
 
 ```python
-config = DataAugmentationConfig(
+config = DataSynthesisConfig(
     num_instructions=5,
     num_responses=5,
     temperature=0.8,
@@ -56,12 +56,12 @@ config.add_field("instruction", field_type="instruction")
 config.add_field("response", field_type="response")
 ```
 
-### Running the Data Augmentation
+### Running the Data Synthesis
 
-To run the data augmentation process, simply execute the `main.py` script:
+To run the data synthesis process, simply execute the `example_training_data.py` script:
 
 ```bash
-python main.py
+python example_training_data.py
 ```
 
 The script will perform the following steps:
@@ -72,11 +72,11 @@ The script will perform the following steps:
 
 You can control whether the AI Align AI (AAA) process is enabled or disabled by setting the `USE_AAA` variable in the `main()` function. Set it to `True` to enable AAA or `False` to disable it.
 
-## Data Augmentation Process
+## Data Synthesis Process
 
 The data augmentation process involves the interaction between the User, Navigator Agent, and LLMs. Here's a sequence diagram illustrating the process:
 
-![Navigator Agent Data Augmentation Process](docs/images/navigator_agent_augment_data_flow.png)
+![Navigator Agent Data Synthesis Process](docs/images/navigator_agent_augment_data_flow.png)
 
 1. Data Extraction and Initial Generation:
 - Extract context, instruction, and response format from each record.
@@ -97,9 +97,9 @@ The data augmentation process involves the interaction between the User, Navigat
 - Apply Self-Teaching to further improve the response.
 - Evaluate and select the best candidate response.
 
-4. Final Augmentation:
-- Add the synthetically generated record to the augmented dataset.
-- Return the augmented dataset to the user.
+4. Final Synthesis:
+- Add the generated record to the dataset.
+- Return the synthetic dataset to the user.
 
 ## Contributing
 
@@ -118,4 +118,4 @@ This project was inspired by the techniques described in the following papers an
 - Wei et al. "StarCoder2-Instruct: Fully Transparent and Permissive Self-Alignment for Code Generation." Hugging Face Blog, 29 Apr. 2024, https://huggingface.co/blog/sc2-instruct.
 - Li et al. "Textbooks Are All You Need II: phi-1.5 technical report." arXiv preprint arXiv:2309.05463 (2023).
 
-We would like to express our gratitude to the authors of these works for their valuable insights and contributions to the field of large language model training and data augmentation.
+We would like to express our gratitude to the authors of these works for their valuable insights and contributions to the field of large language model training and data synthesis.
