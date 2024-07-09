@@ -7,8 +7,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import pandas as pd
 from langchain.prompts import PromptTemplate
 
-from .data_synthesis import (InstructionResponseConfig, SingleTextConfig,
-                             log_message)
+from .data_synthesis import InstructionResponseConfig, SingleTextConfig, log_message
 from .evaluation_utils import relative_ranking
 from .generation_types import GenerationType
 
@@ -146,6 +145,8 @@ class EvolutionaryTextGenerator:
 
             if self.verbose:
                 log_message(f"Final {generation_type.value} after AAA:\n{final_text}\n")
+        else:
+            final_text = best_text
 
         return final_text
 
@@ -547,7 +548,9 @@ def apply_aaa(
         co_teaching_text = llm.generate(co_teaching_prompt)
         co_teaching_results.append((llm.backend_model, co_teaching_text))
         if verbose:
-            log_message(f"🏫 Co-Teaching {i}: {llm.backend_model}\n- {co_teaching_text}")
+            log_message(
+                f"🏫 Co-Teaching {i}: {llm.backend_model}\n- {co_teaching_text}"
+            )
 
     best_co_teaching_prompt = BEST_CO_TEACHING_TEMPLATE.format(
         original_text=text,

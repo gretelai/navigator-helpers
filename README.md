@@ -51,9 +51,10 @@ config = SingleTextConfig(
     quality_prompt="Evaluate the quality of this text:",
     complexity_target=0.5,
     use_aaa=True,
-)```
+)
+```
 
-Example for instruction-response generation
+Example for instruction-response generation:
 
 ```python
 config = InstructionResponseConfig(
@@ -80,9 +81,10 @@ config = InstructionResponseConfig(
     response_quality_prompt="Evaluate the quality of this response:",
     response_complexity_target=0.5,
     use_aaa=True,
-)```
+)
+```
 
-### Running the Data Synthesis
+### Generating synthetic text data
 
 To run the data synthesis process, simply execute one of the example scripts:
 
