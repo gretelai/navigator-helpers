@@ -326,16 +326,34 @@ class EvolutionaryTextGenerator:
         self, texts: List[str], generation_type: GenerationType
     ) -> List[float]:
         complexity_prompt = self._get_prompt("complexity_prompt", generation_type)
-        return [
-            float(
-                self.llm.generate(
-                    prompt=f"{complexity_prompt}\n\nText to evaluate:\n{text}\n\nComplexity score (0-1):",
-                    temperature=0.2,
-                    max_tokens=10,
-                )
-            )
-            for text in texts
-        ]
+        complexities = []
+
+        for text in texts:
+            prompt = f"{complexity_prompt}\n\nText to evaluate:\n{text}\n\nProvide only a numerical complexity score between 0 and 1, where 0 is the least complex and 1 is the most complex. Your response should be only the number, without any additional text or explanation:\n"
+
+            for _ in range(3):  # Try up to 3 times
+                try:
+                    response = self.llm.generate(
+                        prompt=prompt,
+                        temperature=0.2,
+                        max_tokens=10,
+                    )
+                    complexity = float(response.strip())
+                    if 0 <= complexity <= 1:
+                        complexities.append(complexity)
+                        break
+                    else:
+                        raise ValueError("Complexity score out of range")
+                except (ValueError, TypeError):
+                    if _ == 2:  # If this is the last attempt
+                        if self.verbose:
+                            log_message(
+                                f"Failed to get valid complexity for text: {text[:50]}... Using default of 0.5"
+                            )
+                        complexities.append(0.5)  # Use a default value
+                    continue
+
+        return complexities
 
     def _filter_quality(
         self, texts: List[str], generation_type: GenerationType, strict: bool = True

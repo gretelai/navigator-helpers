@@ -1,11 +1,11 @@
 import logging
+import traceback
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from tqdm.auto import tqdm
 
-from .data_synthesis import (InstructionResponseConfig, initialize_navigator,
-                             log_message)
+from .data_synthesis import InstructionResponseConfig, initialize_navigator, log_message
 from .evaluation_utils import evaluate_texts
 from .generation_types import GenerationType
 from .text_generation import EvolutionaryTextGenerator
@@ -52,15 +52,16 @@ class TrainingDataSynthesizer:
         if self.verbose:
             log_message("🔍 Synthesizing diverse instructions based on the inputs.")
 
+        instruction_prompt = f"\n\nContext: {context}\n\nInstruction:"
         instruction = self.text_generator.generate(
-            context, generation_type=GenerationType.INSTRUCTION
+            instruction_prompt, generation_type=GenerationType.INSTRUCTION
         )
 
         # Evaluate the instruction
         evaluation = evaluate_texts(
             texts=[instruction],
             llm=self.navigator_llm,
-            prompt=self.config.instruction_format_prompt,
+            prompt=self.config.instruction_quality_prompt,
             context=context,
         )
         score = evaluation["composite_score"].iloc[0]
@@ -79,17 +80,17 @@ class TrainingDataSynthesizer:
                 "📝 Synthesizing diverse responses to the top synthetic instruction."
             )
 
-        response_context = f"{context}\nInstruction: {instruction}"
+        response_prompt = f"Based on the following context and instruction, generate a self-contained response that includes all necessary information:\n\nContext: {context}\n\nInstruction: {instruction}\n\nResponse:"
         response = self.text_generator.generate(
-            response_context, generation_type=GenerationType.RESPONSE
+            response_prompt, generation_type=GenerationType.RESPONSE
         )
 
         # Evaluate the response
         evaluation = evaluate_texts(
             texts=[response],
             llm=self.navigator_llm,
-            prompt=self.config.response_format_prompt,
-            context=response_context,
+            prompt=self.config.response_quality_prompt,
+            context=f"{context}\n{instruction}",
         )
         score = evaluation["composite_score"].iloc[0]
 
@@ -127,7 +128,9 @@ class TrainingDataSynthesizer:
                 )
 
             except Exception as e:
-                logger.error(f"Error processing row {index}: {str(e)}")
+                error_message = f"Error processing row {index}: {str(e)}"
+                full_traceback = traceback.format_exc()
+                logger.error(f"{error_message}\n\nFull traceback:\n{full_traceback}")
 
         return pd.DataFrame(new_rows)
 

@@ -3,8 +3,7 @@ import logging
 
 import pandas as pd
 
-from navigator_helpers import (InstructionResponseConfig,
-                               TrainingDataSynthesizer)
+from navigator_helpers import InstructionResponseConfig, TrainingDataSynthesizer
 
 
 def main():
@@ -26,12 +25,7 @@ def main():
     ]
 
     # Define a system prompt
-    SYSTEM_PROMPT = """You are an AI assistant tasked with generating high-quality instruction-response pairs.
-Your goal is to create diverse, engaging, and informative content that covers a wide range of topics.
-When generating instructions, aim for clear, concise questions or commands that prompt thoughtful responses.
-When generating responses, provide detailed, accurate, and helpful information that directly addresses the instruction.
-Focus on generating questions that can be answered directly from the given context, and provide responses that are concise and to the point.
-"""
+    SYSTEM_PROMPT = """"You are an expert in generating high-quality, context-specific closed questions and their corresponding answers. Your task is to create question-answer pairs that can be definitively answered using only the information provided in the given context. Focus on accuracy, relevance, and completeness."""
 
     # Dataset configuration
     df = pd.read_csv(
@@ -47,22 +41,20 @@ Focus on generating questions that can be answered directly from the given conte
         population_size=5,
         mutation_rate=0.5,
         temperature=0.7,
-        max_tokens=150,
+        max_tokens=200,
         api_key=GRETEL_API_KEY,
         navigator_tabular=NAVIGATOR_TABULAR,
         navigator_llm=NAVIGATOR_LLM,
         co_teach_llms=CO_TEACH_LLMS,
-        system_prompt=SYSTEM_PROMPT,
-        instruction_format_prompt="Generate a concise and clear question or command directly related to the given context. The question should be specific, easy to understand, and focused on a single aspect of the context.",
-        instruction_mutation_prompt="Modify this question to make it more focused and directly related to the main point of the context.",
-        instruction_complexity_prompt="Rate the complexity of this question based on its use of technical jargon and depth of explanation:",
-        instruction_quality_prompt="Evaluate the quality of this question based on its clarity, relevance, and completeness:",
-        response_format_prompt="Generate a concise and direct response to the given question. The response should be clear, factually accurate, and focused solely on answering the question without additional context or information.",
-        response_mutation_prompt="Modify this response to make it more concise and directly address the question asked.",
-        response_complexity_prompt="Rate the complexity of this response based on its use of technical jargon and depth of explanation:",
-        response_quality_prompt="Evaluate the quality of this response based on its clarity, relevance, and completeness:",
-        instruction_complexity_target=0.2,  # For simpler instructions
-        response_complexity_target=0.2,  # For simpler responses
+        system_prompt="You are an expert in generating balanced, context-rich questions and comprehensive answers based on given contexts. Your goal is to create question-answer pairs that are informative, detailed when necessary, and understandable without prior knowledge, while not revealing the answer in the question.",
+        instruction_format_prompt="Generate a specific and clear question directly related to a key point in the given context. The question should include enough background information to be understood without prior knowledge, while being answerable using only the information provided. Do not reveal the answer in the question. Ensure the question is focused and can be answered concisely if the information allows, but also accommodate for more detailed responses when appropriate.",
+        instruction_mutation_prompt="Refine this question to include necessary context for understanding, without revealing the answer. Ensure it remains clear and can be comprehensively answered using only the information in the given context. Adjust the question to allow for a concise answer if possible, but also consider if a more detailed response is warranted based on the complexity of the topic.",
+        instruction_quality_prompt="Evaluate the quality of this question based on its specificity, inclusion of necessary context, relevance to the original context, clarity for someone unfamiliar with the topic, and ability to be answered appropriately (either concisely or in detail) without revealing the answer:",
+        instruction_complexity_target=0.7,
+        response_format_prompt="Generate an informative answer to the given question. Use only the information provided in the original context. The response should be as concise as possible while fully addressing the question, including relevant context and explanations where necessary. For complex topics, provide a more detailed response. Ensure the answer provides enough background information to be understood by someone unfamiliar with the topic.",
+        response_mutation_prompt="Refine this answer to balance conciseness with comprehensiveness. For straightforward questions, aim for brevity while ensuring accuracy. For complex topics, provide more detail and context. Add relevant information from the context as needed. Verify factual accuracy and correct any inaccuracies or missing key information. Ensure the answer can be understood without prior knowledge of the topic.",
+        response_quality_prompt="Evaluate the quality of this answer based on its accuracy, appropriate level of detail (concise for simple questions, comprehensive for complex ones), relevance to the question, clarity for someone unfamiliar with the topic, inclusion of necessary background information, and whether it provides a satisfactory response using only the information from the given context:",
+        response_complexity_target=0.8,
         use_aaa=True,
     )
 
