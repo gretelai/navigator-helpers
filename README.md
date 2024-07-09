@@ -1,6 +1,6 @@
 # Navigator Helpers 🚀
 
-Gretel Navigator is a compound AI-based system for generating high quality synthetic data generation that can be used for training AI and LLMs. Navigator leverages techniques such as diverse instruction and response generation, and an AI alignment process to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic instructions, responses, and leverages evaluations for quality, adherence, toxicity, and bias.
+Gretel Navigator is a compound AI-based system for generating high-quality synthetic data that can be used for training AI and LLMs. Navigator leverages techniques such as diverse text generation and an AI alignment process to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic texts while considering quality, adherence, toxicity, and bias.
 
 ## Installation
 
@@ -25,81 +25,98 @@ Gretel Navigator is a compound AI-based system for generating high quality synth
    ```
 
 ## Usage
-
 ### Input Requirements
-
-The input to this program is LLM training data in a pandas DataFrame format. You must specify one or more context columns, an instruction column, and a response column.
-
+The input to this program is LLM training data in a pandas DataFrame format. You must specify one or more input fields, and an output field.
 ### Configuration
+The data synthesis configuration is created using either the `SingleTextConfig` or `InstructionResponseConfig` class, depending on your use case. This includes setting the number of generations, population size, mutation rate, temperature, token limits, and specifying the API key, Navigator LLM, and co-teaching LLMs.
 
-The data synthesis configuration is created using the `DataSynthesisConfig` class. This includes setting the number of instructions and responses to generate, temperature, token limits, and specifying the API key, primary model, and co-teaching models.
-
-Fields are added to the configuration to specify the context, instruction, and response columns.
-
-Example:
+Example for single text generation:
 
 ```python
-config = DataSynthesisConfig(
-    num_instructions=5,
-    num_responses=5,
+config = SingleTextConfig(
+    input_fields=["context"],
+    output_field="generated_text",
+    num_generations=3,
+    population_size=5,
+    mutation_rate=0.5,
     temperature=0.8,
-    max_tokens_instruction=100,
-    max_tokens_response=150,
+    max_tokens=150,
     api_key=GRETEL_API_KEY,
-    primary_model=GRETEL_PRIMARY_MODEL,
-    co_teach_models=CO_TEACH_MODELS,
-    instruction_format_prompt="A well-formulated question or command in everyday English.",
-    response_format_prompt="A well-formulated response to the question in everyday English.",
-)
-config.add_field("context", field_type="context")
-config.add_field("instruction", field_type="instruction")
-config.add_field("response", field_type="response")
-```
+    navigator_llm=NAVIGATOR_LLM,
+    co_teach_llms=CO_TEACH_LLMS,
+    system_prompt=SYSTEM_PROMPT,
+    format_prompt="Generate a natural text based on the given context.",
+    mutation_prompt="Modify this text to make it more engaging and aligned with the context:",
+    complexity_prompt="Rate the complexity of this text:",
+    quality_prompt="Evaluate the quality of this text:",
+    complexity_target=0.5,
+    use_aaa=True,
+)```
+
+Example for instruction-response generation
+
+```python
+config = InstructionResponseConfig(
+    input_fields=["context"],
+    output_instruction_field="instruction",
+    output_response_field="response",
+    num_generations=3,
+    population_size=5,
+    mutation_rate=0.5,
+    temperature=0.8,
+    max_tokens=150,
+    api_key=GRETEL_API_KEY,
+    navigator_llm=NAVIGATOR_LLM,
+    co_teach_llms=CO_TEACH_LLMS,
+    system_prompt=SYSTEM_PROMPT,
+    instruction_format_prompt="Generate a clear instruction based on the given context.",
+    instruction_mutation_prompt="Modify this instruction to make it more specific:",
+    instruction_complexity_prompt="Rate the complexity of this instruction:",
+    instruction_quality_prompt="Evaluate the quality of this instruction:",
+    instruction_complexity_target=0.5,
+    response_format_prompt="Generate a detailed response to the given instruction.",
+    response_mutation_prompt="Modify this response to make it more informative:",
+    response_complexity_prompt="Rate the complexity of this response:",
+    response_quality_prompt="Evaluate the quality of this response:",
+    response_complexity_target=0.5,
+    use_aaa=True,
+)```
 
 ### Running the Data Synthesis
 
-To run the data synthesis process, simply execute the `example_training_data.py` script:
+To run the data synthesis process, simply execute one of the example scripts:
 
 ```bash
 python example_training_data.py
 ```
 
-The script will perform the following steps:
-1. Load the input dataset from the specified URL.
-2. Create the data augmentation configuration.
-3. Create the data augmenter and perform augmentation.
-4. Print the augmented data as JSON.
+or
 
-You can control whether the AI Align AI (AAA) process is enabled or disabled by setting the `USE_AAA` variable in the `main()` function. Set it to `True` to enable AAA or `False` to disable it.
+```bash
+python example_chat.py
+```
 
 ## Data Synthesis Process
+The data synthesis process involves the following steps:
 
-The data augmentation process involves the interaction between the User, Navigator Agent, and LLMs. Here's a sequence diagram illustrating the process:
-
-![Navigator Agent Data Synthesis Process](docs/images/navigator_agent_augment_data_flow.png)
-
-1. Data Extraction and Initial Generation:
-- Extract context, instruction, and response format from each record.
-- Generate diverse instructions using LLMs.
-- Evaluate and select the best candidate instruction.
-
-2. Instruction Improvement (AAA):
-- Apply Co-Teaching to the selected instruction using multiple LLMs.
-- Incorporate suggestions and evaluate Co-Teaching results.
-- Apply Self-Teaching to further improve the instruction.
-- Evaluate and select the best candidate instruction.
-
-3. Response Generation and Improvement:
-- Generate diverse responses for the selected instruction.
-- Evaluate and select the best candidate response.
-- Apply Co-Teaching to the selected response using multiple LLMs.
-- Incorporate suggestions and evaluate Co-Teaching results.
-- Apply Self-Teaching to further improve the response.
-- Evaluate and select the best candidate response.
-
-4. Final Synthesis:
-- Add the generated record to the dataset.
-- Return the synthetic dataset to the user.
+1. Initialization:
+  - Create the appropriate configuration (SingleTextConfig or InstructionResponseConfig).
+  - Initialize the EvolutionaryTextGenerator with the navigator LLM and co-teaching LLMs.
+2. Text Generation:
+  - Generate an initial population of texts.
+  - Apply mutations to the population.
+  - Filter the quality of the texts.
+  - Rank the texts based on quality and complexity.
+  - Select a diverse subset for the next generation.
+  - Repeat for the specified number of generations.
+3.  AI Align AI (AAA) Process (if enabled):
+  - Apply Co-Teaching to the best text using multiple LLMs.
+  - Apply Self-Teaching to further improve the text.
+  - Select the final text.
+4. Evaluation:
+  - Evaluate the generated text for quality, relevance, and other metrics.
+5. Output:
+  - Return the generated text(s) or conversation.
 
 ## Contributing
 
