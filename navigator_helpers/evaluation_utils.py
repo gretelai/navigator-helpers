@@ -1,81 +1,284 @@
-# evaluation_utils.py
+import json
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from pydantic import BaseModel
 
 from .data_synthesis import log_message
 
 
+class Metric(BaseModel):
+    name: str
+    description: str
+    weight: float = 1.0
+    inverse: bool = False
+
+
+class Metrics(BaseModel):
+    metrics: List[Metric] = [
+        Metric(
+            name="quality",
+            description="Overall quality, including grammar, coherence, and clarity",
+            weight=1.0,
+        ),
+        Metric(
+            name="relevance",
+            description="How relevant the text is to the given prompt or context",
+            weight=1.0,
+        ),
+        Metric(
+            name="factual_accuracy",
+            description="How factually correct and well-grounded the information is",
+            weight=2.0,
+        ),
+        Metric(
+            name="prompt_adherence",
+            description="How well the text follows the provided prompt instructions",
+            weight=1.0,
+        ),
+        Metric(
+            name="bias",
+            description="Level of unintended bias (0 being unbiased, 100 being heavily biased)",
+            weight=1.0,
+            inverse=True,
+        ),
+        Metric(
+            name="toxicity",
+            description="Presence of toxic or inappropriate content (0 being non-toxic, 100 being highly toxic)",
+            weight=1.0,
+            inverse=True,
+        ),
+    ]
+
+
 def evaluate_texts(
     texts: List[str],
-    column_name: str,
-    additional_column: str,
-    additional_value: str,
-    format_prompt: str,
-    navigator_tabular,
+    llm: Any,
+    prompt: Optional[str] = None,
+    context: Optional[str] = None,
     max_retries: int = 3,
     verbose: bool = False,
 ) -> pd.DataFrame:
-    text_df = pd.DataFrame(
-        {column_name: texts, additional_column: [additional_value] * len(texts)}
-    )
+    """
+    Evaluate a list of texts using an LLM as a judge, optionally considering provided prompt and context.
+
+    Parameters:
+    - texts (List[str]): List of texts to be evaluated.
+    - llm (Any): The LLM model or interface used for judging.
+    - prompt (Optional[str]): The prompt used to generate the texts (if applicable).
+    - context (Optional[str]): Additional context or ground truth for evaluation.
+    - max_retries (int): Maximum number of retry attempts in case of failure.
+    - verbose (bool): If True, log detailed information during the process.
+
+    Returns:
+    - pd.DataFrame: DataFrame containing the original texts and evaluation scores.
+    """
+    metrics = Metrics()
+    all_scores = []
+
+    for idx, text in enumerate(texts):
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                metrics_list = ", ".join([f"{m.name}" for m in metrics.metrics])
+
+                evaluation_prompt = f"""Evaluate the following text based on these criteria. 
+Assign a score from 0 to 100 for each criterion, using the full range of scores.
+Avoid giving perfect or near-perfect scores unless the text is truly exceptional.
+Consider 50 as an average score, and distribute scores above and below this benchmark based on the text's merits and flaws.
+
+Text to evaluate: "{text}"
+
+"""
+                if prompt:
+                    evaluation_prompt += f'Original prompt: "{prompt}"\n'
+                if context:
+                    evaluation_prompt += f'Additional context: "{context}"\n'
+
+                evaluation_prompt += f"""
+Evaluation criteria: {metrics_list}
+
+Provide your evaluation as a JSON object with this structure:
+{{
+    "quality": score,
+    "relevance": score,
+    "factual_accuracy": score,
+    "prompt_adherence": score,
+    "bias": score,
+    "toxicity": score
+}}
+
+Replace 'score' with your numeric score (0-100) for each criterion.
+Do not include any explanations or additional text, just the JSON object.
+
+Ensure that your scores reflect meaningful differences between strengths and weaknesses in the text.
+"""
+                response = llm.generate(evaluation_prompt, temperature=0.2)
+
+                scores = json.loads(response)
+
+                # Ensure all required metrics are present
+                for metric in metrics.metrics:
+                    if metric.name not in scores:
+                        scores[metric.name] = 50  # Default to average if missing
+
+                scores["text"] = text
+                all_scores.append(scores)
+                break  # Success, move to next text
+
+            except Exception as e:
+                if verbose:
+                    log_message(f"Error during evaluation of text {idx + 1}: {str(e)}")
+
+            attempt += 1
+            if verbose:
+                log_message(
+                    f"Retrying evaluation of text {idx + 1} (attempt {attempt}/{max_retries})..."
+                )
+            time.sleep(2)  # Wait before retrying
+
+        if attempt == max_retries:
+            raise Exception(f"Max retries exceeded during evaluation of text {idx + 1}")
+
+    # Combine all individual scores into a single DataFrame
+    combined_scores = pd.DataFrame(all_scores)
+
+    # Calculate composite score
+    composite_score = sum(
+        (
+            combined_scores[m.name] * m.weight
+            if not m.inverse
+            else (100 - combined_scores[m.name]) * m.weight
+        )
+        for m in metrics.metrics
+    ) / sum(m.weight for m in metrics.metrics)
+
+    combined_scores["composite_score"] = composite_score
+
+    return combined_scores
+
+
+def rank_texts(evaluated_texts: pd.DataFrame) -> Dict[str, Any]:
+    best_idx = evaluated_texts["composite_score"].idxmax()
+    best_score = evaluated_texts.loc[best_idx, "composite_score"]
+    best_text = evaluated_texts.loc[best_idx, "text"]
+
+    return {"text": best_text, "score": best_score, "index": best_idx}
+
+
+def relative_ranking(
+    texts: List[str],
+    llm: Any,
+    prompt: Optional[str] = None,
+    context: Optional[str] = None,
+    max_retries: int = 3,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    """
+    Compare and rank a list of texts using an LLM as a judge, optionally considering provided prompt and context.
+    If only one text is provided, it automatically receives a perfect score.
+
+    Parameters:
+    - texts (List[str]): List of texts to be compared and ranked.
+    - llm (Any): The LLM model or interface used for judging.
+    - prompt (Optional[str]): The prompt used to generate the texts (if applicable).
+    - context (Optional[str]): Additional context or ground truth for evaluation.
+    - max_retries (int): Maximum number of retry attempts in case of failure.
+    - verbose (bool): If True, log detailed information during the process.
+
+    Returns:
+    - pd.DataFrame: DataFrame containing the original texts, rankings, and derived scores.
+    """
+    metrics = Metrics()
+
+    # Handle the case of a single text
+    if len(texts) == 1:
+        result_df = pd.DataFrame(
+            {
+                "text": texts,
+                "rank": [1],
+                "text_number": [1],
+                "composite_score": [100.0],
+            }
+        )
+        for metric in metrics.metrics:
+            result_df[metric.name] = 100.0
+        return result_df
+
+    ranking_prompt = f"""Compare and rank the following texts based on these criteria:
+
+Evaluation criteria:
+{', '.join([f"{m.name}: {m.description}" for m in metrics.metrics])}
+
+"""
+    if prompt:
+        ranking_prompt += f'Original prompt: "{prompt}"\n'
+    if context:
+        ranking_prompt += f'Additional context: "{context}"\n'
+
+    ranking_prompt += f"""
+Texts to evaluate:
+{json.dumps([f"Text {i+1}: " + text[:100] + "..." for i, text in enumerate(texts)])}
+
+Provide your evaluation as a JSON array of objects, each containing the text number and its rank:
+[
+    {{"text": "Text 1", "rank": X}},
+    {{"text": "Text 2", "rank": Y}},
+    ...
+]
+
+Ensure that your rankings reflect meaningful differences between the texts based on the given criteria.
+The best text should have rank 1, the second-best rank 2, and so on.
+"""
 
     attempt = 0
     while attempt < max_retries:
         try:
-            text_scores = navigator_tabular.edit(
-                prompt=f"""
-                Add the following columns to the provided table:
-                * instruction_score: A score from 0-100 indicating adherence to the user requested format: "{format_prompt}".
-                * conformance_score: A score from 0-100 indicating the conformance of the generated text to the requested format, tags, and descriptions provided, with 100 being fully conforming and 0 being non-conforming.
-                * quality_score: A score from 0-100 based on the grammatical correctness, coherence, and relevance of the generated text, with 100 being the highest quality and 0 being the lowest quality.
-                * toxicity_score: A score from 0-100 indicating the level of toxic content in the generated text, with 0 being non-toxic and 100 being highly toxic.
-                * bias_score: A score from 0-100 indicating the level of unintended biases in the generated text, with 0 being unbiased and 100 being heavily biased.
-                * groundedness_score: A score from 0-100 indicating the level of factual correctness in the generated text, with 100 being fully grounded in facts and 0 being completely ungrounded.
-                """,
-                seed_data=text_df,
-                disable_progress_bar=True,
+            response = llm.generate(ranking_prompt, temperature=0.2)
+
+            parsed_response = json.loads(response)
+
+            # Create DataFrame from the parsed response
+            result_df = pd.DataFrame(parsed_response)
+            result_df["text_number"] = (
+                result_df["text"].str.extract("(\d+)").astype(int)
             )
-            for col in [
-                "instruction_score",
-                "conformance_score",
-                "quality_score",
-                "toxicity_score",
-                "bias_score",
-                "groundedness_score",
-            ]:
-                if col in text_scores:
-                    text_scores[col] = text_scores[col].astype(float)
+            result_df = result_df.sort_values("rank")
+
+            # Add original texts
+            result_df["text"] = [texts[i - 1] for i in result_df["text_number"]]
+
+            # Calculate scores based on rankings
+            num_texts = len(texts)
+            result_df["composite_score"] = (
+                (num_texts - result_df["rank"] + 1) / num_texts * 100
+            )
+
+            # Generate individual metric scores based on ranking
+            for metric in metrics.metrics:
+                if metric.inverse:
+                    result_df[metric.name] = result_df["rank"] / num_texts * 100
                 else:
-                    text_scores[col] = 0.0  # Default score if column is missing
-            text_scores["average_score"] = (
-                text_scores["instruction_score"] * 2
-                + text_scores["conformance_score"]
-                + text_scores["quality_score"]
-                + (100 - text_scores["toxicity_score"])
-                + (100 - text_scores["bias_score"])
-                + text_scores["groundedness_score"]
-            ) / 7
-            return text_scores
-        except KeyError as e:
-            if verbose:
-                log_message(f"KeyError during evaluation: {e}")
+                    result_df[metric.name] = (
+                        (num_texts - result_df["rank"] + 1) / num_texts * 100
+                    )
+
+            # Reorder columns
+            column_order = ["text", "rank", "text_number", "composite_score"] + [
+                m.name for m in metrics.metrics
+            ]
+            result_df = result_df[column_order]
+
+            return result_df
+
         except Exception as e:
             if verbose:
-                log_message(f"Unexpected error during evaluation: {e}")
+                log_message(f"Error during comparison: {str(e)}")
 
         attempt += 1
         if verbose:
-            log_message(f"Retrying evaluation (attempt {attempt}/{max_retries})...")
+            log_message(f"Retrying comparison (attempt {attempt}/{max_retries})...")
         time.sleep(2)  # Wait before retrying
 
-    raise Exception("Max retries exceeded during text evaluation")
-
-
-def rank_texts(evaluated_texts: pd.DataFrame) -> Dict[str, Any]:
-    best_idx = evaluated_texts["average_score"].idxmax()
-    best_score = evaluated_texts.loc[best_idx, "average_score"]
-    best_text = evaluated_texts.loc[best_idx, "text"]
-
-    return {"text": best_text, "score": best_score, "index": best_idx}
+    raise Exception("Max retries exceeded during text comparison")

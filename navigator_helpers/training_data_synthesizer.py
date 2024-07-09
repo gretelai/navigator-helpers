@@ -1,239 +1,104 @@
 import logging
-import time
-from typing import List
-import random
+import traceback
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from langchain.prompts import PromptTemplate
 from tqdm.auto import tqdm
 
-from .aaa_utils import apply_aaa
-from .data_synthesis import DataFieldConfig, initialize_navigator, log_message
-from .evaluation_utils import evaluate_texts, rank_texts
-from .prompt_templates import (
-    INSTRUCTION_TEMPLATE,
-    RESPONSE_TEMPLATE,
-    TRAIN_CO_TEACH_TEMPLATE,
-    TRAIN_SELF_TEACHING_TEMPLATE,
-    TRAIN_SUGGESTIONS_TEMPLATE,
-)
+from .data_synthesis import InstructionResponseConfig, initialize_navigator, log_message
+from .evaluation_utils import evaluate_texts
+from .generation_types import GenerationType
+from .text_generation import EvolutionaryTextGenerator
 
 logger = logging.getLogger(__name__)
 
 
 class TrainingDataSynthesizer:
-    def __init__(self, df, config, use_aaa=True, output_file=None, verbose=False):
-
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        config: InstructionResponseConfig,
+        output_file: Optional[str] = None,
+        verbose: bool = False,
+    ):
         self.df = df
         self.config = config
-        self.use_aaa = use_aaa
         self.output_file = output_file
         self.verbose = verbose
-        self.response_template = RESPONSE_TEMPLATE
-        self.co_teach_template = TRAIN_CO_TEACH_TEMPLATE
-        self.suggestions_template = TRAIN_SUGGESTIONS_TEMPLATE
-        self.self_teaching_template = TRAIN_SELF_TEACHING_TEMPLATE
-        self.instruction_template = INSTRUCTION_TEMPLATE
+
         if not self.config.input_fields:
             raise ValueError("At least one input field must be provided.")
-        # Initialize LLMs
+
         (
             self.navigator_llm,
             self.navigator_tabular,
             self.co_teach_llms,
-        ) = initialize_navigator(config)
-
-    def apply_aaa_to_text(
-        self, text, context, format_prompt, data_type, instruction=None
-    ):
-        if self.verbose:
-            log_message(f"🤖 Applying AI Align AI (AAA) to improve the {data_type}.")
-
-        template_vars = {
-            "data_type": data_type.capitalize(),
-            "instruction_text": self.format_instruction_text(data_type, instruction),
-            "format_prompt": format_prompt,
-        }
-
-        improved_text = apply_aaa(
-            text=text,
-            context=context,
+        ) = self._initialize_llms()
+        self.text_generator = EvolutionaryTextGenerator(
+            llm=self.navigator_llm,
             co_teach_llms=self.co_teach_llms,
-            navigator_llm=self.navigator_llm,
-            co_teach_template=self.co_teach_template,
-            suggestions_template=self.suggestions_template,
-            self_teaching_template=self.self_teaching_template,
-            template_vars=template_vars,
+            config=self.config,
             verbose=self.verbose,
         )
 
-        # Re-evaluate the improved text using the Navigator
+    def _initialize_llms(self):
+        try:
+            return initialize_navigator(self.config)
+        except Exception as e:
+            logger.error(f"Failed to initialize LLMs: {str(e)}")
+            raise
+
+    def generate_diverse_instructions(self, context: str) -> tuple[str, float]:
+        if self.verbose:
+            log_message("🔍 Synthesizing diverse instructions based on the inputs.")
+
+        instruction_prompt = f"\n\nContext: {context}\n\nInstruction:"
+        instruction = self.text_generator.generate(
+            instruction_prompt, generation_type=GenerationType.INSTRUCTION
+        )
+
+        # Evaluate the instruction
+        evaluation = evaluate_texts(
+            texts=[instruction],
+            llm=self.navigator_llm,
+            prompt=self.config.instruction_quality_prompt,
+            context=context,
+        )
+        score = evaluation["composite_score"].iloc[0]
+
+        if self.verbose:
+            log_message(f"\nGenerated instruction (score: {score:.2f}):")
+            log_message(f'    - "{instruction}"')
+
+        return instruction, score
+
+    def generate_diverse_responses(
+        self, context: str, instruction: str
+    ) -> tuple[str, float]:
         if self.verbose:
             log_message(
-                f"    🔄 🏆 Re-evaluating improved {data_type} text using Navigator for Ranking"
+                "📝 Synthesizing diverse responses to the top synthetic instruction."
             )
-        improved_score = evaluate_texts(
-            [improved_text],
-            "text",
-            "context",
-            context,
-            format_prompt,
-            navigator_tabular=self.navigator_tabular,
-            verbose=self.verbose,
-        )["average_score"].iloc[0]
 
-        return {"text": improved_text, "score": improved_score}
-
-    def format_instruction_text(self, data_type, instruction):
-        if data_type == "response":
-            return (
-                f"Instruction: {instruction}\n\n"
-                "The response should address the provided instruction.\n\n"
-            )
-        return ""
-
-    def construct_context(self, row, fields: List[DataFieldConfig]) -> str:
-        context = ""
-        for field in fields:
-            context += f"{field.name}: {row[field.name]} "
-        return context.strip()
-
-    def generate_diverse_instructions(self, context):
-        instructions = []
-        for _ in range(self.config.num_instructions):
-            # Randomize generation parameters
-            temperature = random.uniform(0.5, 1.2)
-            max_tokens = random.randint(
-                self.config.max_tokens_instruction // 2,
-                self.config.max_tokens_instruction,
-            )
-            top_k = random.randint(20, 100)
-            top_p = random.uniform(0.8, 1.0)
-
-            prompt = self.instruction_template.format(
-                context=context,
-                instruction_format_prompt=self.config.instruction_format_prompt,
-            )
-            generated_text = self.navigator_llm.generate(
-                prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_k=top_k,
-                top_p=top_p,
-            )
-            instructions.append(generated_text)
-
-        instruction_scores = evaluate_texts(
-            instructions,
-            "instruction",
-            "context",
-            context,
-            self.config.instruction_format_prompt,
-            navigator_tabular=self.navigator_tabular,
+        response_prompt = f"Based on the following context and instruction, generate a self-contained response that includes all necessary information:\n\nContext: {context}\n\nInstruction: {instruction}\n\nResponse:"
+        response = self.text_generator.generate(
+            response_prompt, generation_type=GenerationType.RESPONSE
         )
 
-        if self.verbose:
-            log_message("Generated instructions:")
-            for idx, (instruction, score) in enumerate(
-                zip(instructions, instruction_scores["average_score"])
-            ):
-                log_message(f'   {idx + 1}. "{instruction}" (Score: {score:.2f})')
-
-        if self.use_aaa:
-            best_idx = instruction_scores["average_score"].idxmax()
-            best_instruction = instructions[best_idx]
-            best_score = instruction_scores.loc[best_idx, "average_score"]
-
-            if self.verbose:
-                log_message(f"\n🌟 Selected top instruction for AAA improvement:")
-                log_message(f'   "{best_instruction}" (Score: {best_score:.2f})')
-
-            improved_instruction = self.apply_aaa_to_text(
-                text=best_instruction,
-                context=context,
-                format_prompt=self.config.instruction_format_prompt,
-                data_type="instruction",
-            )
-            instructions[best_idx] = improved_instruction["text"]
-            instruction_scores.loc[best_idx, "average_score"] = improved_instruction[
-                "score"
-            ]
-
-            if self.verbose:
-                log_message("\nFinal instructions after AAA improvement:")
-                for idx, (instruction, score) in enumerate(
-                    zip(instructions, instruction_scores["average_score"])
-                ):
-                    if idx == best_idx:
-                        log_message(
-                            f'   {idx + 1}. 🌟 "{instruction}" (Score: {score:.2f}) [Improved]'
-                        )
-                    else:
-                        log_message(
-                            f'   {idx + 1}. "{instruction}" (Score: {score:.2f})'
-                        )
-
-        return instructions, instruction_scores
-
-    def generate_diverse_responses(self, context, instruction):
-        responses = []
-        for _ in range(self.config.num_responses):
-            # Randomize generation parameters
-            temperature = random.uniform(0.5, 1.2)
-            max_tokens = random.randint(
-                self.config.max_tokens_response // 2, self.config.max_tokens_response
-            )
-            top_k = random.randint(20, 100)
-            top_p = random.uniform(0.8, 1.0)
-
-            prompt = self.response_template.format(
-                context=context,
-                instruction=instruction,
-                response_format_prompt=self.config.response_format_prompt,
-            )
-            generated_text = self.navigator_llm.generate(
-                prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_k=top_k,
-                top_p=top_p,
-            )
-            responses.append(generated_text)
-
-        response_scores = evaluate_texts(
-            texts=responses,
-            column_name="response",
-            additional_column="context",
-            additional_value=context,
-            format_prompt=self.config.response_format_prompt,
-            navigator_tabular=self.navigator_tabular,
-            verbose=self.verbose,
+        # Evaluate the response
+        evaluation = evaluate_texts(
+            texts=[response],
+            llm=self.navigator_llm,
+            prompt=self.config.response_quality_prompt,
+            context=f"{context}\n{instruction}",
         )
-
-        if self.use_aaa:
-            best_idx = response_scores["average_score"].idxmax()
-            best_response = responses[best_idx]
-            best_score = response_scores.loc[best_idx, "average_score"]
-
-            if self.verbose:
-                log_message(f"\n🌟 Selected top response for AAA improvement:")
-                log_message(f'   "{best_response}" (Score: {best_score:.2f})')
-
-            improved_response = self.apply_aaa_to_text(
-                text=best_response,
-                context=context,
-                format_prompt=self.config.response_format_prompt,
-                data_type="response",
-                instruction=instruction,
-            )
-            responses[best_idx] = improved_response["text"]
-            response_scores.loc[best_idx, "average_score"] = improved_response["score"]
+        score = evaluation["composite_score"].iloc[0]
 
         if self.verbose:
-            for response, score in zip(responses, response_scores["average_score"]):
-                log_message(f'   - "{response}" (Score: {score:.1f})')
+            log_message(f"\nGenerated response (score: {score:.2f}):")
+            log_message(f'    - "{response}"')
 
-        return responses, response_scores
+        return response, score
 
     def generate(self) -> pd.DataFrame:
         new_rows = []
@@ -243,101 +108,79 @@ class TrainingDataSynthesizer:
             desc="Synthesizing Data",
             leave=True,
         ):
-            context = self.construct_context(row, self.config.input_fields)
+            try:
+                if self.verbose:
+                    log_message(
+                        f"🆕 Starting the process of synthesizing a new training record for index {index}."
+                    )
+                    log_message("=" * 50)
 
-            if self.verbose:
+                new_row = self._process_row(index, row)
+                new_rows.append(new_row)
+                self._append_to_output_file(new_row, index)
+
+                log_message(f"✅ Completed synthetic record for index {index}")
                 log_message(
-                    f"🆕 Starting the process of synthesizing a new training record for index {index}."
-                )
-                log_message("=" * 50)
-                log_message(
-                    f"🔍 Synthesizing diverse instructions based on the inputs."
-                )
-
-            new_instructions, instruction_scores = self.generate_diverse_instructions(
-                context
-            )
-
-            best_instruction = self.select_best_instruction(
-                context, new_instructions, instruction_scores
-            )
-
-            if self.verbose:
-                log_message(
-                    f"🌟 Selected instruction:\n    - {best_instruction['instruction']} (Score: {best_instruction['score']})"
+                    f"🌟 Instruction:\n  - {new_row[self.config.output_instruction_field]}"
                 )
                 log_message(
-                    "📝 Synthesizing diverse responses to the top synthetic instruction."
+                    f"🌟 Response:\n  - {new_row[self.config.output_response_field]}"
                 )
 
-            new_responses, response_scores = self.generate_diverse_responses(
-                context, best_instruction["instruction"]
-            )
-
-            best_response = self.select_best_response(
-                context, best_instruction["instruction"], new_responses, response_scores
-            )
-
-            if self.verbose:
-                log_message(
-                    f"🌟 Selected response:\n  - {best_response['response']} (Score: {best_response['score']})"
-                )
-
-            new_row = self.create_new_row(row, best_instruction, best_response)
-            new_rows.append(new_row)
-
-            # Append the new row to the CSV file
-            new_df = pd.DataFrame([new_row])
-            if self.output_file:
-                new_df.to_csv(self.output_file, mode="a", header=not index, index=False)
-
-            log_message(f"✅ Completed synthetic record for index {index}")
-            log_message(f"🌟 Instruction:\n  - {best_instruction['instruction']}")
-            log_message(f"🌟 Response:\n  - {best_response['response']}")
+            except Exception as e:
+                error_message = f"Error processing row {index}: {str(e)}"
+                full_traceback = traceback.format_exc()
+                logger.error(f"{error_message}\n\nFull traceback:\n{full_traceback}")
 
         return pd.DataFrame(new_rows)
 
-    def create_new_row(self, original_row, best_instruction, best_response):
-        selected_fields = [field.name for field in self.config.input_fields]
-        new_row = {
-            field: original_row[field]
-            for field in selected_fields
-            if field in original_row
-        }
+    def _process_row(self, index: int, row: pd.Series) -> Dict[str, Any]:
+        context = self._construct_context(row)
 
-        new_row[self.config.output_instruction_field] = best_instruction["instruction"]
-        new_row[f"{self.config.output_instruction_field}_score"] = best_instruction[
-            "score"
-        ]
+        instruction, instruction_score = self.generate_diverse_instructions(context)
+        response, response_score = self.generate_diverse_responses(context, instruction)
 
-        new_row[self.config.output_response_field] = best_response["response"]
-        new_row[f"{self.config.output_response_field}_score"] = best_response["score"]
+        new_row = self._create_new_row(
+            row, instruction, response, instruction_score, response_score
+        )
+
+        if self.verbose:
+            log_message(f"\nGenerated training data for index {index}:")
+            log_message(f"    Instruction (score: {instruction_score:.2f}):")
+            log_message(f"    - {instruction}")
+            log_message(f"Response (score: {response_score:.2f}):")
+            log_message(f"    - {response}")
 
         return new_row
 
-    @staticmethod
-    def log_teaching_steps(text, teaching_type, step_type):
-        if step_type == "Input":
-            log_message(f"{teaching_type} Input: {text}")
-        elif step_type == "Result":
-            log_message(f"{teaching_type} Result: {text}")
-        elif step_type == "Suggestions":
-            log_message(f"{teaching_type} Suggestion:\n  - {text}")
-
-    def select_best_instruction(self, context, instructions, scores):
-        best_idx = scores["average_score"].idxmax()
-        best_score = scores.loc[best_idx, "average_score"]
-        log_message(
-            f"Selected optimal instruction at index {best_idx}. Score: {best_score}"
+    def _construct_context(self, row: pd.Series) -> str:
+        return " ".join(
+            f"{field}: {row[field]}"
+            for field in self.config.input_fields
+            if field in row
         )
 
-        return {"instruction": instructions[best_idx], "score": best_score}
+    def _create_new_row(
+        self,
+        original_row: pd.Series,
+        instruction: str,
+        response: str,
+        instruction_score: float,
+        response_score: float,
+    ) -> Dict[str, Any]:
+        new_row = {
+            field: original_row[field]
+            for field in self.config.input_fields
+            if field in original_row
+        }
+        new_row[self.config.output_instruction_field] = instruction
+        new_row[f"{self.config.output_instruction_field}_score"] = instruction_score
+        new_row[self.config.output_response_field] = response
+        new_row[f"{self.config.output_response_field}_score"] = response_score
+        return new_row
 
-    def select_best_response(self, context, instruction, responses, scores):
-        best_idx = scores["average_score"].idxmax()
-        best_score = scores.loc[best_idx, "average_score"]
-
-        log_message(
-            f"Selected optimal response at index {best_idx}. Score: {best_score}"
-        )
-        return {"response": responses[best_idx], "score": best_score}
+    def _append_to_output_file(self, new_row: Dict[str, Any], index: int):
+        if self.output_file:
+            pd.DataFrame([new_row]).to_json(
+                self.output_file, mode="a", orient="records", lines=True
+            )
