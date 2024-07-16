@@ -8,12 +8,13 @@ from typing import Callable, List, Optional, Tuple, Union
 import pandas as pd
 from langchain.prompts import PromptTemplate
 
-from .data_synthesis import InstructionResponseConfig, SingleTextConfig, log_message
+from .data_synthesis import (InstructionResponseConfig, SingleTextConfig,
+                             log_message)
 from .evaluation_utils import relative_ranking
 from .generation_types import GenerationType
+from .json_utils import parse_json_response, validate_json_keys
 
 logger = logging.getLogger(__name__)
-
 
 # Updated AAA prompts
 CO_TEACH_TEMPLATE = PromptTemplate(
@@ -359,7 +360,7 @@ class EvolutionaryTextGenerator:
                     )
 
                     # Parse the JSON response
-                    response_json = json.loads(response.strip())
+                    response_json = parse_json_response(response, self.verbose)
                     complexity = response_json["complexity"]
 
                     if 1 <= complexity <= 5:
@@ -410,11 +411,7 @@ class EvolutionaryTextGenerator:
                         prompt=batch_prompt, temperature=0.2, max_tokens=100
                     )
                     # Extract the JSON part of the response using regex
-                    match = re.search(r"\{.*?\}", response, re.DOTALL)
-                    if not match:
-                        raise ValueError("No JSON object found in the response")
-
-                    evaluation = json.loads(match.group(0))
+                    evaluation = parse_json_response(response, self.verbose)
 
                     if len(evaluation) != len(batch):
                         raise ValueError(
@@ -619,22 +616,12 @@ def apply_aaa(
     best_co_teaching_response = primary_llm.generate(best_co_teaching_prompt)
 
     try:
-        # Extract the JSON part of the response using regex
-        best_co_teaching_json = re.search(
-            r"\{.*?\}", best_co_teaching_response, re.DOTALL
-        ).group(0)
-        best_co_teaching_data = json.loads(best_co_teaching_json)
+        best_co_teaching_data = parse_json_response(best_co_teaching_response, verbose)
         best_option_number = best_co_teaching_data["best_option"]
         best_model, best_co_teaching_text = co_teaching_results[
             int(best_option_number) - 1
         ]
-    except (
-        json.JSONDecodeError,
-        KeyError,
-        ValueError,
-        IndexError,
-        AttributeError,
-    ) as e:
+    except (ValueError, KeyError) as e:
         if verbose:
             log_message(f"Error parsing best co-teaching result: {str(e)}")
             log_message(f"Full response: {best_co_teaching_response}")
@@ -676,13 +663,9 @@ def apply_aaa(
     final_selection_response = primary_llm.generate(final_selection_prompt)
 
     try:
-        # Extract the JSON part of the response using regex
-        final_selection_json = re.search(
-            r"\{.*?\}", final_selection_response, re.DOTALL
-        ).group(0)
-        final_selection_data = json.loads(final_selection_json)
+        final_selection_data = parse_json_response(final_selection_response, verbose)
         final_selection = final_selection_data["best_option"]
-    except (json.JSONDecodeError, KeyError, ValueError, AttributeError) as e:
+    except (ValueError, KeyError) as e:
         if verbose:
             log_message(f"Error parsing final selection result: {str(e)}")
             log_message(f"Full response: {final_selection_response}")

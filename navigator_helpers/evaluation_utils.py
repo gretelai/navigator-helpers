@@ -7,6 +7,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from .data_synthesis import log_message
+from .json_utils import parse_json_response, validate_json_keys
 
 
 class Metric(BaseModel):
@@ -117,7 +118,7 @@ Ensure that your scores reflect meaningful differences between strengths and wea
 """
                 response = llm.generate(evaluation_prompt, temperature=0.2)
 
-                scores = json.loads(response)
+                scores = parse_json_response(response, verbose)
 
                 # Ensure all required metrics are present
                 for metric in metrics.metrics:
