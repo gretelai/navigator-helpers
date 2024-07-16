@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -6,6 +7,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from .data_synthesis import log_message
+from .json_utils import parse_json_response, validate_json_keys
 
 
 class Metric(BaseModel):
@@ -116,7 +118,7 @@ Ensure that your scores reflect meaningful differences between strengths and wea
 """
                 response = llm.generate(evaluation_prompt, temperature=0.2)
 
-                scores = json.loads(response)
+                scores = parse_json_response(response, verbose)
 
                 # Ensure all required metrics are present
                 for metric in metrics.metrics:
@@ -129,7 +131,7 @@ Ensure that your scores reflect meaningful differences between strengths and wea
 
             except Exception as e:
                 if verbose:
-                    log_message(f"Error during evaluation of text {idx + 1}: {str(e)}")
+                    log_message(f"Error during evaluation scoring of texts {idx + 1}: {str(e)}")
 
             attempt += 1
             if verbose:
@@ -194,17 +196,14 @@ def relative_ranking(
 
     # Handle the case of a single text
     if len(texts) == 1:
-        result_df = pd.DataFrame(
+        return pd.DataFrame(
             {
                 "text": texts,
                 "rank": [1],
-                "text_number": [1],
                 "composite_score": [100.0],
+                **{metric.name: [100.0] for metric in metrics.metrics},
             }
         )
-        for metric in metrics.metrics:
-            result_df[metric.name] = 100.0
-        return result_df
 
     ranking_prompt = f"""Compare and rank the following texts based on these criteria:
 
@@ -221,28 +220,48 @@ Evaluation criteria:
 Texts to evaluate:
 {json.dumps([f"Text {i+1}: " + text[:100] + "..." for i, text in enumerate(texts)])}
 
-Provide your evaluation as a JSON array of objects, each containing the text number and its rank:
-[
-    {{"text": "Text 1", "rank": X}},
-    {{"text": "Text 2", "rank": Y}},
+Provide your ranking as a simple JSON object where the keys are the text numbers and the values are their ranks:
+{{
+    "1": X,
+    "2": Y,
     ...
-]
+}}
 
 Ensure that your rankings reflect meaningful differences between the texts based on the given criteria.
 The best text should have rank 1, the second-best rank 2, and so on.
+Provide only the JSON object, with no additional explanation.
 """
+
+    def parse_response(response: str) -> dict:
+        try:
+            parsed = json.loads(response)
+            if isinstance(parsed, dict) and all(
+                key.isdigit() and isinstance(value, int)
+                for key, value in parsed.items()
+            ):
+                return {int(k): v for k, v in parsed.items()}
+        except json.JSONDecodeError:
+            pass
+
+        # If JSON parsing fails, try to extract information using regex
+        pattern = r'"?(\d+)"?\s*:\s*(\d+)'
+        matches = re.findall(pattern, response)
+        if matches:
+            return {int(text): int(rank) for text, rank in matches}
+
+        raise ValueError("Unable to parse the relative ranking response into the required format")
 
     attempt = 0
     while attempt < max_retries:
         try:
             response = llm.generate(ranking_prompt, temperature=0.2)
 
-            parsed_response = json.loads(response)
+            parsed_response = parse_response(response)
 
             # Create DataFrame from the parsed response
-            result_df = pd.DataFrame(parsed_response)
-            result_df["text_number"] = (
-                result_df["text"].str.extract("(\d+)").astype(int)
+            result_df = pd.DataFrame(
+                [(k, v) for k, v in parsed_response.items()],
+                columns=["text_number", "rank"],
             )
             result_df = result_df.sort_values("rank")
 
@@ -274,11 +293,12 @@ The best text should have rank 1, the second-best rank 2, and so on.
 
         except Exception as e:
             if verbose:
-                log_message(f"Error during comparison: {str(e)}")
+                print(f"Error during relative ranking comparison (attempt {attempt + 1}): {str(e)}")
+                print(f"LLM Response:\n{response}")
 
         attempt += 1
         if verbose:
-            log_message(f"Retrying comparison (attempt {attempt}/{max_retries})...")
+            print(f"Retrying relative ranking comparison (attempt {attempt}/{max_retries})...")
         time.sleep(2)  # Wait before retrying
 
     raise Exception("Max retries exceeded during text comparison")

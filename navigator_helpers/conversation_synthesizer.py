@@ -11,7 +11,6 @@ from .text_generation import EvolutionaryTextGenerator, log_message
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class Conversation:
     def __init__(self, system_prompt):
@@ -52,8 +51,7 @@ class ConversationSynthesizer:
         )
 
     def generate(self):
-        if self.verbose:
-            log_message("🚀 Starting conversation generation process")
+        logger.info("Starting conversation generation process")
 
         generated_conversations = []
 
@@ -62,17 +60,12 @@ class ConversationSynthesizer:
             desc="Generating Conversations",
             disable=not self.verbose,
         ):
-            if self.verbose:
-                log_message(
-                    f"\n📝 Generating conversation {i + 1}/{self.num_conversations}"
-                )
+            logger.info(f"Generating conversation {i + 1}/{self.num_conversations}")
 
-            conversation = self._generate_conversation()
+            conversation = self._generate_conversation(i + 1)
             conversation_dict = conversation.to_dict()
 
-            if self.verbose:
-                log_message(f"✅ Conversation {i + 1} generated successfully ⭐")
-                self._print_conversation(conversation)
+            logger.info(f"Conversation {i + 1} generated successfully")
 
             if self.output_file:
                 with open(self.output_file, "a") as f:
@@ -80,21 +73,27 @@ class ConversationSynthesizer:
 
             generated_conversations.append(conversation_dict)
 
-        if self.verbose:
-            log_message(
-                f"🎉 Generated {self.num_conversations} conversations successfully 🎉"
-            )
+        logger.info(f"Generated {self.num_conversations} conversations successfully")
 
         return generated_conversations
 
-    def _generate_conversation(self):
+    def _generate_conversation(self, conversation_number):
         conversation = Conversation(self.config.system_prompt)
-        for turn in range(self.num_turns):
+        for turn in tqdm(
+            range(self.num_turns),
+            desc=f"Generating Turns for Conversation {conversation_number}",
+            leave=False,
+            disable=not self.verbose,
+        ):
+            logger.info(f"Generating turn {turn + 1}/{self.num_turns} for conversation {conversation_number}")
+
             user_message = self._generate_message(conversation, "user")
             conversation.add_message("user", user_message)
+            logger.info(f"Generated user message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}")
 
             assistant_message = self._generate_message(conversation, "assistant")
             conversation.add_message("assistant", assistant_message)
+            logger.info(f"Generated assistant message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}")
 
         return conversation
 
