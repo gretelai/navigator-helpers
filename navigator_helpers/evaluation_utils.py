@@ -131,7 +131,7 @@ Ensure that your scores reflect meaningful differences between strengths and wea
 
             except Exception as e:
                 if verbose:
-                    log_message(f"Error during evaluation of text {idx + 1}: {str(e)}")
+                    log_message(f"Error during evaluation scoring of texts {idx + 1}: {str(e)}")
 
             attempt += 1
             if verbose:
@@ -249,7 +249,7 @@ Provide only the JSON object, with no additional explanation.
         if matches:
             return {int(text): int(rank) for text, rank in matches}
 
-        raise ValueError("Unable to parse the response into the required format")
+        raise ValueError("Unable to parse the relative ranking response into the required format")
 
     attempt = 0
     while attempt < max_retries:
@@ -293,12 +293,12 @@ Provide only the JSON object, with no additional explanation.
 
         except Exception as e:
             if verbose:
-                print(f"Error during comparison (attempt {attempt + 1}): {str(e)}")
+                print(f"Error during relative ranking comparison (attempt {attempt + 1}): {str(e)}")
                 print(f"LLM Response:\n{response}")
 
         attempt += 1
         if verbose:
-            print(f"Retrying comparison (attempt {attempt}/{max_retries})...")
+            print(f"Retrying relative ranking comparison (attempt {attempt}/{max_retries})...")
         time.sleep(2)  # Wait before retrying
 
     raise Exception("Max retries exceeded during text comparison")
