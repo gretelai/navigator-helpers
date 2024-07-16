@@ -2,7 +2,7 @@ import logging
 import sys
 import time
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 import pandas as pd
 from gretel_client import Gretel
@@ -30,8 +30,8 @@ class StreamlitLogHandler(logging.Handler):
 @dataclass
 class BaseDataSynthesisConfig:
     input_fields: List[str] = field(default_factory=list)
-    num_generations: int = 3
-    population_size: int = 5
+    num_generations: Literal[1, 2, 3, 4, 5] = 3
+    population_size: Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = 5
     mutation_rate: float = 0.5
     temperature: float = 0.8
     max_tokens: int = 150
@@ -58,7 +58,7 @@ class SingleTextConfig(BaseDataSynthesisConfig):
     mutation_prompt: Optional[str] = None
     complexity_prompt: Optional[str] = None
     quality_prompt: Optional[str] = None
-    complexity_target: float = 0.5
+    complexity_target: Literal[1, 2, 3, 4, 5] = 3
 
     def to_dict(self):
         return asdict(self)
@@ -76,12 +76,12 @@ class InstructionResponseConfig(BaseDataSynthesisConfig):
     instruction_mutation_prompt: Optional[str] = None
     instruction_complexity_prompt: Optional[str] = None
     instruction_quality_prompt: Optional[str] = None
-    instruction_complexity_target: float = 0.5
+    instruction_complexity_target: Literal[1, 2, 3, 4, 5] = 3
     response_format_prompt: Optional[str] = None
     response_mutation_prompt: Optional[str] = None
     response_complexity_prompt: Optional[str] = None
     response_quality_prompt: Optional[str] = None
-    response_complexity_target: float = 0.5
+    response_complexity_target: Literal[1, 2, 3, 4, 5] = 3
 
     def to_dict(self):
         return asdict(self)
