@@ -324,33 +324,53 @@ class EvolutionaryTextGenerator:
 
     def _measure_complexities(
         self, texts: List[str], generation_type: GenerationType
-    ) -> List[float]:
-        complexity_prompt = self._get_prompt("complexity_prompt", generation_type)
+    ) -> List[int]:
+        # Use a default complexity prompt if not provided in the config
+        default_complexity_prompt = "Analyze the complexity of the following text. Consider factors such as language difficulty, concept density, and assumed prior knowledge."
+        
+        complexity_prompt = getattr(self.config, f"{generation_type.value}_complexity_prompt", None) or default_complexity_prompt
+        
         complexities = []
 
         for text in texts:
-            prompt = f"{complexity_prompt}\n\nText to evaluate:\n{text}\n\nProvide only a numerical complexity score between 0 and 1, where 0 is the least complex and 1 is the most complex. Your response should be only the number, without any additional text or explanation:\n"
+            prompt = f"""{complexity_prompt}
+
+Text to evaluate:
+{text}
+
+Rate the complexity of this text on a scale from 1 to 5, where 1 is very simple and 5 is very complex.
+Respond with a JSON object in the following format:
+{{"complexity": <integer between 1 and 5>}}
+
+Provide only the JSON object, with no additional text:"""
 
             for _ in range(3):  # Try up to 3 times
                 try:
                     response = self.llm.generate(
                         prompt=prompt,
                         temperature=0.2,
-                        max_tokens=10,
+                        max_tokens=20,
                     )
-                    complexity = float(response.strip())
-                    if 0 <= complexity <= 1:
+                    if self.verbose:
+                        print(f"PROMPT:\n{prompt}")
+                        print(f"RESPONSE:\n{response}")
+                    
+                    # Parse the JSON response
+                    response_json = json.loads(response.strip())
+                    complexity = response_json['complexity']
+                    
+                    if 1 <= complexity <= 5:
                         complexities.append(complexity)
                         break
                     else:
                         raise ValueError("Complexity score out of range")
-                except (ValueError, TypeError):
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
+                    if self.verbose:
+                        print(f"Error processing response: {str(e)}")
                     if _ == 2:  # If this is the last attempt
                         if self.verbose:
-                            log_message(
-                                f"Failed to get valid complexity for text: {text[:50]}... Using default of 0.5"
-                            )
-                        complexities.append(0.5)  # Use a default value
+                            print(f"Failed to get valid complexity for text: {text[:50]}... Using default of 3")
+                        complexities.append(3)  # Use a default value
                     continue
 
         return complexities
