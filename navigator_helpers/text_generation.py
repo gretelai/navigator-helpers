@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import re
 import time
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -23,7 +24,7 @@ CO_TEACH_TEMPLATE = PromptTemplate(
         "The original prompt was: {original_prompt}\n\n"
         "Context (for reference only, do not mention directly): {context}\n"
         "Original text: {original_text}\n"
-        "Improved text:"
+        "Provide only the improved text and nothing else:"
     ),
 )
 
@@ -36,7 +37,7 @@ SUGGESTIONS_TEMPLATE = PromptTemplate(
         "Context (for reference only, do not mention directly): {context}\n"
         "Original text: {original_text}\n"
         "Current improved text: {co_teaching_text}\n"
-        "Suggestions for improvement:"
+        "Provide only the suggestions for improvement and nothing else:"
     ),
 )
 
@@ -56,7 +57,7 @@ SELF_TEACHING_TEMPLATE = PromptTemplate(
         "Original text: {original_text}\n"
         "Current improved text: {co_teaching_text}\n"
         "Suggestions for improvement: {suggestions}\n"
-        "Final improved text:"
+        "Provide only the final improved text and nothing else:"
     ),
 )
 
@@ -73,7 +74,8 @@ BEST_CO_TEACHING_TEMPLATE = PromptTemplate(
         "Context (for reference only, do not mention directly): {context}\n"
         "Original: {original_text}\n\n"
         "{co_teaching_results}\n\n"
-        "Respond with only the number of the best option (e.g., '1', '2', etc.):"
+        "Respond with a JSON object in the following format:\n"
+        '{{"best_option": <option number>}}'
     ),
 )
 
@@ -94,7 +96,8 @@ FINAL_SELECTION_TEMPLATE = PromptTemplate(
         "Self-Teaching: {self_teaching_text}\n\n"
         "Evaluate each option based on clarity, completeness, and overall quality. "
         "Choose the option that best addresses the original intent while including all relevant information.\n\n"
-        "Best option (Original/Co-Teaching/Self-Teaching):"
+        "Respond with a JSON object in the following format:\n"
+        '{{"best_option": "<Original/Co-Teaching/Self-Teaching>"}}'
     ),
 )
 
@@ -327,22 +330,25 @@ class EvolutionaryTextGenerator:
     ) -> List[int]:
         # Use a default complexity prompt if not provided in the config
         default_complexity_prompt = "Analyze the complexity of the following text. Consider factors such as language difficulty, concept density, and assumed prior knowledge."
-        
-        complexity_prompt = getattr(self.config, f"{generation_type.value}_complexity_prompt", None) or default_complexity_prompt
-        
+
+        complexity_prompt = (
+            getattr(self.config, f"{generation_type.value}_complexity_prompt", None)
+            or default_complexity_prompt
+        )
+
         complexities = []
 
         for text in texts:
             prompt = f"""{complexity_prompt}
 
-Text to evaluate:
-{text}
+    Text to evaluate:
+    {text}
 
-Rate the complexity of this text on a scale from 1 to 5, where 1 is very simple and 5 is very complex.
-Respond with a JSON object in the following format:
-{{"complexity": <integer between 1 and 5>}}
+    Rate the complexity of this text on a scale from 1 to 5, where 1 is very simple and 5 is very complex.
+    Respond with a JSON object in the following format:
+    {{"complexity": <integer between 1 and 5>}}
 
-Provide only the JSON object, with no additional text:"""
+    Provide only the JSON object, with no additional text:"""
 
             for _ in range(3):  # Try up to 3 times
                 try:
@@ -351,14 +357,11 @@ Provide only the JSON object, with no additional text:"""
                         temperature=0.2,
                         max_tokens=20,
                     )
-                    if self.verbose:
-                        print(f"PROMPT:\n{prompt}")
-                        print(f"RESPONSE:\n{response}")
-                    
+
                     # Parse the JSON response
                     response_json = json.loads(response.strip())
-                    complexity = response_json['complexity']
-                    
+                    complexity = response_json["complexity"]
+
                     if 1 <= complexity <= 5:
                         complexities.append(complexity)
                         break
@@ -366,12 +369,13 @@ Provide only the JSON object, with no additional text:"""
                         raise ValueError("Complexity score out of range")
                 except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
                     if self.verbose:
-                        print(f"Error processing response: {str(e)}")
+                        log_message(
+                            f"Error processing response for text: {text[:50]}... - {str(e)}"
+                        )
+                        log_message(f"PROMPT:\n{prompt}")
+                        log_message(f"RESPONSE:\n{response}")
                     if _ == 2:  # If this is the last attempt
-                        if self.verbose:
-                            print(f"Failed to get valid complexity for text: {text[:50]}... Using default of 3")
                         complexities.append(3)  # Use a default value
-                    continue
 
         return complexities
 
@@ -391,6 +395,7 @@ Provide only the JSON object, with no additional text:"""
                 "For each text, evaluate if it is concise, clear, and aligned with the context. "
                 "Provide your evaluation as a JSON object where the keys are the text numbers "
                 "and the values are boolean true (if the text passes the quality check) or false (if it doesn't). "
+                "Only provide the JSON object with no additional explanation or text.\n"
                 "Example format:\n"
                 "{\n"
                 '  "1": true,\n'
@@ -404,8 +409,12 @@ Provide only the JSON object, with no additional text:"""
                     response = self.llm.generate(
                         prompt=batch_prompt, temperature=0.2, max_tokens=100
                     )
-                    # Parse the JSON response
-                    evaluation = json.loads(response)
+                    # Extract the JSON part of the response using regex
+                    match = re.search(r"\{.*?\}", response, re.DOTALL)
+                    if not match:
+                        raise ValueError("No JSON object found in the response")
+
+                    evaluation = json.loads(match.group(0))
 
                     if len(evaluation) != len(batch):
                         raise ValueError(
@@ -420,14 +429,22 @@ Provide only the JSON object, with no additional text:"""
                     return results
                 except json.JSONDecodeError as e:
                     if self.verbose:
-                        print(f"JSON parsing error in attempt {attempt + 1}: {str(e)}")
+                        log_message(
+                            f"Quality Filter - JSON parsing error in attempt {attempt + 1}: {str(e)}"
+                        )
+                        log_message(f"PROMPT:\n{batch_prompt}")
+                        log_message(f"RESPONSE:\n{response}")
                 except Exception as e:
                     if self.verbose:
-                        print(f"Error in attempt {attempt + 1}: {str(e)}")
+                        log_message(
+                            f"Quality Filter - Error in attempt {attempt + 1}: {str(e)}"
+                        )
+                        log_message(f"PROMPT:\n{batch_prompt}")
+                        log_message(f"RESPONSE:\n{response}")
 
                 if attempt == max_retries - 1:
                     if self.verbose:
-                        print(
+                        log_message(
                             f"Max retries exceeded for batch. Assuming all texts in this batch are valid."
                         )
                     return [(text, True) for text in batch]
@@ -586,9 +603,7 @@ def apply_aaa(
         co_teaching_text = llm.generate(co_teaching_prompt)
         co_teaching_results.append((llm.backend_model, co_teaching_text))
         if verbose:
-            log_message(
-                f"🏫 Co-Teaching {i}: {llm.backend_model}\n- {co_teaching_text}"
-            )
+            log_message(f"🏫 Co-Teaching {i}: {llm.backend_model}\n- {co_teaching_text}")
 
     best_co_teaching_prompt = BEST_CO_TEACHING_TEMPLATE.format(
         original_text=text,
@@ -601,8 +616,30 @@ def apply_aaa(
         original_prompt=original_prompt,
         context=context,
     )
-    best_co_teaching = primary_llm.generate(best_co_teaching_prompt)
-    best_model, best_co_teaching_text = co_teaching_results[int(best_co_teaching) - 1]
+    best_co_teaching_response = primary_llm.generate(best_co_teaching_prompt)
+
+    try:
+        # Extract the JSON part of the response using regex
+        best_co_teaching_json = re.search(
+            r"\{.*?\}", best_co_teaching_response, re.DOTALL
+        ).group(0)
+        best_co_teaching_data = json.loads(best_co_teaching_json)
+        best_option_number = best_co_teaching_data["best_option"]
+        best_model, best_co_teaching_text = co_teaching_results[
+            int(best_option_number) - 1
+        ]
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        ValueError,
+        IndexError,
+        AttributeError,
+    ) as e:
+        if verbose:
+            log_message(f"Error parsing best co-teaching result: {str(e)}")
+            log_message(f"Full response: {best_co_teaching_response}")
+        best_model, best_co_teaching_text = co_teaching_results[0]
+
     if verbose:
         log_message(
             f"🏆 Selected co-teaching result: {best_model}\n- {best_co_teaching_text}"
@@ -636,7 +673,21 @@ def apply_aaa(
         original_prompt=original_prompt,
         context=context,
     )
-    final_selection = primary_llm.generate(final_selection_prompt)
+    final_selection_response = primary_llm.generate(final_selection_prompt)
+
+    try:
+        # Extract the JSON part of the response using regex
+        final_selection_json = re.search(
+            r"\{.*?\}", final_selection_response, re.DOTALL
+        ).group(0)
+        final_selection_data = json.loads(final_selection_json)
+        final_selection = final_selection_data["best_option"]
+    except (json.JSONDecodeError, KeyError, ValueError, AttributeError) as e:
+        if verbose:
+            log_message(f"Error parsing final selection result: {str(e)}")
+            log_message(f"Full response: {final_selection_response}")
+        final_selection = "Self-Teaching"  # Default to self-teaching if parsing fails
+
     if final_selection.lower() == "original":
         final_text = text
         selection_source = "Original"
