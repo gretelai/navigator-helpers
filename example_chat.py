@@ -1,8 +1,6 @@
 import json
 import logging
 
-import pandas as pd
-
 from navigator_helpers import ConversationSynthesizer, SingleTextConfig
 
 
@@ -45,8 +43,9 @@ def main():
         population_size=3,
         mutation_rate=0.5,
         temperature=0.8,
-        max_tokens=150,
+        max_tokens=200,
         api_key=GRETEL_API_KEY,
+        endpoint="https://api.gretel.ai",
         navigator_llm=NAVIGATOR_LLM,
         co_teach_llms=CO_TEACH_LLMS,
         system_prompt=SYSTEM_PROMPT,
@@ -54,7 +53,7 @@ def main():
         mutation_prompt="Modify this conversation turn to make it more engaging and aligned with the conversation context:",
         complexity_prompt="Rate the complexity of this conversation turn:",
         quality_prompt="Evaluate the quality of this conversation turn:",
-        complexity_target=0.5,
+        complexity_target=3,
         use_aaa=False,
     )
 
@@ -80,8 +79,7 @@ def main():
     # Print an example conversation
     print("\nExample of a synthesized conversation:")
     example_conversation = conversations[0]
-    for message in example_conversation["messages"]:
-        print(f"{message['role'].capitalize()}: {message['content']}")
+    print(json.dumps(example_conversation, indent=2))
 
 
 if __name__ == "__main__":
