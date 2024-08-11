@@ -72,15 +72,60 @@ class EvolDataGenerator:
         self.llm = self.gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=config["llm_model"]
         )
+        self.validated_fields: Dict[str, str] = {}
         self.content_validator = ContentValidator()
         self.column_validators = self._initialize_validators()
-        logger.info(f"EvolDataGenerator initialized with configuration: {config}")
-
-        # Initialize counters
+        logger.info(
+            f"EvolDataGenerator initialized with configuration:\n{json.dumps(config, indent=2)}"
+        )
+        self.mutation_strategies = self._initialize_mutation_strategies()
         self.records_filtered = 0
         self.records_repaired = 0
         self.relevance_checks_failed = 0
         self.safety_checks_failed = 0
+
+    def _initialize_mutation_strategies(self) -> Dict[str, List[str]]:
+        return {
+            "improve": [
+                "Improve the content, enhancing its quality, clarity, coherence, or effectiveness while maintaining its core meaning.",
+                "Optimize the content for better performance, efficiency, or clarity, rewriting it to be more concise, effective, or clear.",
+            ],
+            "simplify": [
+                "Simplify the content to make it more accessible and understandable.",
+                "Make the content more abstract or generalized, broadening the scope to cover a wider range of scenarios or applications.",
+            ],
+            "complexity": [
+                "Increase the complexity and nuance of the content by introducing more sophisticated concepts, layers of detail, or intricate relationships.",
+                "Expand the content by adding more details, explanations, or edge cases, such as considering uncommon scenarios, edge conditions, or additional attributes.",
+            ],
+            "diversity": [
+                "Provide an alternative way to solve or express the same problem or concept, introducing different approaches, perspectives, or methods.",
+                "Adapt the content to a closely related context within the same domain, ensuring that the core focus remains aligned with the original intent.",
+                "Make the content more specific or concrete with particular details, focusing on a narrower, more detailed aspect of the original prompt.",
+                "Rewrite the content in a different style or format, such as changing the tone, structure, or presentation.",
+                "Present the content from a different perspective or point of view, potentially introducing new dimensions, angles, or considerations.",
+            ],
+        }
+
+    def _select_mutation_strategy(self) -> str:
+        selected_categories = self.config.get(
+            "mutation_categories", list(self.mutation_strategies.keys())
+        )
+        selected_strategies = []
+        for category in selected_categories:
+            selected_strategies.extend(self.mutation_strategies.get(category, []))
+
+        if not selected_strategies:
+            logger.warning(
+                "No valid mutation strategies selected. Using all strategies."
+            )
+            selected_strategies = [
+                strategy
+                for strategies in self.mutation_strategies.values()
+                for strategy in strategies
+            ]
+
+        return random.choice(selected_strategies)
 
     def _initialize_validators(self) -> Dict[str, Callable]:
         validator_map = {
@@ -108,6 +153,10 @@ class EvolDataGenerator:
                     validators[column] = (validator_map[base_validator], base_validator)
             else:
                 validators[column] = (self.llm_validate, base_validator)
+
+            self.validated_fields[column] = (
+                f"{base_validator}:{':'.join(params)}" if params else base_validator
+            )
 
             logger.debug(
                 f"Configured {base_validator} validator for column '{column}' with parameters: {params}"
@@ -284,24 +333,10 @@ Return a dataset with the following columns:
 
         logger.debug("Applying mutations")
 
-        mutation_strategies = [
-            "Increase the complexity and nuance of the content by introducing more sophisticated concepts, layers of detail, or intricate relationships.",
-            "Simplify the content to make it more accessible and understandable.",
-            "Expand the content by adding more details, explanations, or edge cases, such as considering uncommon scenarios, edge conditions, or additional attributes.",
-            "Provide an alternative way to solve or express the same problem or concept, introducing different approaches, perspectives, or methods.",
-            "Adapt the content to a closely related context within the same domain, ensuring that the core focus remains aligned with the original intent.",
-            "Make the content more abstract or generalized, broadening the scope to cover a wider range of scenarios or applications.",
-            "Make the content more specific or concrete with particular details, focusing on a narrower, more detailed aspect of the original prompt.",
-            "Optimize the content for better performance, efficiency, or clarity, rewriting it to be more concise, effective, or clear.",
-            "Rewrite the content in a different style or format, such as changing the tone, structure, or presentation.",
-            "Present the content from a different perspective or point of view, potentially introducing new dimensions, angles, or considerations.",
-            "Improve the content, enhancing its quality, clarity, coherence, or effectiveness while maintaining its core meaning.",
-        ]
-
         mutated_population = []
         for index, individual in population.iterrows():
             if random.random() < self.config["mutation_rate"]:
-                strategy = random.choice(mutation_strategies)
+                strategy = self._select_mutation_strategy()
                 logger.debug(f"Mutating example {index} with strategy: {strategy}")
 
                 expected_columns = [x for x in individual.index if x != "quality_score"]
@@ -435,6 +470,7 @@ Return a dataset with the following columns:
                     json.dump(example.to_dict(), f, indent=2)
                     f.write("\n")
 
+        # After the data generation loop
         final_result = pd.concat(results, ignore_index=True)
         logger.info(
             f"Data generation complete. Final result shape: {final_result.shape}"
@@ -468,21 +504,24 @@ Return a dataset with the following columns:
         # Define a separator for visual clarity
         separator = "=" * 50
 
-        # Enhanced summary of metrics
+        # Concise summary of metrics
         logger.info("")
         logger.info(separator)
-        logger.info(f"{'Summary of Process Metrics':^50}")
+        logger.info(f"{'Summary of Metrics':^50}")
         logger.info(separator)
-        logger.info(f"Records returned from evolutionary process: {len(final_result)}")
         logger.info(
-            f"Total records generated: {total_records_generated} (including {estimated_mutations} from mutations)"
+            f"Total records generated: {total_records_generated} (Mutations: {estimated_mutations})"
         )
         logger.info(
-            f"Records repaired: {self.records_repaired} ({percent_repaired:.2f}%) | Records filtered: {self.records_filtered} ({percent_filtered:.2f}%)"
+            f"Attempted repairs: {self.records_repaired} ({percent_repaired:.2f}%) | Filtered records: {self.records_filtered} ({percent_filtered:.2f}%)"
         )
         logger.info(
-            f"Relevance check failures: {self.relevance_checks_failed} | Safety check failures: {self.safety_checks_failed}"
+            f"Relevance failures: {self.relevance_checks_failed} | Safety failures: {self.safety_checks_failed}"
         )
+        logger.info(separator)
+        logger.info("Validated Fields:")
+        for field, validator in self.validated_fields.items():
+            logger.info(f"  - {field}: {validator}")
         logger.info(separator)
         logger.info("")
 
