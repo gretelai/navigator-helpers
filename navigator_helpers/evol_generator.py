@@ -59,7 +59,7 @@ class ContentValidator:
             return str(e)
 
 
-class SyntheticDataGenerator:
+class EvolDataGenerator:
     def __init__(self, config: Dict[str, Any], output_file: str):
         self.config = config
         self.output_file = output_file
@@ -72,7 +72,7 @@ class SyntheticDataGenerator:
         )
         self.content_validator = ContentValidator()
         self.column_validators = self._initialize_validators()
-        logger.info(f"Initialized SyntheticDataGenerator with config: {config}")
+        logger.info(f"Initialized EvolDataGenerator with config: {config}")
 
     def _initialize_validators(self) -> Dict[str, Callable]:
         validator_map = {

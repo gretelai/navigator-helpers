@@ -1,6 +1,6 @@
 import pandas as pd
 
-from navigator_helpers import SyntheticDataGenerator
+from navigator_helpers import EvolDataGenerator
 
 # Define the user prompt
 user_prompt = """You are an expert in generating complex, nuanced, and context-rich questions along with comprehensive SQL-based answers. Your expertise spans various SQL concepts including advanced joins, subqueries, window functions, CTEs, and complex aggregations.
@@ -25,6 +25,6 @@ config = {
     "column_validators": {"sql_context": "sql:postgres", "sql": "sql:postgres"},
 }
 
-generator = SyntheticDataGenerator(config, output_file="output.jsonl")
+generator = EvolDataGenerator(config, output_file="output.jsonl")
 result = generator.generate_data(contextual_tags, user_prompt)
 print(result)
