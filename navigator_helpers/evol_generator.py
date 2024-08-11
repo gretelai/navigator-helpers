@@ -229,7 +229,7 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                 else:
                     raise ValueError(f"Missing columns in response: {missing_columns}")
             except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed with error: {str(e)}")
+                logger.warning(f"Attempt {attempt + 1} failed with error: {str(e)}")
                 if attempt == max_retries - 1:
                     logger.error(f"Max retries reached. Failed prompt:\n{prompt}")
                     logger.error(f"Expected columns: {expected_columns}")
@@ -255,8 +255,11 @@ Important: Ensure that the `corrected_content` field contains only the corrected
     def _expand_population(
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        logger.info("Expanding population")
+        if self.config.get("expansion_size", 0) == 0:
+            logger.info("Expansion size is 0, skipping population expansion.")
+            return population
 
+        logger.info("Expanding population")
         # Prepare the expansion prompt
         expansion_prompt = (
             f"{user_prompt}\n\n"
@@ -279,6 +282,11 @@ Important: Ensure that the `corrected_content` field contains only the corrected
     def _apply_mutations(
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
+
+        if self.config.get("mutation_rate", 0.0) == 0.0:
+            logger.info("Mutation rate is 0.0, skipping mutations.")
+            return population
+
         logger.info("Applying mutations")
 
         mutation_strategies = [
@@ -343,13 +351,17 @@ Important: Ensure that the `corrected_content` field contains only the corrected
 
         return mutated
 
+
     def generate_data(
         self, contextual_tags: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        logger.info(
-            f"Starting data generation for {len(contextual_tags)} contextual tags"
-        )
+        logger.info(f"Starting data generation for {len(contextual_tags)} contextual tags")
         results = []
+
+        num_generations = max(
+            self.config.get("num_generations", 1), 1
+        )  # Ensure at least 1 generation
+
         for record_index, row in tqdm(
             contextual_tags.iterrows(),
             total=len(contextual_tags),
@@ -363,9 +375,9 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                 f"Record {record_index + 1}: Initial population size: {len(population)}"
             )
 
-            for gen in range(self.config["num_generations"]):
+            for gen in range(num_generations):
                 logger.info(
-                    f"Record {record_index + 1}: Starting generation {gen + 1}/{self.config['num_generations']}"
+                    f"Record {record_index + 1}: Starting generation {gen + 1}/{num_generations}"
                 )
                 expanded_population = self._expand_population(population, user_prompt)
                 logger.info(
@@ -411,9 +423,7 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                     f.write("\n")
 
         final_result = pd.concat(results, ignore_index=True)
-        logger.info(
-            f"Data generation complete. Final result shape: {final_result.shape}"
-        )
+        logger.info(f"Data generation complete. Final result shape: {final_result.shape}")
         return final_result
 
     def _rank_population(
@@ -480,9 +490,6 @@ Ensure that your scores reflect meaningful differences between the examples base
                     all_quality_scores.get
                 )
 
-                logger.debug(
-                    f"Population DataFrame (with new quality scores):\n{population}"
-                )
                 ranked_population = population.sort_values(
                     "quality_score", ascending=False
                 )
@@ -493,13 +500,13 @@ Ensure that your scores reflect meaningful differences between the examples base
                 return ranked_population
 
             except Exception as e:
-                logger.error(
+                logger.warning(
                     f"Error during ranking (attempt {attempt + 1}/{max_retries}): {str(e)}"
                 )
-                logger.error(f"Full stack trace:\n{traceback.format_exc()}")
-                logger.error(f"LLM Response:\n{response}")
-                logger.error(f"Quality Scores:\n{all_quality_scores}")
-                logger.error(f"Population DataFrame (reset index):\n{population}")
+                logger.warning(f"Full stack trace:\n{traceback.format_exc()}")
+                logger.warning(f"LLM Response:\n{response}")
+                logger.warning(f"Quality Scores:\n{all_quality_scores}")
+                logger.warning(f"Population DataFrame (reset index):\n{population}")
 
             attempt += 1
             logger.info(f"Retrying ranking (attempt {attempt}/{max_retries})...")
