@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import pandas as pd
 import sqlfluff
 from gretel_client import Gretel
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 # Set up logging
 logging.basicConfig(
