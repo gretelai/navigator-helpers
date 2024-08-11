@@ -76,6 +76,12 @@ class EvolDataGenerator:
         self.column_validators = self._initialize_validators()
         logger.info(f"EvolDataGenerator initialized with configuration: {config}")
 
+        # Initialize counters
+        self.records_filtered = 0
+        self.records_repaired = 0
+        self.relevance_checks_failed = 0
+        self.safety_checks_failed = 0
+
     def _initialize_validators(self) -> Dict[str, Callable]:
         validator_map = {
             "sql": self.content_validator.validate_sql,
@@ -149,15 +155,14 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
         error = validator_func(content, content_type)
         if error:
             logger.warning(f"Validation error for {content_type}: {error}")
-            logger.error(
-                f"INVALID content detected: {content[:100]}..."
-            )  # Log first 100 chars
+            logger.error(f"INVALID content detected: {content[:100]}...")
             corrected_content, explanation = self.correct_content(
                 content, content_type, error
             )
             logger.info(
                 f"Corrected content of type {content_type}. Explanation: {explanation}"
             )
+            self.records_repaired += 1
             return corrected_content
         return content
 
@@ -248,6 +253,7 @@ Return a dataset with the following columns:
             return population
 
         logger.debug("Expanding population")
+
         expansion_prompt = (
             f"{user_prompt}\n\n"
             f"Generate new, diverse variations with the following columns:\n{self._create_column_list()}\n\n"
@@ -262,9 +268,12 @@ Return a dataset with the following columns:
             expected_columns=expected_columns,
         )
 
-        logger.info(f"Population expanded. New shape: {expanded.shape}")
+        logger.info(f"Population expanded. Expansion shape: {expanded.shape}")
 
-        return self.validate_and_correct_data(expanded)
+        # Combine the new examples with the existing population
+        updated_population = pd.concat([population, expanded], ignore_index=True)
+
+        return self.validate_and_correct_data(updated_population)
 
     def _apply_mutations(
         self, population: pd.DataFrame, user_prompt: str
@@ -319,18 +328,18 @@ Return a dataset with the following columns:
                 )
 
                 mutated_population.append(
-                    mutated_individual.drop(columns=["mutation_explanation"])
+                    mutated_individual.drop(columns=["mutation_explanation"]).iloc[0]
                 )
             else:
                 logger.debug(f"Example {index} not selected for mutation")
-                mutated_population.append(individual)  # Append the individual directly
+                mutated_population.append(individual)
 
-        # Combine all mutated individuals into a single DataFrame
-        mutated = pd.DataFrame(mutated_population, columns=population.columns)  # Fix here
+        # Merge mutated examples into a single dataframe
+        mutated = pd.DataFrame(mutated_population, columns=population.columns)
 
         # Validate and correct the mutated data
         mutated = self.validate_and_correct_data(mutated)
-        logger.info(f"Mutations applied. Population shape: {mutated.shape}")
+        logger.info(f"Mutations applied. Mutations shape: {mutated.shape}")
 
         return mutated
 
@@ -356,7 +365,7 @@ Return a dataset with the following columns:
             logger.info(f"Processing record {record_index + 1}/{len(contextual_tags)}")
             prompt = self._create_prompt(user_prompt, row)
             logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
-            
+
             # Step 1: Generate initial population
             population = self._generate_initial_population(prompt)
             logger.info(
@@ -379,7 +388,9 @@ Return a dataset with the following columns:
 
                 # Step 3: Apply mutations (if applicable)
                 if self.config.get("mutation_rate", 0.0) > 0.0:
-                    population = self._apply_mutations(population, user_prompt=user_prompt)
+                    population = self._apply_mutations(
+                        population, user_prompt=user_prompt
+                    )
                     logger.debug(
                         f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(population)}"
                     )
@@ -388,7 +399,7 @@ Return a dataset with the following columns:
 
                 # Step 4: Rank the population
                 ranked_population = self._rank_population(population, prompt)
-                
+
                 # Step 5: Filter the population
                 population = self._filter_population(ranked_population)
                 logger.info(
@@ -397,7 +408,9 @@ Return a dataset with the following columns:
 
             # Use only the highest-ranking individual if specified
             if return_highest_only:
-                population = population.sort_values(by='quality_score', ascending=False).head(1)
+                population = population.sort_values(
+                    by="quality_score", ascending=False
+                ).head(1)
                 logger.info(
                     f"Record {record_index + 1}: Returning highest ranking individual with score: {population['quality_score'].iloc[0]}"
                 )
@@ -426,6 +439,53 @@ Return a dataset with the following columns:
         logger.info(
             f"Data generation complete. Final result shape: {final_result.shape}"
         )
+
+        # Calculate the total number of records generated, including an estimate for mutations
+        total_records_generated = (
+            len(contextual_tags)
+            * self.config.get("population_size", 1)
+            * self.config.get("num_generations", 1)
+        )
+        estimated_mutations = int(
+            total_records_generated
+            * self.config.get("mutation_rate", 0.0)
+            * self.config.get("num_generations", 1)
+        )
+        total_records_generated += estimated_mutations
+
+        # Calculate percentages
+        percent_repaired = (
+            (self.records_repaired / total_records_generated) * 100
+            if total_records_generated > 0
+            else 0
+        )
+        percent_filtered = (
+            (self.records_filtered / total_records_generated) * 100
+            if total_records_generated > 0
+            else 0
+        )
+
+        # Define a separator for visual clarity
+        separator = "=" * 50
+
+        # Enhanced summary of metrics
+        logger.info("")
+        logger.info(separator)
+        logger.info(f"{'Summary of Process Metrics':^50}")
+        logger.info(separator)
+        logger.info(f"Records returned from evolutionary process: {len(final_result)}")
+        logger.info(
+            f"Total records generated: {total_records_generated} (including {estimated_mutations} from mutations)"
+        )
+        logger.info(
+            f"Records repaired: {self.records_repaired} ({percent_repaired:.2f}%) | Records filtered: {self.records_filtered} ({percent_filtered:.2f}%)"
+        )
+        logger.info(
+            f"Relevance check failures: {self.relevance_checks_failed} | Safety check failures: {self.safety_checks_failed}"
+        )
+        logger.info(separator)
+        logger.info("")
+
         return final_result
 
     def _rank_population(
@@ -439,7 +499,12 @@ Return a dataset with the following columns:
             "Scoring and ranking population for relevance, coherence, factual accuracy, bias, and safety."
         )
 
-        def create_ranking_prompt(examples: pd.DataFrame, original_prompt: str) -> str:
+        def create_ranking_prompt(
+            examples: pd.DataFrame, original_prompt: str, start_index: int
+        ) -> str:
+            example_prompts = []
+            for i, example in enumerate(examples.iterrows(), start=start_index):
+                example_prompts.append(f"Example {i}: " + example[1].to_json())
             return f"""Evaluate the following examples based on these criteria:
 *  Relevance: How well the example adheres to the original prompt.
 *  Coherence: The logical flow, clarity, and internal consistency of the example.
@@ -450,7 +515,7 @@ Return a dataset with the following columns:
 Original prompt: "{original_prompt}"
 
 Examples to evaluate:
-{chr(10).join([f"Example {i+1}: " + example.to_json() for i, example in examples.iterrows()])}
+{chr(10).join(example_prompts)}
 
 Provide a quality score for each example on a scale of 1 to 5, where:
 1 = Very low quality
@@ -474,7 +539,9 @@ Ensure that your scores reflect meaningful differences between the examples base
             try:
                 for start in range(0, len(population), batch_size):
                     batch = population.iloc[start : start + batch_size]
-                    ranking_prompt = create_ranking_prompt(batch, original_prompt)
+                    ranking_prompt = create_ranking_prompt(
+                        batch, original_prompt, start + 1
+                    )
                     response = self.llm.generate(ranking_prompt, temperature=0.2)
                     quality_scores = parse_quality_scores(response)
 
@@ -483,13 +550,24 @@ Ensure that your scores reflect meaningful differences between the examples base
                             f"Mismatch in number of scores ({len(quality_scores)}) and batch size ({len(batch)})"
                         )
 
-                    for i, score in quality_scores.items():
-                        all_quality_scores[i - 1] = score
+                    # Map the batch indexes to the original population
+                    for i, score in enumerate(quality_scores.values()):
+                        population_index = start + i
+                        all_quality_scores[population_index] = score
 
+                # Resetting index but drop it immediately if it creates a column
                 population = population.reset_index(drop=True)
                 population["quality_score"] = population.index.map(
                     all_quality_scores.get
                 )
+
+                # Check for any NaN values in quality scores
+                if population["quality_score"].isna().any():
+                    missing_scores = population[population["quality_score"].isna()]
+                    logger.error(
+                        f"Missing scores for the following examples:\n{missing_scores}"
+                    )
+                    population["quality_score"].fillna(0, inplace=True)
 
                 ranked_population = population.sort_values(
                     "quality_score", ascending=False
@@ -523,6 +601,7 @@ Ensure that your scores reflect meaningful differences between the examples base
 
         quality_filtered = ranked_population[ranked_population["quality_score"] >= 3]
         removed_count = len(ranked_population) - len(quality_filtered)
+        self.records_filtered += removed_count
         logger.info(
             f"Filtered out {removed_count} examples ({removed_count/len(ranked_population)*100:.2f}%) with quality score below 3"
         )
@@ -548,6 +627,7 @@ Ensure that your scores reflect meaningful differences between the examples base
 
         final_filtered_df = pd.DataFrame(final_filtered).reset_index(drop=True)
         removed_count_strict = len(quality_filtered) - len(final_filtered_df)
+        self.records_filtered += removed_count_strict
         logger.info(
             f"Strict validation removed {removed_count_strict} additional examples "
             f"({removed_count_strict/len(quality_filtered)*100:.2f}%)"
