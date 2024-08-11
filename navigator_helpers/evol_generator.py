@@ -6,6 +6,8 @@ import re
 import time
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Union
+from pydantic import BaseModel, Field, validator
+from enum import Enum
 
 import pandas as pd
 import sqlfluff
@@ -25,6 +27,100 @@ logger = logging.getLogger(__name__)
 def parse_quality_scores(response: str) -> Dict[int, int]:
     pattern = r"Example (\d+): ([0-9.]+)"
     return {int(num): int(float(score)) for num, score in re.findall(pattern, response)}
+
+
+class MutationCategory(str, Enum):
+    IMPROVE = "improve"
+    SIMPLIFY = "simplify"
+    COMPLEXITY = "complexity"
+    DIVERSITY = "diversity"
+
+
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+class GeneratorConfig(BaseModel):
+    api_key: str = Field(
+        ...,
+        env="GRETEL_API_KEY",
+        description="API key for authentication with the Gretel service.",
+    )
+
+    tabular_model: str = Field(
+        ..., description="The tabular model to use for data generation."
+    )
+
+    llm_model: str = Field(
+        ..., description="The language model to use for text generation."
+    )
+
+    num_generations: int = Field(
+        1, ge=1, description="Number of generations to run in the evolutionary process."
+    )
+
+    population_size: int = Field(
+        10, ge=1, description="Size of the population in each generation."
+    )
+
+    expansion_size: int = Field(
+        0,
+        ge=0,
+        description="Number of new individuals to add to the population in each generation.",
+    )
+
+    mutation_rate: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Probability of mutation for each individual in the population.",
+    )
+
+    mutation_categories: List[MutationCategory] = Field(
+        [], description="Categories of mutation strategies to use."
+    )
+
+    column_validators: Dict[str, str] = Field(
+        {}, description="Mapping of column names to validator types."
+    )
+
+    log_level: LogLevel = Field(
+        LogLevel.INFO, description="Logging level for the application."
+    )
+
+    expected_columns: List[str] = Field(
+        ..., description="List of column names expected to be returned by the LLM."
+    )
+
+    class Config:
+        use_enum_values = True
+
+    @validator("column_validators")
+    def validate_column_validators(cls, v):
+        valid_validators = ["sql", "json", "python"]
+        for column, validator in v.items():
+            validator_type = validator.split(":")[0]
+            if validator_type not in valid_validators:
+                raise ValueError(
+                    f"Invalid validator type '{validator_type}' for column '{column}'. "
+                    f"Valid types are: {', '.join(valid_validators)}"
+                )
+        return v
+
+    @validator("mutation_categories")
+    def validate_mutation_categories(cls, v):
+        if not v:
+            return v
+        invalid_categories = set(v) - set(MutationCategory)
+        if invalid_categories:
+            raise ValueError(
+                f"Invalid mutation categories: {', '.join(invalid_categories)}. "
+                f"Valid categories are: {', '.join(MutationCategory)}"
+            )
+        return v
 
 
 class ContentValidator:
@@ -62,30 +158,110 @@ class ContentValidator:
 
 
 class EvolDataGenerator:
-    def __init__(self, config: Dict[str, Any], output_file: str):
+    def __init__(self, config: GeneratorConfig, output_file: str):
         self.config = config
         self.output_file = output_file
-        self.gretel = Gretel(api_key=config["api_key"])
+        self.gretel = Gretel(api_key=self.config.api_key)
         self.tabular = self.gretel.factories.initialize_navigator_api(
-            backend_model=config["tabular_model"]
+            backend_model=config.tabular_model
         )
         self.llm = self.gretel.factories.initialize_navigator_api(
-            "natural_language", backend_model=config["llm_model"]
+            "natural_language", backend_model=config.llm_model
         )
         self.validated_fields: Dict[str, str] = {}
         self.content_validator = ContentValidator()
         self.column_validators = self._initialize_validators()
-        logger.info(
-            f"EvolDataGenerator initialized with configuration:\n{json.dumps(config, indent=2)}"
-        )
+        logger.info(f"EvolDataGenerator initialized with configuration:\n{config}")
         self.mutation_strategies = self._initialize_mutation_strategies()
+        self.total_records_generated = 0
+        self.total_mutations = 0
         self.records_filtered = 0
         self.records_repaired = 0
         self.relevance_checks_failed = 0
         self.safety_checks_failed = 0
 
+    def generate_data(
+        self, contextual_tags: pd.DataFrame, user_prompt: str
+    ) -> pd.DataFrame:
+        logger.info(
+            f"Starting data generation for {len(contextual_tags)} contextual tags"
+        )
+        results = []
+
+        for record_index, row in contextual_tags.iterrows():
+            logger.info(f"Processing record {record_index + 1}/{len(contextual_tags)}")
+            prompt = self._create_prompt(user_prompt, row)
+            logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
+
+            # Step 1: Generate initial population
+            population = self._generate_initial_population(prompt)
+            self.total_records_generated += len(population)
+            logger.info(
+                f"Record {record_index + 1}: Initial population size: {len(population)}"
+            )
+
+            for gen in range(self.config.num_generations):
+                logger.info(
+                    f"Record {record_index + 1}: Starting generation {gen + 1}/{self.config.num_generations}"
+                )
+
+                # Step 2: Expand population (if applicable)
+                if self.config.expansion_size > 0:
+                    population = self._expand_population(population, user_prompt)
+                    self.total_records_generated += self.config.expansion_size
+                    logger.debug(
+                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after expansion: {len(population)}"
+                    )
+                else:
+                    logger.info("Skipping population expansion.")
+
+                # Step 3: Apply mutations (if applicable)
+                if self.config.mutation_rate > 0.0:
+                    population = self._apply_mutations(
+                        population, user_prompt=user_prompt
+                    )
+                    logger.debug(
+                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(population)}"
+                    )
+                else:
+                    logger.info("Skipping mutations.")
+
+                # Step 4: Rank the population
+                population = self._rank_population(population, prompt)
+
+                # Step 5: Filter the population
+                population = self._filter_population(population)
+                logger.info(
+                    f"Record {record_index + 1}, Generation {gen + 1}: Final population size after filtering: {len(population)}"
+                )
+
+            # Step 6: Merge contextual tags with the final population
+            contextual_data = pd.DataFrame([row] * len(population), columns=row.index)
+            combined_data = pd.concat(
+                [
+                    contextual_data.reset_index(drop=True),
+                    population.reset_index(drop=True),
+                ],
+                axis=1,
+            )
+            results.append(combined_data)
+
+            with open(self.output_file, "a") as f:
+                for _, example in combined_data.iterrows():
+                    json.dump(example.to_dict(), f, indent=2)
+                    f.write("\n")
+
+        final_result = pd.concat(results, ignore_index=True)
+        logger.info(
+            f"Data generation complete. Final result shape: {final_result.shape}"
+        )
+
+        self._log_summary(final_result)
+
+        return final_result
+
     def _initialize_mutation_strategies(self) -> Dict[str, List[str]]:
-        return {
+        strategies = {
             "improve": [
                 "Improve the content, enhancing its quality, clarity, coherence, or effectiveness while maintaining its core meaning.",
                 "Optimize the content for better performance, efficiency, or clarity, rewriting it to be more concise, effective, or clear.",
@@ -106,14 +282,17 @@ class EvolDataGenerator:
                 "Present the content from a different perspective or point of view, potentially introducing new dimensions, angles, or considerations.",
             ],
         }
+        return {
+            category: strategies[category]
+            for category in self.config.mutation_categories
+        }
 
     def _select_mutation_strategy(self) -> str:
-        selected_categories = self.config.get(
-            "mutation_categories", list(self.mutation_strategies.keys())
-        )
-        selected_strategies = []
-        for category in selected_categories:
-            selected_strategies.extend(self.mutation_strategies.get(category, []))
+        selected_strategies = [
+            strategy
+            for category in self.config.mutation_categories
+            for strategy in self.mutation_strategies.get(category, [])
+        ]
 
         if not selected_strategies:
             logger.warning(
@@ -135,7 +314,7 @@ class EvolDataGenerator:
         }
 
         validators = {}
-        for column, validator_type in self.config.get("column_validators", {}).items():
+        for column, validator_type in self.config.column_validators.items():
             validator_type_parts = validator_type.split(":")
             base_validator = validator_type_parts[0].lower()
             params = validator_type_parts[1:] if len(validator_type_parts) > 1 else []
@@ -247,7 +426,7 @@ Return a dataset with the following columns:
         )
 
     def _create_prompt(self, user_prompt: str, context_row: pd.Series) -> str:
-        input_fields = self.config.get("input_fields", context_row.index)
+        input_fields = context_row.index
         context = "\n".join(
             f"{key}: {value}"
             for key, value in context_row.items()
@@ -281,11 +460,11 @@ Return a dataset with the following columns:
     def _generate_initial_population(self, prompt: str) -> pd.DataFrame:
         logger.info("Generating initial population")
 
-        expected_columns = self.config.get("expected_columns", [])
+        expected_columns = self.config.expected_columns
 
         population = self.safe_tabular_generate(
             prompt=prompt,
-            num_records=self.config["population_size"],
+            num_records=self.config.population_size,
             expected_columns=expected_columns,
         )
 
@@ -297,7 +476,7 @@ Return a dataset with the following columns:
     def _expand_population(
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        if self.config.get("expansion_size", 0) == 0:
+        if self.config.expansion_size == 0:
             logger.info("Expansion size is 0, skipping population expansion.")
             return population
 
@@ -313,7 +492,7 @@ Return a dataset with the following columns:
 
         expanded = self.safe_tabular_generate(
             prompt=expansion_prompt,
-            num_records=self.config["expansion_size"],
+            num_records=self.config.expansion_size,
             expected_columns=expected_columns,
         )
 
@@ -327,15 +506,16 @@ Return a dataset with the following columns:
     def _apply_mutations(
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        if self.config.get("mutation_rate", 0.0) == 0.0:
+        if self.config.mutation_rate == 0.0:
             logger.info("Mutation rate is 0.0, skipping mutations.")
             return population
 
         logger.debug("Applying mutations")
-
         mutated_population = []
+        mutations_count = 0  # Initialize mutation counter
+
         for index, individual in population.iterrows():
-            if random.random() < self.config["mutation_rate"]:
+            if random.random() < self.config.mutation_rate:
                 strategy = self._select_mutation_strategy()
                 logger.debug(f"Mutating example {index} with strategy: {strategy}")
 
@@ -365,6 +545,7 @@ Return a dataset with the following columns:
                 mutated_population.append(
                     mutated_individual.drop(columns=["mutation_explanation"]).iloc[0]
                 )
+                mutations_count += 1  # Increment mutation counter
             else:
                 logger.debug(f"Example {index} not selected for mutation")
                 mutated_population.append(individual)
@@ -374,158 +555,15 @@ Return a dataset with the following columns:
 
         # Validate and correct the mutated data
         mutated = self.validate_and_correct_data(mutated)
-        logger.info(f"Mutations applied. Mutations shape: {mutated.shape}")
+
+        logger.info(
+            f"Mutations applied. Mutations count: {mutations_count}, Mutations shape: {mutated.shape}"
+        )
+
+        # Update the total mutations count
+        self.total_mutations += mutations_count
 
         return mutated
-
-    def generate_data(
-        self, contextual_tags: pd.DataFrame, user_prompt: str
-    ) -> pd.DataFrame:
-        logger.info(
-            f"Starting data generation for {len(contextual_tags)} contextual tags"
-        )
-        results = []
-
-        num_generations = max(
-            self.config.get("num_generations", 1), 1
-        )  # Ensure at least 1 generation
-
-        return_highest_only = self.config.get("return_highest_only", False)
-
-        for record_index, row in tqdm(
-            contextual_tags.iterrows(),
-            total=len(contextual_tags),
-            desc="Generating Data",
-        ):
-            logger.info(f"Processing record {record_index + 1}/{len(contextual_tags)}")
-            prompt = self._create_prompt(user_prompt, row)
-            logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
-
-            # Step 1: Generate initial population
-            population = self._generate_initial_population(prompt)
-            logger.info(
-                f"Record {record_index + 1}: Initial population size: {len(population)}"
-            )
-
-            for gen in range(num_generations):
-                logger.info(
-                    f"Record {record_index + 1}: Starting generation {gen + 1}/{num_generations}"
-                )
-
-                # Step 2: Expand population (if applicable)
-                if self.config.get("expansion_size", 0) > 0:
-                    population = self._expand_population(population, user_prompt)
-                    logger.debug(
-                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after expansion: {len(population)}"
-                    )
-                else:
-                    logger.info("Skipping population expansion.")
-
-                # Step 3: Apply mutations (if applicable)
-                if self.config.get("mutation_rate", 0.0) > 0.0:
-                    population = self._apply_mutations(
-                        population, user_prompt=user_prompt
-                    )
-                    logger.debug(
-                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(population)}"
-                    )
-                else:
-                    logger.info("Skipping mutations.")
-
-                # Step 4: Rank the population
-                ranked_population = self._rank_population(population, prompt)
-
-                # Step 5: Filter the population
-                population = self._filter_population(ranked_population)
-                logger.info(
-                    f"Record {record_index + 1}, Generation {gen + 1}: Final population size after filtering: {len(population)}"
-                )
-
-            # Use only the highest-ranking individual if specified
-            if return_highest_only:
-                population = population.sort_values(
-                    by="quality_score", ascending=False
-                ).head(1)
-                logger.info(
-                    f"Record {record_index + 1}: Returning highest ranking individual with score: {population['quality_score'].iloc[0]}"
-                )
-
-            logger.info(
-                f"Record {record_index + 1}: Final population size after all generations: {len(population)}"
-            )
-
-            # Step 6: Merge contextual tags with the final population
-            contextual_data = pd.DataFrame([row] * len(population), columns=row.index)
-            combined_data = pd.concat(
-                [
-                    contextual_data.reset_index(drop=True),
-                    population.reset_index(drop=True),
-                ],
-                axis=1,
-            )
-            results.append(combined_data)
-
-            with open(self.output_file, "a") as f:
-                for _, example in combined_data.iterrows():
-                    json.dump(example.to_dict(), f, indent=2)
-                    f.write("\n")
-
-        # After the data generation loop
-        final_result = pd.concat(results, ignore_index=True)
-        logger.info(
-            f"Data generation complete. Final result shape: {final_result.shape}"
-        )
-
-        # Calculate the total number of records generated, including an estimate for mutations
-        total_records_generated = (
-            len(contextual_tags)
-            * self.config.get("population_size", 1)
-            * self.config.get("num_generations", 1)
-        )
-        estimated_mutations = int(
-            total_records_generated
-            * self.config.get("mutation_rate", 0.0)
-            * self.config.get("num_generations", 1)
-        )
-        total_records_generated += estimated_mutations
-
-        # Calculate percentages
-        percent_repaired = (
-            (self.records_repaired / total_records_generated) * 100
-            if total_records_generated > 0
-            else 0
-        )
-        percent_filtered = (
-            (self.records_filtered / total_records_generated) * 100
-            if total_records_generated > 0
-            else 0
-        )
-
-        # Define a separator for visual clarity
-        separator = "=" * 50
-
-        # Concise summary of metrics
-        logger.info("")
-        logger.info(separator)
-        logger.info(f"{'Summary of Metrics':^50}")
-        logger.info(separator)
-        logger.info(
-            f"Total records generated: {total_records_generated} (Mutations: {estimated_mutations})"
-        )
-        logger.info(
-            f"Attempted repairs: {self.records_repaired} ({percent_repaired:.2f}%) | Filtered records: {self.records_filtered} ({percent_filtered:.2f}%)"
-        )
-        logger.info(
-            f"Relevance failures: {self.relevance_checks_failed} | Safety failures: {self.safety_checks_failed}"
-        )
-        logger.info(separator)
-        logger.info("Validated Fields:")
-        for field, validator in self.validated_fields.items():
-            logger.info(f"  - {field}: {validator}")
-        logger.info(separator)
-        logger.info("")
-
-        return final_result
 
     def _rank_population(
         self,
@@ -676,3 +714,59 @@ Ensure that your scores reflect meaningful differences between the examples base
             f"Final population size after strict filtering: {len(final_filtered_df)}"
         )
         return final_filtered_df
+
+    def _log_summary(self, final_result: pd.DataFrame):
+        final_records_count = len(final_result)
+
+        percent_repaired = (
+            (self.records_repaired / self.total_records_generated) * 100
+            if self.total_records_generated > 0
+            else 0
+        )
+        percent_filtered = (
+            (
+                (self.total_records_generated - final_records_count)
+                / self.total_records_generated
+            )
+            * 100
+            if self.total_records_generated > 0
+            else 0
+        )
+
+        summary = {
+            "total_records_processed": self.total_records_generated,
+            "total_mutations": self.total_mutations,
+            "final_records_returned": final_records_count,
+            "records_repaired": self.records_repaired,
+            "percent_repaired": f"{percent_repaired:.2f}%",
+            "records_filtered_or_not_selected": self.total_records_generated
+            - final_records_count,
+            "percent_filtered_or_not_selected": f"{percent_filtered:.2f}%",
+            "relevance_checks_failed": self.relevance_checks_failed,
+            "safety_checks_failed": self.safety_checks_failed,
+            "validated_fields": self.column_validators.keys(),  # Assuming column_validators is a dictionary
+        }
+
+        separator = "=" * 50
+        logger.info("")
+        logger.info(separator)
+        logger.info(f"{'Summary of Data Generation Process':^50}")
+        logger.info(separator)
+        logger.info(
+            f"Total records processed: {summary['total_records_processed']} (including {summary['total_mutations']} mutations)"
+        )
+        logger.info(f"Final records returned: {summary['final_records_returned']}")
+        logger.info(
+            f"Repairs attempted: {summary['records_repaired']} ({summary['percent_repaired']})"
+        )
+        logger.info(
+            f"Records filtered or not selected: {summary['records_filtered_or_not_selected']} ({summary['percent_filtered_or_not_selected']})"
+        )
+        logger.info(f"Relevance checks failed: {summary['relevance_checks_failed']}")
+        logger.info(f"Safety checks failed: {summary['safety_checks_failed']}")
+        logger.info(separator)
+        logger.info("Validated Fields:")
+        for field in summary["validated_fields"]:
+            logger.info(f"  - {field}")
+        logger.info(separator)
+        logger.info("")
