@@ -5,23 +5,14 @@ import random
 import re
 import time
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, validator
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import pandas as pd
 import sqlfluff
 from gretel_client import Gretel
+from pydantic import BaseModel, Field, validator
 from tqdm.auto import tqdm
-
-# Set up logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%H:%M:%S",
-)
-logging.getLogger("sqlfluff").setLevel(logging.WARNING)
-logger = logging.getLogger(__name__)
 
 
 def parse_quality_scores(response: str) -> Dict[int, int]:
@@ -160,6 +151,7 @@ class ContentValidator:
 class EvolDataGenerator:
     def __init__(self, config: GeneratorConfig, output_file: str):
         self.config = config
+        self._setup_logging()
         self.output_file = output_file
         self.gretel = Gretel(api_key=self.config.api_key)
         self.tabular = self.gretel.factories.initialize_navigator_api(
@@ -171,7 +163,9 @@ class EvolDataGenerator:
         self.validated_fields: Dict[str, str] = {}
         self.content_validator = ContentValidator()
         self.column_validators = self._initialize_validators()
-        logger.info(f"EvolDataGenerator initialized with configuration:\n{config}")
+        self.logger.debug(
+            f"EvolDataGenerator initialized with configuration:\n{config}"
+        )
         self.mutation_strategies = self._initialize_mutation_strategies()
         self.total_records_generated = 0
         self.total_mutations = 0
@@ -179,29 +173,47 @@ class EvolDataGenerator:
         self.records_repaired = 0
         self.relevance_checks_failed = 0
         self.safety_checks_failed = 0
+        with open(self.output_file, "w") as f:
+            f.write("")
+
+    def _setup_logging(self):
+        # Set up logging
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+
+        logging.basicConfig(
+            level=self.config.log_level,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt="%H:%M:%S",
+        )
+        logging.getLogger("gretel_client").setLevel(logging.WARNING)
+        logging.getLogger("sqlfluff").setLevel(logging.WARNING)
+        self.logger = logging.getLogger(__name__)
 
     def generate_data(
         self, contextual_tags: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        logger.info(
+        self.logger.debug(
             f"Starting data generation for {len(contextual_tags)} contextual tags"
         )
         results = []
 
         for record_index, row in contextual_tags.iterrows():
-            logger.info(f"Processing record {record_index + 1}/{len(contextual_tags)}")
+            print(
+                f"Generating synthetic record {record_index + 1}/{len(contextual_tags)}"
+            )
             prompt = self._create_prompt(user_prompt, row)
-            logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
+            self.logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
 
             # Step 1: Generate initial population
             population = self._generate_initial_population(prompt)
             self.total_records_generated += len(population)
-            logger.info(
+            self.logger.debug(
                 f"Record {record_index + 1}: Initial population size: {len(population)}"
             )
 
             for gen in range(self.config.num_generations):
-                logger.info(
+                self.logger.debug(
                     f"Record {record_index + 1}: Starting generation {gen + 1}/{self.config.num_generations}"
                 )
 
@@ -209,29 +221,29 @@ class EvolDataGenerator:
                 if self.config.expansion_size > 0:
                     population = self._expand_population(population, user_prompt)
                     self.total_records_generated += self.config.expansion_size
-                    logger.debug(
+                    self.logger.debug(
                         f"Record {record_index + 1}, Generation {gen + 1}: Population size after expansion: {len(population)}"
                     )
                 else:
-                    logger.info("Skipping population expansion.")
+                    self.logger.debug("Skipping population expansion.")
 
                 # Step 3: Apply mutations (if applicable)
                 if self.config.mutation_rate > 0.0:
                     population = self._apply_mutations(
                         population, user_prompt=user_prompt
                     )
-                    logger.debug(
+                    self.logger.debug(
                         f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(population)}"
                     )
                 else:
-                    logger.info("Skipping mutations.")
+                    self.logger.debug("Skipping mutations.")
 
                 # Step 4: Rank the population
                 population = self._rank_population(population, prompt)
 
                 # Step 5: Filter the population
                 population = self._filter_population(population)
-                logger.info(
+                self.logger.debug(
                     f"Record {record_index + 1}, Generation {gen + 1}: Final population size after filtering: {len(population)}"
                 )
 
@@ -251,14 +263,14 @@ class EvolDataGenerator:
                     json.dump(example.to_dict(), f, indent=2)
                     f.write("\n")
 
-        final_result = pd.concat(results, ignore_index=True)
-        logger.info(
-            f"Data generation complete. Final result shape: {final_result.shape}"
+        synthetic_data = pd.concat(results, ignore_index=True)
+        self.logger.info(
+            f"Synthetic data generation complete. Saved to `{self.output_file}`."
         )
 
-        self._log_summary(final_result)
+        self._log_summary(synthetic_data)
 
-        return final_result
+        return synthetic_data
 
     def _initialize_mutation_strategies(self) -> Dict[str, List[str]]:
         strategies = {
@@ -295,7 +307,7 @@ class EvolDataGenerator:
         ]
 
         if not selected_strategies:
-            logger.warning(
+            self.logger.warning(
                 "No valid mutation strategies selected. Using all strategies."
             )
             selected_strategies = [
@@ -337,7 +349,7 @@ class EvolDataGenerator:
                 f"{base_validator}:{':'.join(params)}" if params else base_validator
             )
 
-            logger.debug(
+            self.logger.debug(
                 f"Configured {base_validator} validator for column '{column}' with parameters: {params}"
             )
 
@@ -346,7 +358,7 @@ class EvolDataGenerator:
     def validate_content(self, content: str, content_type: str) -> Optional[str]:
         validator = self.column_validators.get(content_type)
         if not validator:
-            logger.warning(
+            self.logger.warning(
                 f"No validator found for content type '{content_type}', defaulting to LLM validation."
             )
             return self.llm_validate(content, content_type)
@@ -366,7 +378,7 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
         return response.strip()[8:]  # Remove 'INVALID: ' prefix
 
     def validate_and_correct_data(self, data: pd.DataFrame) -> pd.DataFrame:
-        logger.info("Starting data validation and correction process")
+        self.logger.debug("Starting data validation and correction process")
         for column, (validator_func, validator_type) in self.column_validators.items():
             if column in data.columns:
                 data[column] = data[column].apply(
@@ -374,7 +386,7 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
                         x, validator_func, validator_type
                     )
                 )
-        logger.info("Data validation and correction completed")
+        self.logger.debug("Data validation and correction completed")
         return data
 
     def validate_and_correct_content(
@@ -382,13 +394,13 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
     ) -> str:
         error = validator_func(content, content_type)
         if error:
-            logger.warning(f"Validation error for {content_type}: {error}")
-            logger.error(f"INVALID content detected: {content[:100]}...")
+            self.logger.warning(f"Validation error for {content_type}: {error}")
+            self.logger.warning(f"Data failed validation: {content[:100]}...")
             corrected_content, explanation = self.correct_content(
                 content, content_type, error
             )
-            logger.info(
-                f"Corrected content of type {content_type}. Explanation: {explanation}"
+            self.logger.info(
+                f"Attempted repair of {content_type}. Explanation: {explanation}"
             )
             self.records_repaired += 1
             return corrected_content
@@ -397,7 +409,9 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
     def correct_content(
         self, content: str, content_type: str, error_message: str
     ) -> tuple[str, str]:
-        logger.debug(f"Correcting {content_type} content using structured generation")
+        self.logger.debug(
+            f"Correcting {content_type} content using structured generation"
+        )
 
         expected_columns = ["corrected_content", "explanation"]
 
@@ -417,7 +431,7 @@ Return a dataset with the following columns:
 
         corrected_content = response["corrected_content"].iloc[0]
         explanation = response["explanation"].iloc[0]
-        logger.debug(f"Correction applied for {content_type}. {explanation}")
+        self.logger.debug(f"Correction applied for {content_type}. {explanation}")
         return corrected_content, explanation
 
     def _create_column_list(self) -> str:
@@ -440,7 +454,9 @@ Return a dataset with the following columns:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = self.tabular.generate(prompt=prompt, num_records=num_records)
+                response = self.tabular.generate(
+                    prompt=prompt, num_records=num_records, disable_progress_bar=True
+                )
                 missing_columns = [
                     col for col in expected_columns if col not in response.columns
                 ]
@@ -449,16 +465,16 @@ Return a dataset with the following columns:
                 else:
                     raise ValueError(f"Missing columns in response: {missing_columns}")
             except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+                self.logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt == max_retries - 1:
-                    logger.error(
+                    self.logger.error(
                         f"Max retries reached. Failed to generate response for prompt:\n{prompt}"
                     )
                     raise e
                 time.sleep(2)
 
     def _generate_initial_population(self, prompt: str) -> pd.DataFrame:
-        logger.info("Generating initial population")
+        self.logger.info("Generating initial population")
 
         expected_columns = self.config.expected_columns
 
@@ -469,7 +485,7 @@ Return a dataset with the following columns:
         )
 
         self.columns = population.columns.tolist()
-        logger.info(f"Initial population generated with shape: {population.shape}")
+        self.logger.info(f"Initial population generated with shape: {population.shape}")
 
         return self.validate_and_correct_data(population)
 
@@ -477,10 +493,10 @@ Return a dataset with the following columns:
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
         if self.config.expansion_size == 0:
-            logger.info("Expansion size is 0, skipping population expansion.")
+            self.logger.debug("Expansion size is 0, skipping population expansion.")
             return population
 
-        logger.debug("Expanding population")
+        self.logger.debug("Expanding population")
 
         expansion_prompt = (
             f"{user_prompt}\n\n"
@@ -496,7 +512,7 @@ Return a dataset with the following columns:
             expected_columns=expected_columns,
         )
 
-        logger.info(f"Population expanded. Expansion shape: {expanded.shape}")
+        self.logger.info(f"Population expanded. Expansion shape: {expanded.shape}")
 
         # Combine the new examples with the existing population
         updated_population = pd.concat([population, expanded], ignore_index=True)
@@ -507,17 +523,17 @@ Return a dataset with the following columns:
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
         if self.config.mutation_rate == 0.0:
-            logger.info("Mutation rate is 0.0, skipping mutations.")
+            self.logger.debug("Mutation rate is 0.0, skipping mutations.")
             return population
 
-        logger.debug("Applying mutations")
+        self.logger.debug("Applying mutations")
         mutated_population = []
         mutations_count = 0  # Initialize mutation counter
 
         for index, individual in population.iterrows():
             if random.random() < self.config.mutation_rate:
                 strategy = self._select_mutation_strategy()
-                logger.debug(f"Mutating example {index} with strategy: {strategy}")
+                self.logger.info(f"Mutating example {index} with strategy: {strategy}")
 
                 expected_columns = [x for x in individual.index if x != "quality_score"]
                 columns_str = "\n".join([f"- `{col}`" for col in expected_columns])
@@ -538,7 +554,7 @@ Return a dataset with the following columns:
                     expected_columns=expected_columns + ["mutation_explanation"],
                 )
 
-                logger.debug(
+                self.logger.info(
                     f"Mutation explanation for example {index}: {mutated_individual['mutation_explanation'].iloc[0]}"
                 )
 
@@ -547,7 +563,7 @@ Return a dataset with the following columns:
                 )
                 mutations_count += 1  # Increment mutation counter
             else:
-                logger.debug(f"Example {index} not selected for mutation")
+                self.logger.debug(f"Example {index} not selected for mutation")
                 mutated_population.append(individual)
 
         # Merge mutated examples into a single dataframe
@@ -556,7 +572,7 @@ Return a dataset with the following columns:
         # Validate and correct the mutated data
         mutated = self.validate_and_correct_data(mutated)
 
-        logger.info(
+        self.logger.info(
             f"Mutations applied. Mutations count: {mutations_count}, Mutations shape: {mutated.shape}"
         )
 
@@ -572,7 +588,7 @@ Return a dataset with the following columns:
         max_retries: int = 3,
         batch_size: int = 3,
     ) -> pd.DataFrame:
-        logger.info(
+        self.logger.info(
             "Scoring and ranking population for relevance, coherence, factual accuracy, bias, and safety."
         )
 
@@ -641,7 +657,7 @@ Ensure that your scores reflect meaningful differences between the examples base
                 # Check for any NaN values in quality scores
                 if population["quality_score"].isna().any():
                     missing_scores = population[population["quality_score"].isna()]
-                    logger.error(
+                    self.logger.error(
                         f"Missing scores for the following examples:\n{missing_scores}"
                     )
                     population["quality_score"].fillna(0, inplace=True)
@@ -649,37 +665,39 @@ Ensure that your scores reflect meaningful differences between the examples base
                 ranked_population = population.sort_values(
                     "quality_score", ascending=False
                 )
-                logger.info(
+                self.logger.info(
                     f"Rankings generated. Top 5 quality scores: {ranked_population['quality_score'].head().tolist()}"
                 )
 
                 return ranked_population
 
             except Exception as e:
-                logger.warning(
+                self.logger.warning(
                     f"Error during ranking (attempt {attempt + 1}/{max_retries}): {str(e)}"
                 )
-                logger.debug(f"Stack trace:\n{traceback.format_exc()}")
-                logger.debug(f"LLM Response:\n{response}")
-                logger.debug(f"Quality Scores:\n{all_quality_scores}")
-                logger.debug(f"Population DataFrame (reset index):\n{population}")
+                self.logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+                self.logger.debug(f"LLM Response:\n{response}")
+                self.logger.debug(f"Quality Scores:\n{all_quality_scores}")
+                self.logger.debug(f"Population DataFrame (reset index):\n{population}")
 
             attempt += 1
-            logger.info(f"Retrying ranking (attempt {attempt + 1}/{max_retries})...")
+            self.logger.debug(
+                f"Retrying ranking (attempt {attempt + 1}/{max_retries})..."
+            )
             time.sleep(2)
 
-        logger.error(
+        self.logger.error(
             "Max retries exceeded during ranking. Returning original population without ranking."
         )
         return population.assign(quality_score=3)
 
     def _filter_population(self, ranked_population: pd.DataFrame) -> pd.DataFrame:
-        logger.info("Filtering population")
+        self.logger.debug("Filtering population")
 
         quality_filtered = ranked_population[ranked_population["quality_score"] >= 3]
         removed_count = len(ranked_population) - len(quality_filtered)
         self.records_filtered += removed_count
-        logger.info(
+        self.logger.info(
             f"Filtered out {removed_count} examples ({removed_count/len(ranked_population)*100:.2f}%) with quality score below 3"
         )
 
@@ -693,7 +711,7 @@ Ensure that your scores reflect meaningful differences between the examples base
                 if column in row and validator_func != self.llm_validate:
                     validation_error = validator_func(row[column], validator_type)
                     if validation_error:
-                        logger.warning(
+                        self.logger.warning(
                             f"Record {index} failed final validation for column '{column}': {validation_error}"
                         )
                         valid = False
@@ -705,12 +723,12 @@ Ensure that your scores reflect meaningful differences between the examples base
         final_filtered_df = pd.DataFrame(final_filtered).reset_index(drop=True)
         removed_count_strict = len(quality_filtered) - len(final_filtered_df)
         self.records_filtered += removed_count_strict
-        logger.info(
+        self.logger.info(
             f"Strict validation removed {removed_count_strict} additional examples "
             f"({removed_count_strict/len(quality_filtered)*100:.2f}%)"
         )
 
-        logger.info(
+        self.logger.info(
             f"Final population size after strict filtering: {len(final_filtered_df)}"
         )
         return final_filtered_df
@@ -748,25 +766,25 @@ Ensure that your scores reflect meaningful differences between the examples base
         }
 
         separator = "=" * 50
-        logger.info("")
-        logger.info(separator)
-        logger.info(f"{'Summary of Data Generation Process':^50}")
-        logger.info(separator)
-        logger.info(
+        print("")
+        print(separator)
+        print(f"{'Summary of Data Generation Process':^50}")
+        print(separator)
+        print(
             f"Total records processed: {summary['total_records_processed']} (including {summary['total_mutations']} mutations)"
         )
-        logger.info(f"Final records returned: {summary['final_records_returned']}")
-        logger.info(
+        print(f"Final records returned: {summary['final_records_returned']}")
+        print(
             f"Repairs attempted: {summary['records_repaired']} ({summary['percent_repaired']})"
         )
-        logger.info(
+        print(
             f"Records filtered or not selected: {summary['records_filtered_or_not_selected']} ({summary['percent_filtered_or_not_selected']})"
         )
-        logger.info(f"Relevance checks failed: {summary['relevance_checks_failed']}")
-        logger.info(f"Safety checks failed: {summary['safety_checks_failed']}")
-        logger.info(separator)
-        logger.info("Validated Fields:")
+        print(f"Relevance checks failed: {summary['relevance_checks_failed']}")
+        print(f"Safety checks failed: {summary['safety_checks_failed']}")
+        print(separator)
+        print("Validated Fields:")
         for field in summary["validated_fields"]:
-            logger.info(f"  - {field}")
-        logger.info(separator)
-        logger.info("")
+            print(f"  - {field}")
+        print(separator)
+        print("")
