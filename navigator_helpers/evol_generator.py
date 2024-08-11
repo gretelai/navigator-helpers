@@ -14,7 +14,9 @@ from tqdm.auto import tqdm
 
 # Set up logging
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%H:%M:%S",
 )
 logging.getLogger("sqlfluff").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -72,7 +74,7 @@ class EvolDataGenerator:
         )
         self.content_validator = ContentValidator()
         self.column_validators = self._initialize_validators()
-        logger.info(f"Initialized EvolDataGenerator with config: {config}")
+        logger.info(f"EvolDataGenerator initialized with configuration: {config}")
 
     def _initialize_validators(self) -> Dict[str, Callable]:
         validator_map = {
@@ -83,14 +85,11 @@ class EvolDataGenerator:
 
         validators = {}
         for column, validator_type in self.config.get("column_validators", {}).items():
-            # Split the validator_type to extract any additional parameters
             validator_type_parts = validator_type.split(":")
             base_validator = validator_type_parts[0].lower()
             params = validator_type_parts[1:] if len(validator_type_parts) > 1 else []
 
-            # Determine which validator to use
             if base_validator in validator_map:
-                # Expert validator with possible parameters
                 if base_validator == "sql":
                     dialect = params[0] if params else "ansi"
                     validators[column] = (
@@ -100,26 +99,15 @@ class EvolDataGenerator:
                         base_validator,
                     )
                 else:
-                    # Other expert validators can be handled similarly if they accept parameters
                     validators[column] = (validator_map[base_validator], base_validator)
             else:
-                # Default to LLM validation
                 validators[column] = (self.llm_validate, base_validator)
 
-            logger.info(
-                f"Using {base_validator} validator for column '{column}' with params: {params}"
+            logger.debug(
+                f"Configured {base_validator} validator for column '{column}' with parameters: {params}"
             )
 
         return validators
-
-    def validate_content(self, content: str, content_type: str) -> Optional[str]:
-        validator = self.column_validators.get(content_type)
-        if not validator:
-            logger.warning(
-                f"No validator found for content type '{content_type}', defaulting to LLM validation."
-            )
-            return self.llm_validate(content, content_type)
-        return validator(content, content_type)
 
     def validate_content(self, content: str, content_type: str) -> Optional[str]:
         validator = self.column_validators.get(content_type)
@@ -144,7 +132,7 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
         return response.strip()[8:]  # Remove 'INVALID: ' prefix
 
     def validate_and_correct_data(self, data: pd.DataFrame) -> pd.DataFrame:
-        logger.info("Validating and correcting data")
+        logger.info("Starting data validation and correction process")
         for column, (validator_func, validator_type) in self.column_validators.items():
             if column in data.columns:
                 data[column] = data[column].apply(
@@ -152,6 +140,7 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
                         x, validator_func, validator_type
                     )
                 )
+        logger.info("Data validation and correction completed")
         return data
 
     def validate_and_correct_content(
@@ -160,20 +149,22 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
         error = validator_func(content, content_type)
         if error:
             logger.warning(f"Validation error for {content_type}: {error}")
-            logger.error(f"\n\nINVALID: {content}")
+            logger.error(
+                f"INVALID content detected: {content[:100]}..."
+            )  # Log first 100 chars
             corrected_content, explanation = self.correct_content(
                 content, content_type, error
             )
-            logger.info(f"Content of type {content_type} corrected. {explanation}")
+            logger.info(
+                f"Corrected content of type {content_type}. Explanation: {explanation}"
+            )
             return corrected_content
         return content
 
     def correct_content(
         self, content: str, content_type: str, error_message: str
     ) -> tuple[str, str]:
-        logger.info(
-            f"Correcting content of type {content_type} using structured generation"
-        )
+        logger.debug(f"Correcting {content_type} content using structured generation")
 
         expected_columns = ["corrected_content", "explanation"]
 
@@ -185,18 +176,15 @@ Please correct it so that it conforms to valid {content_type.upper()} syntax.
 
 Return a dataset with the following columns:
 - `corrected_content`: Only the corrected version of the provided content, with no additional text, explanations, or formatting.
-- `explanation`: A brief explanation of the corrections made, if applicable.
+- `explanation`: A brief explanation of the corrections made, if applicable."""
 
-Important: Ensure that the `corrected_content` field contains only the corrected content, with no additional text, explanations, or formatting."""
-
-        # Generate the correction using the safe_tabular_generate helper method
         response = self.safe_tabular_generate(
             prompt=prompt, num_records=1, expected_columns=expected_columns
         )
 
         corrected_content = response["corrected_content"].iloc[0]
         explanation = response["explanation"].iloc[0]
-        logger.info(f"Content of type {content_type} corrected. {explanation}")
+        logger.debug(f"Correction applied for {content_type}. {explanation}")
         return corrected_content, explanation
 
     def _create_column_list(self) -> str:
@@ -220,7 +208,6 @@ Important: Ensure that the `corrected_content` field contains only the corrected
         for attempt in range(max_retries):
             try:
                 response = self.tabular.generate(prompt=prompt, num_records=num_records)
-                # Check if all expected columns are present
                 missing_columns = [
                     col for col in expected_columns if col not in response.columns
                 ]
@@ -229,10 +216,11 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                 else:
                     raise ValueError(f"Missing columns in response: {missing_columns}")
             except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed with error: {str(e)}")
+                logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt == max_retries - 1:
-                    logger.error(f"Max retries reached. Failed prompt:\n{prompt}")
-                    logger.error(f"Expected columns: {expected_columns}")
+                    logger.error(
+                        f"Max retries reached. Failed to generate response for prompt:\n{prompt}"
+                    )
                     raise e
                 time.sleep(2)
 
@@ -248,7 +236,7 @@ Important: Ensure that the `corrected_content` field contains only the corrected
         )
 
         self.columns = population.columns.tolist()
-        logger.info(f"Generated initial population. Shape: {population.shape}")
+        logger.info(f"Initial population generated with shape: {population.shape}")
 
         return self.validate_and_correct_data(population)
 
@@ -259,8 +247,7 @@ Important: Ensure that the `corrected_content` field contains only the corrected
             logger.info("Expansion size is 0, skipping population expansion.")
             return population
 
-        logger.info("Expanding population")
-        # Prepare the expansion prompt
+        logger.debug("Expanding population")
         expansion_prompt = (
             f"{user_prompt}\n\n"
             f"Generate new, diverse variations with the following columns:\n{self._create_column_list()}\n\n"
@@ -275,19 +262,18 @@ Important: Ensure that the `corrected_content` field contains only the corrected
             expected_columns=expected_columns,
         )
 
-        logger.info(f"Expanded population. Shape: {expanded.shape}")
+        logger.info(f"Population expanded. New shape: {expanded.shape}")
 
         return self.validate_and_correct_data(expanded)
 
     def _apply_mutations(
         self, population: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-
         if self.config.get("mutation_rate", 0.0) == 0.0:
             logger.info("Mutation rate is 0.0, skipping mutations.")
             return population
 
-        logger.info("Applying mutations")
+        logger.debug("Applying mutations")
 
         mutation_strategies = [
             "Increase the complexity and nuance of the content by introducing more sophisticated concepts, layers of detail, or intricate relationships.",
@@ -307,9 +293,8 @@ Important: Ensure that the `corrected_content` field contains only the corrected
         for index, individual in population.iterrows():
             if random.random() < self.config["mutation_rate"]:
                 strategy = random.choice(mutation_strategies)
-                logger.info(f"Mutating example {index} with strategy: {strategy}")
+                logger.debug(f"Mutating example {index} with strategy: {strategy}")
 
-                # Prepare the mutation prompt
                 expected_columns = [x for x in individual.index if x != "quality_score"]
                 columns_str = "\n".join([f"- `{col}`" for col in expected_columns])
                 individual_dict = individual.to_dict()
@@ -323,44 +308,45 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                     "For the 'mutation_explanation' column, provide a 1-2 sentence explanation of how the data was mutated and how it aligns with the original intent."
                 )
 
-                # Mutate the example using the strategy, provide explanation
                 mutated_individual = self.safe_tabular_generate(
                     prompt=mutation_prompt,
                     num_records=1,
                     expected_columns=expected_columns + ["mutation_explanation"],
                 )
 
-                logger.info(
+                logger.debug(
                     f"Mutation explanation for example {index}: {mutated_individual['mutation_explanation'].iloc[0]}"
                 )
 
-                # Add the mutated individual to the population, dropping the explanation column
                 mutated_population.append(
                     mutated_individual.drop(columns=["mutation_explanation"])
                 )
             else:
                 logger.debug(f"Example {index} not selected for mutation")
-                mutated_population.append(pd.DataFrame([individual]))
+                mutated_population.append(individual)  # Append the individual directly
 
         # Combine all mutated individuals into a single DataFrame
-        mutated = pd.concat(mutated_population, ignore_index=True)
+        mutated = pd.DataFrame(mutated_population, columns=population.columns)  # Fix here
 
         # Validate and correct the mutated data
         mutated = self.validate_and_correct_data(mutated)
-        logger.info(f"Mutations applied. New population shape: {mutated.shape}")
+        logger.info(f"Mutations applied. Population shape: {mutated.shape}")
 
         return mutated
-
 
     def generate_data(
         self, contextual_tags: pd.DataFrame, user_prompt: str
     ) -> pd.DataFrame:
-        logger.info(f"Starting data generation for {len(contextual_tags)} contextual tags")
+        logger.info(
+            f"Starting data generation for {len(contextual_tags)} contextual tags"
+        )
         results = []
 
         num_generations = max(
             self.config.get("num_generations", 1), 1
         )  # Ensure at least 1 generation
+
+        return_highest_only = self.config.get("return_highest_only", False)
 
         for record_index, row in tqdm(
             contextual_tags.iterrows(),
@@ -370,6 +356,8 @@ Important: Ensure that the `corrected_content` field contains only the corrected
             logger.info(f"Processing record {record_index + 1}/{len(contextual_tags)}")
             prompt = self._create_prompt(user_prompt, row)
             logger.debug(f"Generated prompt with contextual tags:\n{prompt}\n\n")
+            
+            # Step 1: Generate initial population
             population = self._generate_initial_population(prompt)
             logger.info(
                 f"Record {record_index + 1}: Initial population size: {len(population)}"
@@ -379,34 +367,46 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                 logger.info(
                     f"Record {record_index + 1}: Starting generation {gen + 1}/{num_generations}"
                 )
-                expanded_population = self._expand_population(population, user_prompt)
+
+                # Step 2: Expand population (if applicable)
+                if self.config.get("expansion_size", 0) > 0:
+                    population = self._expand_population(population, user_prompt)
+                    logger.debug(
+                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after expansion: {len(population)}"
+                    )
+                else:
+                    logger.info("Skipping population expansion.")
+
+                # Step 3: Apply mutations (if applicable)
+                if self.config.get("mutation_rate", 0.0) > 0.0:
+                    population = self._apply_mutations(population, user_prompt=user_prompt)
+                    logger.debug(
+                        f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(population)}"
+                    )
+                else:
+                    logger.info("Skipping mutations.")
+
+                # Step 4: Rank the population
+                ranked_population = self._rank_population(population, prompt)
+                
+                # Step 5: Filter the population
+                population = self._filter_population(ranked_population)
                 logger.info(
-                    f"Record {record_index + 1}, Generation {gen + 1}: Expanded population size: {len(expanded_population)}"
+                    f"Record {record_index + 1}, Generation {gen + 1}: Final population size after filtering: {len(population)}"
                 )
-                all_examples = pd.concat(
-                    [population, expanded_population], ignore_index=True
-                )
+
+            # Use only the highest-ranking individual if specified
+            if return_highest_only:
+                population = population.sort_values(by='quality_score', ascending=False).head(1)
                 logger.info(
-                    f"Record {record_index + 1}, Generation {gen + 1}: Combined population size before mutation: {len(all_examples)}"
+                    f"Record {record_index + 1}: Returning highest ranking individual with score: {population['quality_score'].iloc[0]}"
                 )
-                mutated_population = self._apply_mutations(
-                    all_examples, user_prompt=user_prompt
-                )
-                logger.info(
-                    f"Record {record_index + 1}, Generation {gen + 1}: Population size after mutation: {len(mutated_population)}"
-                )
-                ranked_population = self._rank_population(mutated_population, prompt)
-                filtered_population = self._filter_population(ranked_population)
-                logger.info(
-                    f"Record {record_index + 1}, Generation {gen + 1}: Population size after filtering: {len(filtered_population)}"
-                )
-                population = filtered_population
 
             logger.info(
-                f"Record {record_index + 1}: Final population size: {len(population)}"
+                f"Record {record_index + 1}: Final population size after all generations: {len(population)}"
             )
 
-            # Merge the contextual tags with the generated synthetic data
+            # Step 6: Merge contextual tags with the final population
             contextual_data = pd.DataFrame([row] * len(population), columns=row.index)
             combined_data = pd.concat(
                 [
@@ -423,7 +423,9 @@ Important: Ensure that the `corrected_content` field contains only the corrected
                     f.write("\n")
 
         final_result = pd.concat(results, ignore_index=True)
-        logger.info(f"Data generation complete. Final result shape: {final_result.shape}")
+        logger.info(
+            f"Data generation complete. Final result shape: {final_result.shape}"
+        )
         return final_result
 
     def _rank_population(
@@ -481,7 +483,6 @@ Ensure that your scores reflect meaningful differences between the examples base
                             f"Mismatch in number of scores ({len(quality_scores)}) and batch size ({len(batch)})"
                         )
 
-                    # Map the batch indexes to the original population
                     for i, score in quality_scores.items():
                         all_quality_scores[i - 1] = score
 
@@ -503,14 +504,14 @@ Ensure that your scores reflect meaningful differences between the examples base
                 logger.warning(
                     f"Error during ranking (attempt {attempt + 1}/{max_retries}): {str(e)}"
                 )
-                logger.warning(f"Full stack trace:\n{traceback.format_exc()}")
-                logger.warning(f"LLM Response:\n{response}")
-                logger.warning(f"Quality Scores:\n{all_quality_scores}")
-                logger.warning(f"Population DataFrame (reset index):\n{population}")
+                logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+                logger.debug(f"LLM Response:\n{response}")
+                logger.debug(f"Quality Scores:\n{all_quality_scores}")
+                logger.debug(f"Population DataFrame (reset index):\n{population}")
 
             attempt += 1
-            logger.info(f"Retrying ranking (attempt {attempt}/{max_retries})...")
-            time.sleep(2)  # Wait before retrying
+            logger.info(f"Retrying ranking (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(2)
 
         logger.error(
             "Max retries exceeded during ranking. Returning original population without ranking."
@@ -520,14 +521,12 @@ Ensure that your scores reflect meaningful differences between the examples base
     def _filter_population(self, ranked_population: pd.DataFrame) -> pd.DataFrame:
         logger.info("Filtering population")
 
-        # Filter based on quality score
         quality_filtered = ranked_population[ranked_population["quality_score"] >= 3]
         removed_count = len(ranked_population) - len(quality_filtered)
         logger.info(
-            f"Removed {removed_count} examples ({removed_count/len(ranked_population)*100:.2f}%) with quality score below 3"
+            f"Filtered out {removed_count} examples ({removed_count/len(ranked_population)*100:.2f}%) with quality score below 3"
         )
 
-        # Apply strict validation filtering using only expert validators
         final_filtered = []
         for index, row in quality_filtered.iterrows():
             valid = True
@@ -542,7 +541,7 @@ Ensure that your scores reflect meaningful differences between the examples base
                             f"Record {index} failed final validation for column '{column}': {validation_error}"
                         )
                         valid = False
-                        break  # No need to check other columns if one fails
+                        break
 
             if valid:
                 final_filtered.append(row)
