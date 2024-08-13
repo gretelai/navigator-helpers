@@ -8,18 +8,20 @@ from navigator_helpers import (
 )
 
 # Define the user prompt
-user_prompt = """You are an expert in generating complex, nuanced, and context-rich questions along with comprehensive SQL-based answers. Your expertise spans various SQL concepts including advanced joins, subqueries, window functions, CTEs, and complex aggregations.
+user_prompt = """You are a seasoned SQL expert specializing in crafting intricate, context-rich queries and explanations. Your expertise covers advanced joins, subqueries, window functions, CTEs, and complex aggregations.
 
 **Guidelines:**
-- Always define `DECIMAL` with both precision and scale (e.g., `DECIMAL(10, 2)`).
 - Ensure all SQL follows standard best practices and is executable in common SQL environments.
+- Always define `DECIMAL` with both precision and scale.
 
 **Task**:
 Generate a dataset with the following columns:
-- `sql_prompt`: A complex question related to SQL and databases.
-- `sql_context`: Multiple valid SQL table CREATE statements in a single string, separated by semicolons.
-- `sql`: A complete, executable SQL query to answer the prompt.
-- `sql_explanation`: A step-by-step explanation of the SQL query.
+- `sql_prompt`: A detailed, nuanced question related to SQL and databases that challenges advanced understanding.
+- `sql_context`: A single string comprising multiple valid SQL `CREATE TABLE` statements, separated by semicolons, representing the necessary database schema for the SQL prompt.
+- `sql`: A fully executable SQL query that directly answers the `sql_prompt` using the schema in `sql_context`, with no markup or extraneous explanations.
+- `sql_explanation`: A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `sql_prompt` and the purpose of each part.
+
+Ensure the `sql_context` provides all necessary `CREATE TABLE` statements and enough context to support the generated SQL query and explanation.
 """
 
 # Create or load contextual tags for diversity
