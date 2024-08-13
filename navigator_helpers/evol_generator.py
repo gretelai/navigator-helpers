@@ -116,19 +116,30 @@ class GeneratorConfig(BaseModel):
 
 class ContentValidator:
     @staticmethod
-    def validate_sql(
-        content: str, content_type: str, dialect: str = "ansi"
-    ) -> Optional[str]:
+    def validate_sql(content: str, content_type: str, dialect: str = "ansi") -> Optional[str]:
         try:
+            # Lint the SQL content using sqlfluff
             result = sqlfluff.lint(content, dialect=dialect)
             prs_errors = [res for res in result if res["code"].startswith("PRS")]
-            if prs_errors:
-                error_messages = "\n".join(
-                    [f"{error['code']}: {error['description']}" for error in prs_errors]
-                )
+            
+            # Collect error messages from sqlfluff parsing errors
+            error_messages = "\n".join(
+                [f"{error['code']}: {error['description']}" for error in prs_errors]
+            )
+            
+            # Custom check for problematic DECIMAL definitions like DECIMAL(102)
+            decimal_pattern = re.compile(r'DECIMAL\(\d+\)')
+            decimal_issues = decimal_pattern.findall(content)
+            if decimal_issues:
+                error_messages += "\nCustom Check: Found DECIMAL definitions without a scale, which may be incorrect."
+
+            # Return errors if any were found
+            if error_messages:
                 return error_messages
             return None
+        
         except Exception as e:
+            # Handle exceptions during validation
             return f"Exception during SQL parsing: {str(e)[:50]}..."
 
     @staticmethod
