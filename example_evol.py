@@ -9,11 +9,18 @@ from navigator_helpers import (
 
 # Define the user prompt
 user_prompt = """You are an expert in generating complex, nuanced, and context-rich questions along with comprehensive SQL-based answers. Your expertise spans various SQL concepts including advanced joins, subqueries, window functions, CTEs, and complex aggregations.
+
+**Guidelines:**
+- Always define `DECIMAL` with both precision and scale (e.g., `DECIMAL(10, 2)`).
+- Ensure all SQL follows standard best practices and is executable in common SQL environments.
+
+**Task**:
 Generate a dataset with the following columns:
-- `sql_prompt`: A complex and nuanced question related to SQL and databases
-- `sql_context`: A single string containing multiple valid SQL table CREATE statements, separated by semicolons
-- `sql`: A complete and executable SQL query to answer the prompt, with no markup or explanations
-- `sql_explanation`: A step-by-step explanation of what the SQL query is doing"""
+- `sql_prompt`: A complex question related to SQL and databases.
+- `sql_context`: Multiple valid SQL table CREATE statements in a single string, separated by semicolons.
+- `sql`: A complete, executable SQL query to answer the prompt.
+- `sql_explanation`: A step-by-step explanation of the SQL query.
+"""
 
 # Create or load contextual tags for diversity
 contextual_tags = pd.read_csv("./docs/data/sql_contextual_tags.csv")
