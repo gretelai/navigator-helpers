@@ -463,10 +463,12 @@ Return a dataset with the following columns:
         self, prompt: str, num_records: int, expected_columns: List[str]
     ) -> pd.DataFrame:
         max_retries = 3
+        gen_kwargs = {"top_p": 0.92, "top_k": 40, "temperature": 0.8}
+        
         for attempt in range(max_retries):
             try:
                 response = self.tabular.generate(
-                    prompt=prompt, num_records=num_records, disable_progress_bar=True
+                    prompt=prompt, num_records=num_records, disable_progress_bar=True, **gen_kwargs
                 )
                 missing_columns = [
                     col for col in expected_columns if col not in response.columns
