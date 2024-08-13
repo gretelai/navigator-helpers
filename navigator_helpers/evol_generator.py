@@ -42,11 +42,11 @@ class GeneratorConfig(BaseModel):
     )
 
     tabular_model: str = Field(
-        ..., description="The tabular model to use for data generation."
+        'gretelai/auto', description="The tabular model to use for data generation."
     )
 
     llm_model: str = Field(
-        ..., description="The language model to use for text generation."
+        'gretelai/gpt-auto', description="The language model to use for text generation."
     )
 
     num_generations: int = Field(
@@ -395,7 +395,7 @@ If it's valid {content_type} syntax, respond with 'VALID'. If it's invalid, resp
         error = validator_func(content, content_type)
         if error:
             self.logger.warning(f"Validation error for {content_type}: {error}")
-            self.logger.warning(f"Data failed validation: {content[:100]}...")
+            self.logger.warning(f"Data failed validation: {content}")
             corrected_content, explanation = self.correct_content(
                 content, content_type, error
             )
@@ -485,7 +485,7 @@ Return a dataset with the following columns:
         )
 
         self.columns = population.columns.tolist()
-        self.logger.info(f"Initial population generated with shape: {population.shape}")
+        self.logger.info(f"Initial population generated with {population.shape[0]} rows and {population.shape[1]} columns.")
 
         return self.validate_and_correct_data(population)
 
@@ -512,7 +512,8 @@ Return a dataset with the following columns:
             expected_columns=expected_columns,
         )
 
-        self.logger.info(f"Population expanded. Expansion shape: {expanded.shape}")
+        self.logger.info(f"Population expanded by {expanded.shape[0]} rows.")
+
 
         # Combine the new examples with the existing population
         updated_population = pd.concat([population, expanded], ignore_index=True)
@@ -573,7 +574,7 @@ Return a dataset with the following columns:
         mutated = self.validate_and_correct_data(mutated)
 
         self.logger.info(
-            f"Mutations applied. Mutations count: {mutations_count}, Mutations shape: {mutated.shape}"
+            f"Mutations applied to {mutations_count}/{len(population)} examples from the population."
         )
 
         # Update the total mutations count
@@ -770,10 +771,10 @@ Ensure that your scores reflect meaningful differences between the examples base
         print(separator)
         print(f"{'Summary of Data Generation Process':^50}")
         print(separator)
+        print(f"Final records returned: {summary['final_records_returned']}")
         print(
             f"Total records processed: {summary['total_records_processed']} (including {summary['total_mutations']} mutations)"
         )
-        print(f"Final records returned: {summary['final_records_returned']}")
         print(
             f"Repairs attempted: {summary['records_repaired']} ({summary['percent_repaired']})"
         )
