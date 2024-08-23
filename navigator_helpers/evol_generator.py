@@ -11,8 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import pandas as pd
 import sqlfluff
 from gretel_client import Gretel
-from pydantic import BaseModel, Field, validator
-from tqdm.auto import tqdm
+from pydantic import BaseModel, Field, field_validator
 
 
 def parse_quality_scores(response: str) -> Dict[int, int]:
@@ -89,7 +88,7 @@ class GeneratorConfig(BaseModel):
     class Config:
         use_enum_values = True
 
-    @validator("column_validators")
+    @field_validator("column_validators")
     def validate_column_validators(cls, v):
         valid_validators = ["sql", "json", "python"]
         for column, validator in v.items():
@@ -101,7 +100,7 @@ class GeneratorConfig(BaseModel):
                 )
         return v
 
-    @validator("mutation_categories")
+    @field_validator("mutation_categories")
     def validate_mutation_categories(cls, v):
         if not v:
             return v

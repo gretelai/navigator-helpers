@@ -1,18 +1,26 @@
+from pathlib import Path
+
 from setuptools import setup, find_packages
+
+def reqs(file_path: str) -> list[str]:
+    with open(Path(file_path)) as fh:
+        return [
+            r.strip()
+            for r in fh.readlines()
+            if not (r.startswith("#") or r.startswith("\n"))
+        ]
+
 
 setup(
     name="navigator-helpers",
     version="0.1.0",
-    packages=find_packages(),
-    install_requires=[
-        "datasets==2.19.0",
-        "gretel-client==0.20.1",
-        "langchain==0.2.2",
-        "pandas==2.2.1",
-        "streamlit==1.35.0",
-        "tqdm==4.66.4",
-        "sqlfluff==3.1.0"
-    ],
+    packages=find_packages(exclude=["tests"], include=["navigator_helpers"]),
+    python_requires=">=3.9",
+    install_requires=reqs("requirements.txt"),
+    extras_require={
+        "dev": reqs("requirements-dev.txt"),
+    },
+    entry_points={"console_scripts": []},
     author="Gretel",
     author_email="hi@gretel.ai",
     description="A library of helper functions for Gretel Navigator",
@@ -25,12 +33,13 @@ setup(
         "Intended Audience :: Developers",
         "License :: Free To Use But Restricted",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
 )
