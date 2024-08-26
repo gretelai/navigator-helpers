@@ -1,12 +1,13 @@
 import logging
 import traceback
+
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+
 from tqdm.auto import tqdm
 
-from .data_synthesis import (InstructionResponseConfig, initialize_navigator,
-                             log_message)
+from .data_synthesis import initialize_navigator, InstructionResponseConfig, log_message
 from .evaluation_utils import evaluate_texts
 from .generation_types import GenerationType
 from .text_generation import EvolutionaryTextGenerator

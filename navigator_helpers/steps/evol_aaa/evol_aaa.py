@@ -1,26 +1,32 @@
 import json
+import logging
 import os
 import random
 import re
 import string
 import time
+
+from dataclasses import dataclass
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
-import logging
-from dataclasses import dataclass
 
-import pandas as pd
 import autogen
+import pandas as pd
+
 from autogen.io import base, console
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 # Custom logging filter
 class NoParentFilter(logging.Filter):
     def filter(self, record):
         return not record.name.startswith(("HTTP Request"))
+
 
 # Apply the filter to the root logger
 logging.getLogger().addFilter(NoParentFilter())
@@ -35,6 +41,7 @@ class EvolutionConfig:
     verbose: bool = False
     primary_model_tags: List[str] = ("llama-3.1-8b",)
 
+
 @dataclass
 class AAAConfig:
     temperature: float = 0.7
@@ -45,16 +52,16 @@ class AAAConfig:
     primary_model_tags: List[str] = ("llama-3.1-8b",)
     co_teaching_model_tags: List[str] = ("llama-3.1-8b",)
 
+
 class BaseTextProcessor:
     """
     Base class for text processing operations.
-    
+
     This class provides common functionality for text processing,
     including setting up agents and user proxies.
     """
 
-
-    def __init__(self, config: Union['EvolutionConfig', 'AAAConfig']) -> None:
+    def __init__(self, config: Union["EvolutionConfig", "AAAConfig"]) -> None:
         self.config = config
         self.agents = self._setup_agents()
         self.user_proxy = self._setup_user_proxy()
@@ -74,9 +81,9 @@ class BaseTextProcessor:
     def _setup_agents(self) -> Dict[str, autogen.AssistantAgent]:
         """
         Set up the autogen agents for text processing.
-        
+
         Returns:
-            Dict[str, autogen.AssistantAgent]: A dictionary of agent names to agent objects. 
+            Dict[str, autogen.AssistantAgent]: A dictionary of agent names to agent objects.
 
         Raises:
             ValueError: If no primary model configuration is found.
@@ -96,7 +103,9 @@ class BaseTextProcessor:
         """
 
         LLM_CONFIG_LIST = json.loads(os.environ.get("LLM_CONFIG_LIST"))
-        PRIMARY_CONFIG_LIST_TO_USE = autogen.filter_config(LLM_CONFIG_LIST, {"tags": self.config.primary_model_tags})
+        PRIMARY_CONFIG_LIST_TO_USE = autogen.filter_config(
+            LLM_CONFIG_LIST, {"tags": self.config.primary_model_tags}
+        )
 
         agents = {}
         # Setup primary agent
@@ -107,38 +116,46 @@ class BaseTextProcessor:
             primary_agent_name = f"PrimaryAgent_{primary_api_type}-{primary_model_name}"
 
             primary_llm_config = dict(primary_model_config)
-            primary_llm_config.update({
-                "temperature": self.config.temperature,
-                "cache_seed": None  # Disable caching
-            })
+            primary_llm_config.update(
+                {
+                    "temperature": self.config.temperature,
+                    "cache_seed": None,  # Disable caching
+                }
+            )
 
             agents["primary"] = autogen.AssistantAgent(
                 name=primary_agent_name,
                 llm_config=primary_llm_config,
-                system_message=DEFAULT_DATA_SYSTEM_MESSAGE
+                system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
             )
         else:
             raise ValueError("No primary model configuration found.")
 
         # Setup co-teaching agents only if co_teaching_model_tags are provided
-        if hasattr(self.config, 'co_teaching_model_tags'):
-            CO_TEACHING_CONFIG_LIST_TO_USE = autogen.filter_config(LLM_CONFIG_LIST, {"tags": self.config.co_teaching_model_tags})
+        if hasattr(self.config, "co_teaching_model_tags"):
+            CO_TEACHING_CONFIG_LIST_TO_USE = autogen.filter_config(
+                LLM_CONFIG_LIST, {"tags": self.config.co_teaching_model_tags}
+            )
             for i in range(self.config.num_co_teachers):
-                model_config = CO_TEACHING_CONFIG_LIST_TO_USE[i % len(CO_TEACHING_CONFIG_LIST_TO_USE)]
+                model_config = CO_TEACHING_CONFIG_LIST_TO_USE[
+                    i % len(CO_TEACHING_CONFIG_LIST_TO_USE)
+                ]
                 model_name = model_config.get("model", "unknown")
                 api_type = model_config.get("api_type", "unknown")
                 agent_name = f"CoTeachAgent_{i}_{api_type}-{model_name}"
 
                 llm_config = dict(model_config)
-                llm_config.update({
-                    "temperature": self.config.co_teach_temperature,
-                    "cache_seed": None  # Disable caching
-                })
+                llm_config.update(
+                    {
+                        "temperature": self.config.co_teach_temperature,
+                        "cache_seed": None,  # Disable caching
+                    }
+                )
 
                 agents[f"co_teach_{i}"] = autogen.AssistantAgent(
                     name=agent_name,
                     llm_config=llm_config,
-                    system_message=DEFAULT_DATA_SYSTEM_MESSAGE
+                    system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
                 )
 
         return agents
@@ -146,14 +163,14 @@ class BaseTextProcessor:
     def _setup_user_proxy(self) -> autogen.UserProxyAgent:
         """
         Set up the user proxy agent.
-        
+
         Returns:
             autogen.UserProxyAgent: The user proxy agent.
         """
         return autogen.UserProxyAgent(
             name="UserProxy",
             human_input_mode="NEVER",
-            code_execution_config=False,    # don't allow code execution
+            code_execution_config=False,  # don't allow code execution
             max_consecutive_auto_reply=1,
             is_termination_msg=lambda x: True,  # terminate after one response
         )
@@ -161,16 +178,16 @@ class BaseTextProcessor:
     def _get_agent_response(self, agent: autogen.AssistantAgent, prompt: str) -> str:
         """
         Get a response from an agent for a given prompt.
-        
+
         Args:
             agent (autogen.AssistantAgent): The agent to get a response from.
             prompt (str): The prompt to send to the agent.
-        
+
         Returns:
             str: The agent's response.
         """
         # Add a unique identifier to the prompt
-        unique_id = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        unique_id = "".join(random.choices(string.ascii_letters + string.digits, k=10))
         timestamp = time.time()
         full_prompt = f"[Request ID: {unique_id}, Timestamp: {timestamp}]\n{prompt}"
 
@@ -183,7 +200,7 @@ class BaseTextProcessor:
         # Retrieve the last message from the conversation, which should be the agent's response
         conversation = self.user_proxy.chat_messages[agent]
         if len(conversation) >= 2:  # Ensure there's a response
-            return conversation[-1]['content']
+            return conversation[-1]["content"]
         else:
             return ""
 
@@ -200,7 +217,7 @@ class BaseTextProcessor:
         parsed_objects: List[Dict[str, Any]] = []
         try:
             # This pattern matches JSON objects, allowing for nested structures and newlines
-            json_pattern = re.compile(r'\{(?:[^{}]|\{[^{}]*\})*\}')
+            json_pattern = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}")
             json_objects = json_pattern.findall(text)
             for obj in json_objects:
                 try:
@@ -235,19 +252,19 @@ class BaseTextProcessor:
             str: The extracted JSON content, or an empty JSON string if no valid JSON is found.
         """
         # Remove the string TERMINATE if it's present at the end of the text
-        text = re.sub(r'\s*TERMINATE\s*$', '', text)
+        text = re.sub(r"\s*TERMINATE\s*$", "", text)
 
         # Find the start of the JSON content
-        json_start = re.search(r'```(?:json)?\s*\{', text)
+        json_start = re.search(r"```(?:json)?\s*\{", text)
         if json_start:
             # Remove everything before the start of the JSON content
-            text = text[json_start.start():]
+            text = text[json_start.start() :]
 
             # Remove the opening code block marker
-            text = re.sub(r'^```(?:json)?\s*', '', text)
+            text = re.sub(r"^```(?:json)?\s*", "", text)
 
             # Find and remove the closing code block marker
-            text = re.sub(r'\s*```\s*$', '', text)
+            text = re.sub(r"\s*```\s*$", "", text)
 
         # Try to parse the text as JSON
         try:
@@ -255,7 +272,7 @@ class BaseTextProcessor:
             return json.dumps(parsed, ensure_ascii=False, indent=2)
         except json.JSONDecodeError:
             # If parsing fails, try to find JSON-like content
-            json_pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
+            json_pattern = r"\{(?:[^{}]|\{[^{}]*\})*\}"
             matches = re.findall(json_pattern, text, re.DOTALL)
 
             # Sort matches by length and try to parse the largest one
@@ -268,44 +285,51 @@ class BaseTextProcessor:
                     continue
 
         # If no valid JSON found, return an empty JSON string
-        return '{}'
+        return "{}"
+
 
 class EvolutionTextProcessor(BaseTextProcessor):
     """
     Text processor that uses an evolutionary algorithm to improve text.
     """
 
-
     def __init__(self, evolution_config: EvolutionConfig):
         super().__init__(evolution_config)
 
     def _convert_to_jsonl(self, df: pd.DataFrame) -> str:
-        return df.to_json(orient='records', lines=True)
+        return df.to_json(orient="records", lines=True)
 
     def _convert_to_dataframe(self, jsonl_str: str) -> pd.DataFrame:
         return pd.read_json(StringIO(jsonl_str), lines=True)
 
-    def evolve(self, initial_text: Union[str, pd.DataFrame], context: Optional[Union[str, pd.DataFrame]] = None) -> Union[str, pd.DataFrame]:
+    def evolve(
+        self,
+        initial_text: Union[str, pd.DataFrame],
+        context: Optional[Union[str, pd.DataFrame]] = None,
+    ) -> Union[str, pd.DataFrame]:
         """
         Evolve the initial text using an evolutionary algorithm.
-        
+
         Args:
             initial_text (Union[str, pd.DataFrame]): The initial text to evolve.
             context (Optional[Union[str, pd.DataFrame]]): Optional context for evolution.
-        
+
         Returns:
             Union[str, pd.DataFrame]: The evolved text.
         """
-
 
         evolution_start_time = time.time()
 
         # Track input types
         initial_text_is_df = isinstance(initial_text, pd.DataFrame)
-        context_is_df = isinstance(context, pd.DataFrame) if context is not None else False
+        context_is_df = (
+            isinstance(context, pd.DataFrame) if context is not None else False
+        )
 
         # Convert to JSONL only if it's a DataFrame
-        initial_text_jsonl = self._convert_to_jsonl(initial_text) if initial_text_is_df else initial_text
+        initial_text_jsonl = (
+            self._convert_to_jsonl(initial_text) if initial_text_is_df else initial_text
+        )
         context_jsonl = self._convert_to_jsonl(context) if context_is_df else context
 
         # Clear all agent conversation histories
@@ -316,7 +340,9 @@ class EvolutionTextProcessor(BaseTextProcessor):
             logger.info("🧬 🧬 🧬 Starting the Evolution process ...")
 
         # Create initial population
-        current_population = self._create_initial_population(initial_text_jsonl, context_jsonl)
+        current_population = self._create_initial_population(
+            initial_text_jsonl, context_jsonl
+        )
         for gen in range(self.config.num_generations):
             if self.config.verbose:
                 logger.info(f"Generation {gen + 1}/{self.config.num_generations}")
@@ -324,10 +350,12 @@ class EvolutionTextProcessor(BaseTextProcessor):
             mutated_texts = self._mutate_population(current_population, context_jsonl)
             all_texts = current_population + mutated_texts
             ranked_texts = self._rank_texts(all_texts, context_jsonl)
-            current_population = ranked_texts[:self.config.population_size]
+            current_population = ranked_texts[: self.config.population_size]
 
             if self.config.verbose:
-                logger.info(f"Best text after generation {gen + 1}: {current_population[0][:100]}")
+                logger.info(
+                    f"Best text after generation {gen + 1}: {current_population[0][:100]}"
+                )
 
         evolved_text = current_population[0]
 
@@ -336,7 +364,9 @@ class EvolutionTextProcessor(BaseTextProcessor):
 
         if self.config.verbose:
             logger.info(f"-----------------")
-            logger.info(f"Evolution process completed in {evolution_duration:.2f} seconds")
+            logger.info(
+                f"Evolution process completed in {evolution_duration:.2f} seconds"
+            )
 
         # Convert back to DataFrame if the input was a DataFrame
         if initial_text_is_df:
@@ -344,10 +374,14 @@ class EvolutionTextProcessor(BaseTextProcessor):
 
         return evolved_text
 
-    def _create_initial_population(self, initial_text: str, context: Optional[str] = None) -> List[str]:
+    def _create_initial_population(
+        self, initial_text: str, context: Optional[str] = None
+    ) -> List[str]:
         population = [initial_text]
         if self.config.verbose:
-                logger.info(f"🌱 Creating initial population of size {self.config.population_size}")
+            logger.info(
+                f"🌱 Creating initial population of size {self.config.population_size}"
+            )
         while len(population) < self.config.population_size:
             population.append(self._mutate_text(initial_text, context))
         return population
@@ -417,7 +451,9 @@ class EvolutionTextProcessor(BaseTextProcessor):
             mutation_data = json.loads(response)
             if is_jsonl_input:
                 mutated_jsonl = mutation_data.get("mutated_jsonl", [])
-                mutated_text = '\n'.join(json.dumps(item['mutated']) for item in mutated_jsonl)
+                mutated_text = "\n".join(
+                    json.dumps(item["mutated"]) for item in mutated_jsonl
+                )
             else:
                 mutated_text = mutation_data.get("mutated_text")
 
@@ -426,21 +462,31 @@ class EvolutionTextProcessor(BaseTextProcessor):
                     logger.info(f"Mutation result: {mutated_text[:100]}")
                 return mutated_text
             else:
-                logger.info("Mutation failed to produce a valid result. Returning original text.")
+                logger.info(
+                    "Mutation failed to produce a valid result. Returning original text."
+                )
                 return text
 
         except json.JSONDecodeError:
-            logger.info("Error parsing JSON response in mutation. Returning original text.")
+            logger.info(
+                "Error parsing JSON response in mutation. Returning original text."
+            )
             return text
         except Exception as e:
-            logger.info(f"Unexpected error in mutation: {str(e)}. Returning original text.")
+            logger.info(
+                f"Unexpected error in mutation: {str(e)}. Returning original text."
+            )
         return text
 
-    def _mutate_population(self, population: List[str], context: Optional[str] = None) -> List[str]:
+    def _mutate_population(
+        self, population: List[str], context: Optional[str] = None
+    ) -> List[str]:
         return [
-            self._mutate_text(text, context)
-            if random.random() < self.config.mutation_rate
-            else text
+            (
+                self._mutate_text(text, context)
+                if random.random() < self.config.mutation_rate
+                else text
+            )
             for text in population
         ]
 
@@ -471,12 +517,16 @@ class EvolutionTextProcessor(BaseTextProcessor):
         Provide only the JSON object, with no additional text.
         """
 
-        ranking_response = self._get_agent_response(self.agents["primary"], evaluation_prompt)
+        ranking_response = self._get_agent_response(
+            self.agents["primary"], evaluation_prompt
+        )
         ranking_response = self.extract_json(ranking_response)
 
         return self._parse_ranking(ranking_response, texts)
 
-    def _parse_ranking(self, ranking_response: str, original_texts: List[str]) -> List[str]:
+    def _parse_ranking(
+        self, ranking_response: str, original_texts: List[str]
+    ) -> List[str]:
         try:
             ranking_data = json.loads(ranking_response)
             ranked_texts = []
@@ -492,8 +542,11 @@ class EvolutionTextProcessor(BaseTextProcessor):
 
             return ranked_texts
         except (json.JSONDecodeError, KeyError, IndexError) as e:
-            logger.info(f"Error parsing ranking response: {e}. Returning original order.")
+            logger.info(
+                f"Error parsing ranking response: {e}. Returning original order."
+            )
             return original_texts
+
 
 class AAATextProcessor(BaseTextProcessor):
     """
@@ -504,29 +557,34 @@ class AAATextProcessor(BaseTextProcessor):
         super().__init__(aaa_config)
 
     def _convert_to_jsonl(self, df: pd.DataFrame) -> str:
-        return df.to_json(orient='records', lines=True)
+        return df.to_json(orient="records", lines=True)
 
     def _convert_to_dataframe(self, jsonl_str: str) -> pd.DataFrame:
         return pd.read_json(StringIO(jsonl_str), lines=True)
 
-    def apply_aaa(self, text: Union[str, pd.DataFrame], context: Optional[Union[str, pd.DataFrame]] = None) -> Union[str, pd.DataFrame]:
+    def apply_aaa(
+        self,
+        text: Union[str, pd.DataFrame],
+        context: Optional[Union[str, pd.DataFrame]] = None,
+    ) -> Union[str, pd.DataFrame]:
         """
         Apply the AAA method to improve the input text.
-        
+
         Args:
             text (Union[str, pd.DataFrame]): The text to improve.
             context (Optional[Union[str, pd.DataFrame]]): Optional context for improvement.
-        
+
         Returns:
             Union[str, pd.DataFrame]: The improved text.
         """
-         
 
         aaa_start_time = time.time()
 
         # Track input types
         text_is_df = isinstance(text, pd.DataFrame)
-        context_is_df = isinstance(context, pd.DataFrame) if context is not None else False
+        context_is_df = (
+            isinstance(context, pd.DataFrame) if context is not None else False
+        )
 
         # Convert to JSONL only if it's a DataFrame
         text_jsonl = self._convert_to_jsonl(text) if text_is_df else text
@@ -539,11 +597,26 @@ class AAATextProcessor(BaseTextProcessor):
         if self.config.verbose:
             logger.info("🦾 🦿 🤖 Starting the AAA process ...")
 
-        co_teaching_results, co_teaching_explanations = self._co_teach(text_jsonl, context_jsonl)
-        best_co_teaching_text, best_co_teaching_explanation = self._select_best_co_teaching(text_jsonl, co_teaching_results, co_teaching_explanations)
+        co_teaching_results, co_teaching_explanations = self._co_teach(
+            text_jsonl, context_jsonl
+        )
+        best_co_teaching_text, best_co_teaching_explanation = (
+            self._select_best_co_teaching(
+                text_jsonl, co_teaching_results, co_teaching_explanations
+            )
+        )
         suggestions = self._generate_suggestions(best_co_teaching_text, context_jsonl)
-        self_teaching_text, self_teaching_explanation = self._self_teach(best_co_teaching_text, suggestions, context_jsonl)
-        final_text = self._make_final_selection(text_jsonl, best_co_teaching_text, best_co_teaching_explanation, self_teaching_text, self_teaching_explanation, context_jsonl)
+        self_teaching_text, self_teaching_explanation = self._self_teach(
+            best_co_teaching_text, suggestions, context_jsonl
+        )
+        final_text = self._make_final_selection(
+            text_jsonl,
+            best_co_teaching_text,
+            best_co_teaching_explanation,
+            self_teaching_text,
+            self_teaching_explanation,
+            context_jsonl,
+        )
 
         aaa_end_time = time.time()
         aaa_duration = aaa_end_time - aaa_start_time
@@ -628,36 +701,56 @@ class AAATextProcessor(BaseTextProcessor):
 
                     if is_jsonl_input:
                         improved_jsonl = improvement_data.get("improved_jsonl", [])
-                        improved_text = '\n'.join(json.dumps(item, ensure_ascii=False) for item in improved_jsonl)
+                        improved_text = "\n".join(
+                            json.dumps(item, ensure_ascii=False)
+                            for item in improved_jsonl
+                        )
 
                         # TODO: we could have explanations per line here
-                        improvement_explanation = improvement_data.get("improvement_explanation", "")
+                        improvement_explanation = improvement_data.get(
+                            "improvement_explanation", ""
+                        )
                     else:
                         improved_text = improvement_data.get("improved_text")
-                        improvement_explanation = improvement_data.get("improvement_explanation", "")
+                        improvement_explanation = improvement_data.get(
+                            "improvement_explanation", ""
+                        )
 
                     if improved_text:
                         co_teaching_results.append(improved_text)
                     else:
-                        logger.info(f"Co-teaching with {agent.name} failed to produce a valid result. Using original text.")
+                        logger.info(
+                            f"Co-teaching with {agent.name} failed to produce a valid result. Using original text."
+                        )
                         co_teaching_results.append(text)
 
                     if improvement_explanation:
                         co_teaching_explanations.append(improvement_explanation)
                     else:
-                        logger.info(f"Co-teaching with {agent.name} failed to produce a valid improvement explanation.")
+                        logger.info(
+                            f"Co-teaching with {agent.name} failed to produce a valid improvement explanation."
+                        )
                         co_teaching_results.append("")
 
                 except json.JSONDecodeError:
-                    logger.info(f"Error parsing JSON response from {agent.name} in co-teaching. Using original text.")
+                    logger.info(
+                        f"Error parsing JSON response from {agent.name} in co-teaching. Using original text."
+                    )
                     co_teaching_results.append(text)
 
         if self.config.verbose:
-            logger.info(f"Co-teaching process completed. Generated {len(co_teaching_results)} results.")
+            logger.info(
+                f"Co-teaching process completed. Generated {len(co_teaching_results)} results."
+            )
 
         return co_teaching_results, co_teaching_explanations
 
-    def _select_best_co_teaching(self, original_text: str, co_teaching_results: List[str], co_teaching_explanations: List[str]) -> str:
+    def _select_best_co_teaching(
+        self,
+        original_text: str,
+        co_teaching_results: List[str],
+        co_teaching_explanations: List[str],
+    ) -> str:
         if self.config.verbose:
             logger.info("🔍 Selecting best co-teaching result")
 
@@ -714,8 +807,9 @@ class AAATextProcessor(BaseTextProcessor):
             Provide only the JSON object, with no additional text.
             """
 
-
-        selection_response = self._get_agent_response(self.agents["primary"], selection_prompt)
+        selection_response = self._get_agent_response(
+            self.agents["primary"], selection_prompt
+        )
         selection_response = self.extract_json(selection_response)
 
         try:
@@ -744,7 +838,9 @@ class AAATextProcessor(BaseTextProcessor):
                 logger.info(f"Selected best co-teaching result (default).")
             return selected_text, ""
 
-    def _generate_suggestions(self, text: str, context: Optional[str] = None) -> List[str]:
+    def _generate_suggestions(
+        self, text: str, context: Optional[str] = None
+    ) -> List[str]:
         if self.config.verbose:
             logger.info(f"Generating {self.config.num_suggestions} suggestions...")
 
@@ -808,9 +904,11 @@ class AAATextProcessor(BaseTextProcessor):
 
             # Ensure we have exactly the requested number of suggestions
             if len(suggestions) > self.config.num_suggestions:
-                suggestions = suggestions[:self.config.num_suggestions]
+                suggestions = suggestions[: self.config.num_suggestions]
             while len(suggestions) < self.config.num_suggestions:
-                suggestions.append("No additional suggestion" if not is_jsonl_input else "{}")
+                suggestions.append(
+                    "No additional suggestion" if not is_jsonl_input else "{}"
+                )
 
             if self.config.verbose:
                 logger.info("Suggestions generated.")
@@ -822,7 +920,9 @@ class AAATextProcessor(BaseTextProcessor):
             default_suggestion = "{}" if is_jsonl_input else "No additional suggestion"
             return [default_suggestion] * self.config.num_suggestions
 
-    def _self_teach(self, text: str, suggestions: List[str], context: Optional[str] = None) -> str:
+    def _self_teach(
+        self, text: str, suggestions: List[str], context: Optional[str] = None
+    ) -> str:
         if self.config.verbose:
             logger.info("Starting self-teaching process...")
 
@@ -884,14 +984,18 @@ class AAATextProcessor(BaseTextProcessor):
             Provide only the JSON object, with no additional text.
             """
 
-        response = self._get_agent_response(self.agents["primary"], self_teaching_prompt)
+        response = self._get_agent_response(
+            self.agents["primary"], self_teaching_prompt
+        )
         response = self.extract_json(response)
 
         try:
             improvement_data = json.loads(response)
             if is_jsonl_input:
                 improved_jsonl = improvement_data.get("improved_jsonl", [])
-                improved_text = '\n'.join(json.dumps(item, ensure_ascii=False) for item in improved_jsonl)
+                improved_text = "\n".join(
+                    json.dumps(item, ensure_ascii=False) for item in improved_jsonl
+                )
 
                 # TODO: we could have explanations per line here
                 improvement_explanation = improvement_data.get("changes_made", "")
@@ -908,7 +1012,15 @@ class AAATextProcessor(BaseTextProcessor):
             logger.info("Error parsing JSON response. Returning original text.")
             return text
 
-    def _make_final_selection(self, original: str, co_teaching: str, co_teaching_expl: str, self_teaching: str, self_teaching_expl: str, context: Optional[str] = None) -> str:
+    def _make_final_selection(
+        self,
+        original: str,
+        co_teaching: str,
+        co_teaching_expl: str,
+        self_teaching: str,
+        self_teaching_expl: str,
+        context: Optional[str] = None,
+    ) -> str:
         if self.config.verbose:
             logger.info("Making final selection...")
 
@@ -941,7 +1053,9 @@ class AAATextProcessor(BaseTextProcessor):
         Provide only the JSON object, with no additional text:
         """
 
-        response = self._get_agent_response(self.agents["primary"], final_selection_prompt)
+        response = self._get_agent_response(
+            self.agents["primary"], final_selection_prompt
+        )
         response = self.extract_json(response)
 
         try:
@@ -956,7 +1070,9 @@ class AAATextProcessor(BaseTextProcessor):
                 selected_text = self_teaching
             else:
                 # If the selection is invalid, default to the original text
-                logger.info(f"Invalid selection '{selected_option}'. Defaulting to original text.")
+                logger.info(
+                    f"Invalid selection '{selected_option}'. Defaulting to original text."
+                )
                 selected_text = original
 
             if self.config.verbose:
@@ -968,9 +1084,13 @@ class AAATextProcessor(BaseTextProcessor):
             logger.info("Error parsing JSON response. Defaulting to original text.")
             return original
 
+
 class SilentConsole(console.IOConsole):
-    def print(self, *objects: Any, sep: str = " ", end: str = "\n", flush: bool = False) -> None:
+    def print(
+        self, *objects: Any, sep: str = " ", end: str = "\n", flush: bool = False
+    ) -> None:
         pass
+
 
 def set_autogen_console_output(verbose: bool):
     if verbose:
