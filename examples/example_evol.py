@@ -25,7 +25,7 @@ Ensure the `sql_context` provides all necessary `CREATE TABLE` statements and en
 """
 
 # Create or load contextual tags for diversity
-contextual_tags = pd.read_csv("./docs/data/sql_contextual_tags.csv")
+contextual_tags = pd.read_csv("docs/data/sql_contextual_tags.csv")
 
 # Define the configuration
 config = GeneratorConfig(
