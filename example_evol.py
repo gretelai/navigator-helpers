@@ -3,8 +3,8 @@ import pandas as pd
 from navigator_helpers import (
     EvolDataGenerator,
     GeneratorConfig,
-    MutationCategory,
     LogLevel,
+    MutationCategory,
 )
 
 # Define the user prompt

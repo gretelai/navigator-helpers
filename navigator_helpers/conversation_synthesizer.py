@@ -1,15 +1,17 @@
 import json
 import logging
+
 from dataclasses import dataclass
 from typing import List
 
 from tqdm.auto import tqdm
 
-from .data_synthesis import SingleTextConfig, initialize_navigator
+from .data_synthesis import initialize_navigator, SingleTextConfig
 from .generation_types import GenerationType
 from .text_generation import EvolutionaryTextGenerator, log_message
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Conversation:
@@ -85,15 +87,21 @@ class ConversationSynthesizer:
             leave=False,
             disable=not self.verbose,
         ):
-            logger.info(f"Generating turn {turn + 1}/{self.num_turns} for conversation {conversation_number}")
+            logger.info(
+                f"Generating turn {turn + 1}/{self.num_turns} for conversation {conversation_number}"
+            )
 
             user_message = self._generate_message(conversation, "user")
             conversation.add_message("user", user_message)
-            logger.info(f"Generated user message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}")
+            logger.info(
+                f"Generated user message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}"
+            )
 
             assistant_message = self._generate_message(conversation, "assistant")
             conversation.add_message("assistant", assistant_message)
-            logger.info(f"Generated assistant message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}")
+            logger.info(
+                f"Generated assistant message for turn {turn + 1}/{self.num_turns} in conversation {conversation_number}"
+            )
 
         return conversation
 

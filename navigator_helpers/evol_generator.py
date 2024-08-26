@@ -5,11 +5,13 @@ import random
 import re
 import time
 import traceback
+
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import pandas as pd
 import sqlfluff
+
 from gretel_client import Gretel
 from pydantic import BaseModel, Field, validator
 from tqdm.auto import tqdm
@@ -42,11 +44,12 @@ class GeneratorConfig(BaseModel):
     )
 
     tabular_model: str = Field(
-        'gretelai/auto', description="The tabular model to use for data generation."
+        "gretelai/auto", description="The tabular model to use for data generation."
     )
 
     llm_model: str = Field(
-        'gretelai/gpt-auto', description="The language model to use for text generation."
+        "gretelai/gpt-auto",
+        description="The language model to use for text generation.",
     )
 
     num_generations: int = Field(
@@ -116,19 +119,21 @@ class GeneratorConfig(BaseModel):
 
 class ContentValidator:
     @staticmethod
-    def validate_sql(content: str, content_type: str, dialect: str = "ansi") -> Optional[str]:
+    def validate_sql(
+        content: str, content_type: str, dialect: str = "ansi"
+    ) -> Optional[str]:
         try:
             # Lint the SQL content using sqlfluff
             result = sqlfluff.lint(content, dialect=dialect)
             prs_errors = [res for res in result if res["code"].startswith("PRS")]
-            
+
             # Collect error messages from sqlfluff parsing errors
             error_messages = "\n".join(
                 [f"{error['code']}: {error['description']}" for error in prs_errors]
             )
-            
+
             # Custom check for problematic DECIMAL definitions like DECIMAL(102)
-            decimal_pattern = re.compile(r'DECIMAL\(\d+\)')
+            decimal_pattern = re.compile(r"DECIMAL\(\d+\)")
             decimal_issues = decimal_pattern.findall(content)
             if decimal_issues:
                 error_messages += "\nCustom Check: Found DECIMAL definitions without a scale, which may be incorrect."
@@ -137,7 +142,7 @@ class ContentValidator:
             if error_messages:
                 return error_messages
             return None
-        
+
         except Exception as e:
             # Handle exceptions during validation
             return f"Exception during SQL parsing: {str(e)[:50]}..."
@@ -464,11 +469,14 @@ Return a dataset with the following columns:
     ) -> pd.DataFrame:
         max_retries = 3
         gen_kwargs = {"top_p": 0.92, "top_k": 40, "temperature": 0.8}
-        
+
         for attempt in range(max_retries):
             try:
                 response = self.tabular.generate(
-                    prompt=prompt, num_records=num_records, disable_progress_bar=True, **gen_kwargs
+                    prompt=prompt,
+                    num_records=num_records,
+                    disable_progress_bar=True,
+                    **gen_kwargs,
                 )
                 missing_columns = [
                     col for col in expected_columns if col not in response.columns
@@ -498,7 +506,9 @@ Return a dataset with the following columns:
         )
 
         self.columns = population.columns.tolist()
-        self.logger.info(f"Initial population generated with {population.shape[0]} rows and {population.shape[1]} columns.")
+        self.logger.info(
+            f"Initial population generated with {population.shape[0]} rows and {population.shape[1]} columns."
+        )
 
         return self.validate_and_correct_data(population)
 
@@ -526,7 +536,6 @@ Return a dataset with the following columns:
         )
 
         self.logger.info(f"Population expanded by {expanded.shape[0]} rows.")
-
 
         # Combine the new examples with the existing population
         updated_population = pd.concat([population, expanded], ignore_index=True)

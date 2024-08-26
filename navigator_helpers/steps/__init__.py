@@ -3,5 +3,5 @@ from .evol_aaa.evol_aaa import (
     AAATextProcessor,
     EvolutionConfig,
     EvolutionTextProcessor,
-    set_autogen_console_output
+    set_autogen_console_output,
 )
