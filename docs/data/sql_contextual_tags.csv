@@ -1,0 +1,6 @@
+id,domain,domain_description,sql_complexity
+0,energy,"Comprehensive data on renewable energy sources, energy consumption patterns, grid management systems, and climate change impact studies; research on energy-efficient technologies and sustainable practices.","two or more joins (specify inner, outer, cross)"
+1,aerospace,"Comprehensive data on farm management, crop yields, soil composition, weather patterns, irrigation systems, and livestock health; agricultural research and development, supply chain logistics, and market trends.","set operations such as UNION, INTERSECT, and EXCEPT"
+2,art,"In-depth data on energy consumption, production, and distribution; renewable energy sources, energy efficiency measures, and green technologies; market trends, regulations, and policy initiatives.","basic SQL with a simple select statement"
+3,energy,"Comprehensive data on artist biographies, art movements, styles, sales records, exhibition histories, and museum collections.","basic SQL with a simple select statement"
+4,real_estate,"Comprehensive data on climate patterns, deforestation rates, wildlife populations, and sustainable practices; carbon footprint studies and emission reduction strategies.","common table expressions"
