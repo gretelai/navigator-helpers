@@ -11,6 +11,7 @@ setup(
         "pandas==2.2.1",
         "streamlit==1.35.0",
         "tqdm==4.66.4",
+        "sqlfluff==3.1.0",
         "pyautogen[mistral,groq]==0.2.35",
     ],
     author="Gretel",
