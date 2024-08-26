@@ -1,0 +1,40 @@
+[tool.pytest.ini_options]
+addopts = "-v"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.black]  # https://github.com/psf/black
+target-version = ["py310"]
+exclude='''(.*ipynb)|(.*md)|(venv)|(\.eggs)'''
+line-length = 88
+
+[tool.isort]  # https://github.com/PyCQA/isort
+profile = "black"  # Compatibility with black above.
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = [
+    "navigator_helpers",
+]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+lines_between_types = 1
+force_alphabetical_sort_within_sections = true
+skip_glob = "**/*.md"
+
+[tool.pyright]
+exclude = [
+    "**/__pycache__",
+    "venv",
+]
+
+[tool.flake8]
+max-line-length = 120
+exclude = [
+    "tests/*",
+    "venv/*",
+    ".git",
+    "__pycache__"
+]
+max-complexity = 30
