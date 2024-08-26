@@ -83,8 +83,8 @@ response_quality_prompt = """Evaluate the quality of this SQL answer based on:
 NAVIGATOR_TABULAR = "gretelai/auto"
 NAVIGATOR_LLM = "gretelai/gpt-auto"
 CO_TEACH_LLMS = [
-    "gretelai/gpt-llama3-8b",
-    "gretelai/gpt-mistral7b",
+    "gretelai/gpt-llama3-1-8b",
+    "gretelai/gpt-mistral-nemo-2407",
 ]  # List of co-teaching models
 
 

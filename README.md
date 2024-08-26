@@ -3,25 +3,37 @@
 Gretel Navigator is a compound AI-based system for generating high-quality synthetic data that can be used for training AI and LLMs. Navigator leverages techniques such as diverse text generation and an AI alignment process to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic texts while considering quality, adherence, toxicity, and bias.
 
 ## Installation
-
 1. Clone the repository:
-
    ```bash
    git clone https://github.com/gretelai/navigator-helpers.git
    cd navigator-helpers
    ```
 
 2. Create a virtual environment and activate it:
-
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
-
 3. Install the required dependencies:
-
    ```bash
    pip install -r requirements.txt
+   ```
+
+### Development
+When developing new features in the library, follow the steps above and then install the package in editable mode:
+```bash
+make pip_install_dev
+```
+
+Common development tasks are available as `make` commands:
+- Apply consistent formatting.
+   ```bash
+   make style
+   ```
+  
+- Run tests.
+   ```bash
+   make test
    ```
 
 ## Usage
@@ -89,36 +101,40 @@ config = InstructionResponseConfig(
 To run the data synthesis process, simply execute one of the example scripts:
 
 ```bash
-python example_training_data.py
+python examples/example_training_data.py
 ```
 
 or
 
 ```bash
-python example_chat.py
+python examples/example_chat.py
 ```
 
 ## Data Synthesis Process
 The data synthesis process involves the following steps:
 
 1. Initialization:
-  - Create the appropriate configuration (SingleTextConfig or InstructionResponseConfig).
-  - Initialize the EvolutionaryTextGenerator with the navigator LLM and co-teaching LLMs.
+   - Create the appropriate configuration (SingleTextConfig or InstructionResponseConfig).
+   - Initialize the EvolutionaryTextGenerator with the navigator LLM and co-teaching LLMs.
+
 2. Text Generation:
-  - Generate an initial population of texts.
-  - Apply mutations to the population.
-  - Filter the quality of the texts.
-  - Rank the texts based on quality and complexity.
-  - Select a diverse subset for the next generation.
-  - Repeat for the specified number of generations.
-3.  AI Align AI (AAA) Process (if enabled):
-  - Apply Co-Teaching to the best text using multiple LLMs.
-  - Apply Self-Teaching to further improve the text.
-  - Select the final text.
+   - Generate an initial population of texts.
+   - Apply mutations to the population.
+   - Filter the quality of the texts.
+   - Rank the texts based on quality and complexity.
+   - Select a diverse subset for the next generation.
+   - Repeat for the specified number of generations.
+  
+3. AI Align AI (AAA) Process (if enabled):
+   - Apply Co-Teaching to the best text using multiple LLMs.
+   - Apply Self-Teaching to further improve the text.
+   - Select the final text.
+
 4. Evaluation:
-  - Evaluate the generated text for quality, relevance, and other metrics.
+   - Evaluate the generated text for quality, relevance, and other metrics.
+
 5. Output:
-  - Return the generated text(s) or conversation.
+   - Return the generated text(s) or conversation.
 
 ## Contributing
 

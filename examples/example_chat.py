@@ -17,8 +17,8 @@ def main():
     GRETEL_API_KEY = "prompt"
     NAVIGATOR_LLM = "gretelai/gpt-auto"
     CO_TEACH_LLMS = [
-        "gretelai/gpt-llama3-8b",
-        "gretelai/gpt-mistral7b",
+        "gretelai/gpt-llama3-1-8b",
+        "gretelai/gpt-mistral-nemo-2407",
     ]  # List of co-teaching models
 
     # Define the assistant's personality
