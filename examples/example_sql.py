@@ -131,7 +131,7 @@ config = InstructionResponseConfig(
 synthesizer = TrainingDataSynthesizer(
     df,
     config,
-    output_file="data/sql-results.jsonl",
+    output_file="sql-results.jsonl",
     verbose=True,
 )
 new_df = synthesizer.generate()
