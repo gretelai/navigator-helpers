@@ -6,11 +6,12 @@ setup(
     packages=find_packages(),
     install_requires=[
         "datasets==2.19.0",
-        "gretel-client==0.19.0",
+        "gretel-client==0.20.1",
         "langchain==0.2.2",
         "pandas==2.2.1",
         "streamlit==1.35.0",
         "tqdm==4.66.4",
+        "sqlfluff==3.1.0"
     ],
     author="Gretel",
     author_email="hi@gretel.ai",
