@@ -1,6 +1,6 @@
 import pytest
 
-from navigator_helpers import SyntheticDataGenerator
+from navigator_helpers import EvolDataGenerator
 
 
 def test_something():
@@ -8,4 +8,4 @@ def test_something():
 
     with pytest.raises(TypeError):
         # Expected to fail with TypeError, because positional args are missing.
-        SyntheticDataGenerator()
+        EvolDataGenerator()

@@ -5,8 +5,8 @@ import pandas as pd
 from navigator_helpers import (
     DataFieldDefinition,
     DataModelDefinition,
+    EvolDataGenerator,
     GeneratorConfig,
-    SyntheticDataGenerator,
 )
 
 
@@ -16,7 +16,7 @@ def main():
         api_key="prompt",
         llm_model="gretelai/gpt-auto",
         num_generations=3,
-        log_level="DEBUG",
+        log_level="INFO",
     )
 
     model_def = DataModelDefinition(
@@ -49,7 +49,7 @@ def main():
     )
 
     # Initialize the SyntheticDataGenerator
-    generator = SyntheticDataGenerator(config, model_def)
+    generator = EvolDataGenerator(config, model_def)
 
     # Generate the data
     synthetic_data = generator.generate_data(

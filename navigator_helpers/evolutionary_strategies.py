@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 
-def get_prebuilt_mutation_strategies() -> Dict[str, List[str]]:
+def get_prebuilt_evolutionary_strategies() -> Dict[str, List[str]]:
     return {
         "improve": [
             "Improve the content, enhancing its quality, clarity, coherence, or effectiveness while maintaining its core meaning.",

@@ -1,13 +1,13 @@
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
-from .mutation_strategies import get_prebuilt_mutation_strategies
-from .synthetic_data_generator import SyntheticDataGenerator
+from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
+from .synthetic_data_generator import EvolDataGenerator
 
 __all__ = [
     "DataFieldDefinition",
     "DataModelDefinition",
     "GeneratorConfig",
-    "SyntheticDataGenerator",
+    "EvolDataGenerator",
     "ContentValidator",
-    "get_prebuilt_mutation_strategies",
+    "get_prebuilt_evolutionary_strategies",
 ]

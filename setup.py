@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from setuptools import find_packages, setup
+
 
 def reqs(file_path: str) -> list[str]:
     with open(Path(file_path)) as fh:

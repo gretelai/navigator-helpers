@@ -5,8 +5,8 @@ import pandas as pd
 from navigator_helpers import (
     DataFieldDefinition,
     DataModelDefinition,
+    EvolDataGenerator,
     GeneratorConfig,
-    SyntheticDataGenerator,
 )
 
 
@@ -60,7 +60,7 @@ def main():
     contextual_tags = pd.read_csv("./docs/data/sql_contextual_tags.csv")
 
     # Initialize the SyntheticDataGenerator
-    generator = SyntheticDataGenerator(config, model_def)
+    generator = EvolDataGenerator(config, model_def)
 
     # Generate the data
     synthetic_data = generator.generate_data(

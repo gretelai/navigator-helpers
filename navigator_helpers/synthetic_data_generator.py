@@ -11,41 +11,41 @@ from gretel_client import Gretel
 
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
-from .mutation_strategies import get_prebuilt_mutation_strategies
+from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
 
 MAX_TOKENS = 2048  # Max generation tokens
 
 
-class SyntheticDataGenerator:
+class EvolDataGenerator:
     def __init__(
         self,
         config: GeneratorConfig,
         model_definition: DataModelDefinition,
-        custom_mutation_strategies: Optional[Dict[str, List[str]]] = None,
+        custom_evolutionary_strategies: Optional[Dict[str, List[str]]] = None,
     ):
         self.config = config
         self.model_definition = model_definition
-        self.custom_mutation_strategies = custom_mutation_strategies or {}
+        self.custom_evolutionary_strategies = custom_evolutionary_strategies or {}
         self.gretel = Gretel(api_key=self.config.api_key)
         self.llm = self.gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=self.config.llm_model
         )
         self._setup_logging()
         self.validators = self._initialize_validators()
-        self.mutation_strategies = self._initialize_mutation_strategies()
+        self.evolutionary_strategies = self._initialize_evolution_strategies()
 
-    def _initialize_mutation_strategies(self) -> Dict[str, List[str]]:
-        default_strategies = get_prebuilt_mutation_strategies()
-        return {**default_strategies, **self.custom_mutation_strategies}
+    def _initialize_evolution_strategies(self) -> Dict[str, List[str]]:
+        default_strategies = get_prebuilt_evolutionary_strategies()
+        return {**default_strategies, **self.custom_evolutionary_strategies}
 
-    def _select_mutation_strategy(self, field: DataFieldDefinition) -> str:
-        if not field.mutation_strategies:
+    def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
+        if not field.evolutionary_strategies:
             self.logger.warning(
-                f"No mutation strategies defined for field {field.name}. Skipping mutation."
+                f"No evolution strategies defined for field {field.name}. Skipping evolution."
             )
             return ""
-        category = random.choice(list(field.mutation_strategies))
-        return random.choice(self.mutation_strategies[category])
+        category = random.choice(list(field.evolutionary_strategies))
+        return random.choice(self.evolutionary_strategies[category])
 
     def _generate_field_value(
         self,
@@ -69,32 +69,32 @@ class SyntheticDataGenerator:
         field_value = self._generate_field_value(context, field, current_record)
         self.logger.debug(f"Initial value for {field.name}: {field_value}")
 
-        mutation_rate = (
-            field.mutation_rate
-            if field.mutation_rate is not None
-            else self.config.mutation_rate
+        evolution_rate = (
+            field.evolution_rate
+            if field.evolution_rate is not None
+            else self.config.evolution_rate
         )
 
         for gen in range(self.config.num_generations):
-            if random.random() < mutation_rate:
-                mutation_strategy = self._select_mutation_strategy(field)
-                if mutation_strategy:
+            if random.random() < evolution_rate:
+                evolution_strategy = self._select_evolutionary_strategy(field)
+                if evolution_strategy:
                     self.logger.info(
-                        f"Applying mutation strategy '{mutation_strategy}' to {field.name}"
+                        f"Applying evolution strategy '{evolution_strategy}' to {field.name}"
                     )
-                    mutated_value = self._mutate_field_value(
+                    evolved_value = self._mutate_field_value(
                         field_value,
-                        mutation_strategy,
+                        evolution_strategy,
                         field,
                         context,
                         current_record=current_record,
                     )
                     field_value, _ = self._validate_and_correct_field_value(
-                        mutated_value, field
+                        evolved_value, field
                     )
             else:
                 self.logger.debug(
-                    f"No mutation applied to {field.name} in generation {gen+1}"
+                    f"No evolution applied to {field.name} in generation {gen+1}"
                 )
 
         return field_value
@@ -102,7 +102,7 @@ class SyntheticDataGenerator:
     def _mutate_field_value(
         self,
         value: Any,
-        mutation_strategy: str,
+        evolution_strategy: str,
         field: DataFieldDefinition,
         context: Dict[str, Any],
         current_record: Dict[str, Any],
@@ -111,34 +111,34 @@ class SyntheticDataGenerator:
         context_json = json.dumps(context)
         current_record_json = json.dumps(current_record, indent=2)
 
-        # Build the mutation prompt
-        mutation_prompt = textwrap.dedent(
+        # Build the evolution prompt
+        evolution_prompt = textwrap.dedent(
             f"""
-        Apply the following mutation strategy to the given value:
-        Strategy: {mutation_strategy}
+        Apply the following evolution strategy to the given value:
+        Strategy: {evolution_strategy}
         Current value: {value}
         Field type: {field.type}
         Field description: {field.description}
         Context: {context_json}
         Current Record (already generated fields): {current_record_json}
 
-        Ensure that the mutated value remains consistent with the fields that have already been generated in the current record.
-        Return only the mutated value.
+        Ensure that the evolved value remains consistent with the fields that have already been generated in the current record.
+        Return only the evolved value.
         """
         )
 
-        self.logger.debug(f"Mutation prompt for {field.name}:\n{mutation_prompt}")
+        self.logger.debug(f"evolution prompt for {field.name}:\n{evolution_prompt}")
 
-        # Generate the mutated value
-        mutated_response = self.llm.generate(
-            mutation_prompt, temperature=0.8, max_tokens=MAX_TOKENS
+        # Generate the evolved value
+        evolved_response = self.llm.generate(
+            evolution_prompt, temperature=0.8, max_tokens=MAX_TOKENS
         )
 
-        # Parse the mutated value
-        mutated_value = self._parse_field_value(mutated_response.strip(), field)
+        # Parse the evolved value
+        evolved_value = self._parse_field_value(evolved_response.strip(), field)
 
-        self.logger.debug(f"Mutated value for {field.name}: {mutated_value}")
-        return mutated_value
+        self.logger.debug(f"evolved value for {field.name}: {evolved_value}")
+        return evolved_value
 
     def _setup_logging(self):
         logging.basicConfig(
