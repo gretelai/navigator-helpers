@@ -1,7 +1,5 @@
 from pathlib import Path
-
 from setuptools import find_packages, setup
-
 
 def reqs(file_path: str) -> list[str]:
     with open(Path(file_path)) as fh:
@@ -11,11 +9,10 @@ def reqs(file_path: str) -> list[str]:
             if not (r.startswith("#") or r.startswith("\n"))
         ]
 
-
 setup(
     name="navigator-helpers",
-    version="0.1.0",
-    packages=find_packages(exclude=["tests"], include=["navigator_helpers"]),
+    version="0.1.2",  # Incremented version number
+    packages=find_packages(exclude=["tests", "examples"], include=["navigator_helpers"]),
     python_requires=">=3.9",
     install_requires=reqs("requirements.txt"),
     extras_require={
@@ -24,7 +21,7 @@ setup(
     entry_points={"console_scripts": []},
     author="Gretel",
     author_email="hi@gretel.ai",
-    description="A library of helper functions for Gretel Navigator",
+    description="A library of helper functions for Gretel Navigator, including synthetic data generation",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/gretelai/navigator-helpers",
@@ -42,5 +39,6 @@ setup(
         "Operating System :: MacOS",
         "Operating System :: Microsoft :: Windows",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
 )
