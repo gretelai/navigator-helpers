@@ -15,7 +15,7 @@ def main():
     config = GeneratorConfig(
         api_key="prompt",
         llm_model="gretelai/gpt-auto",
-        num_generations=1,
+        num_generations=3,
         log_level="INFO",
     )
 
@@ -37,7 +37,7 @@ def main():
                 name="prompt",
                 type="str",
                 description="A detailed, nuanced natural language question related to SQL and databases, based on the provided `sql_context` field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.",
-                validator="English",
+                validator="A natural language question written in English",
                 mutation_strategies=["diversity", "complexity", "improve"],
             ),
             DataFieldDefinition(
@@ -52,6 +52,7 @@ def main():
                 type="str",
                 description="A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `prompt` and the purpose of each part. Include references to the domain-specific context.",
                 mutation_strategies=["simplify", "improve"],
+                validator="A natural language explanation written in English",
             ),
         ],
     )
