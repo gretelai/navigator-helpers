@@ -1,8 +1,20 @@
 # Navigator Helpers 🚀
 
-Gretel Navigator is a compound AI-based system for generating high-quality synthetic data that can be used for training AI and LLMs. Navigator leverages techniques such as diverse text generation and an AI alignment process to iteratively enhance data quality. The system integrates multiple LLMs in a co-teaching and self-improvement process, generating diverse and high-quality synthetic texts while considering quality, adherence, toxicity, and bias.
+Gretel Navigator is a compound AI-based system for generating high-quality synthetic data using contextual tags and an evolutionary approach. This method iteratively improves, validates, and evaluates outputs to create synthetic data with greater quality than an underlying LLM could do on its own, and to combat hallucinations in AI-generated content.
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ## Installation
+
+### Standard Installation
+
 1. Clone the repository:
    ```bash
    git clone https://github.com/gretelai/navigator-helpers.git
@@ -14,131 +26,103 @@ Gretel Navigator is a compound AI-based system for generating high-quality synth
    python3 -m venv venv
    source venv/bin/activate
    ```
+
 3. Install the required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-### Development
-When developing new features in the library, follow the steps above and then install the package in editable mode:
-```bash
-make pip_install_dev
-```
+### Development Setup
 
-Common development tasks are available as `make` commands:
-- Apply consistent formatting.
+For developers, additional setup is required to facilitate ongoing development:
+
+1. Install the package in editable mode:
    ```bash
-   make style
-   ```
-  
-- Run tests.
-   ```bash
-   make test
+   make pip_install_dev
    ```
 
-## Usage
+2. Common development tasks are available as `make` commands:
+   - Apply consistent formatting:
+     ```bash
+     make style
+     ```
+   - Run tests:
+     ```bash
+     make test
+     ```
+
+## Basic Usage
+
 ### Input Requirements
-The input to this program is LLM training data in a pandas DataFrame format. You must specify one or more input fields, and an output field.
+
+The input to this program is LLM training data in a pandas DataFrame format (optional), containing tags that can be used to seed LLM generation for the specified task. You must specify one or more output fields to synthetically generate.
+
 ### Configuration
-The data synthesis configuration is created using either the `SingleTextConfig` or `InstructionResponseConfig` class, depending on your use case. This includes setting the number of generations, population size, mutation rate, temperature, token limits, and specifying the API key, Navigator LLM, and co-teaching LLMs.
 
-Example for single text generation:
+The data synthesis configuration is created using the `GeneratorConfig` class:
 
 ```python
-config = SingleTextConfig(
-    input_fields=["context"],
-    output_field="generated_text",
+config = GeneratorConfig(
+    api_key="your_api_key",
+    llm_model="gretelai/gpt-auto",
     num_generations=3,
-    population_size=5,
-    mutation_rate=0.5,
-    temperature=0.8,
-    max_tokens=150,
-    api_key=GRETEL_API_KEY,
-    navigator_llm=NAVIGATOR_LLM,
-    co_teach_llms=CO_TEACH_LLMS,
-    system_prompt=SYSTEM_PROMPT,
-    format_prompt="Generate a natural text based on the given context.",
-    mutation_prompt="Modify this text to make it more engaging and aligned with the context:",
-    complexity_prompt="Rate the complexity of this text:",
-    quality_prompt="Evaluate the quality of this text:",
-    complexity_target=0.5,
-    use_aaa=True,
+    evolution_rate=0.5,
+    log_level="INFO",
 )
 ```
 
-Example for instruction-response generation:
+### Defining Your Data Model
+
+Use `DataModelDefinition`, which utilizes Pydantic, to specify the structure of your synthetic data schema:
 
 ```python
-config = InstructionResponseConfig(
-    input_fields=["context"],
-    output_instruction_field="instruction",
-    output_response_field="response",
-    num_generations=3,
-    population_size=5,
-    mutation_rate=0.5,
-    temperature=0.8,
-    max_tokens=150,
-    api_key=GRETEL_API_KEY,
-    navigator_llm=NAVIGATOR_LLM,
-    co_teach_llms=CO_TEACH_LLMS,
-    system_prompt=SYSTEM_PROMPT,
-    instruction_format_prompt="Generate a clear instruction based on the given context.",
-    instruction_mutation_prompt="Modify this instruction to make it more specific:",
-    instruction_complexity_prompt="Rate the complexity of this instruction:",
-    instruction_quality_prompt="Evaluate the quality of this instruction:",
-    instruction_complexity_target=0.5,
-    response_format_prompt="Generate a detailed response to the given instruction.",
-    response_mutation_prompt="Modify this response to make it more informative:",
-    response_complexity_prompt="Rate the complexity of this response:",
-    response_quality_prompt="Evaluate the quality of this response:",
-    response_complexity_target=0.5,
-    use_aaa=True,
+model_def = DataModelDefinition(
+    system_message="Your system message here",
+    fields=[
+        DataFieldDefinition(
+            name="field_name",
+            type="str",
+            description="Field description",
+            validator="your_validator",
+            evolutionary_strategies=["strategy1", "strategy2"],
+        ),
+        # Add more fields as needed
+    ],
 )
 ```
 
-### Generating synthetic text data
+### Generating Synthetic Data
 
-To run the data synthesis process, simply execute one of the example scripts:
+To run the evolutionary data generation process:
+
+```python
+generator = EvolDataGenerator(config, model_def)
+evolved_data = generator.generate_data(
+    contextual_tags=your_contextual_data,
+    output_file="output.jsonl",
+    custom_evolutionary_strategies=your_custom_strategies  # Optional
+)
+```
+
+For more detailed usage, including custom evolutionary strategies and validators, see [ADVANCED_USAGE.md](ADVANCED_USAGE.md).
+
+## Examples
+
+For detailed examples, please refer to the `examples/` directory in this repository. You can run these examples using:
 
 ```bash
-python examples/example_training_data.py
+python examples/example_nl2sql.py
 ```
 
 or
 
 ```bash
-python examples/example_chat.py
+python examples/example_closed_qa.py
 ```
-
-## Data Synthesis Process
-The data synthesis process involves the following steps:
-
-1. Initialization:
-   - Create the appropriate configuration (SingleTextConfig or InstructionResponseConfig).
-   - Initialize the EvolutionaryTextGenerator with the navigator LLM and co-teaching LLMs.
-
-2. Text Generation:
-   - Generate an initial population of texts.
-   - Apply mutations to the population.
-   - Filter the quality of the texts.
-   - Rank the texts based on quality and complexity.
-   - Select a diverse subset for the next generation.
-   - Repeat for the specified number of generations.
-  
-3. AI Align AI (AAA) Process (if enabled):
-   - Apply Co-Teaching to the best text using multiple LLMs.
-   - Apply Self-Teaching to further improve the text.
-   - Select the final text.
-
-4. Evaluation:
-   - Evaluate the generated text for quality, relevance, and other metrics.
-
-5. Output:
-   - Return the generated text(s) or conversation.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue.
+Contributions are welcome! Please feel free to submit a pull request or open an issue. For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
