@@ -1,4 +1,5 @@
 import textwrap
+
 import pandas as pd
 
 from navigator_helpers import (

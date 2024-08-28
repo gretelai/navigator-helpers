@@ -1,4 +1,5 @@
 import textwrap
+
 import pandas as pd
 
 from navigator_helpers import (
@@ -19,9 +20,11 @@ def main():
     )
 
     model_def = DataModelDefinition(
-        system_message=textwrap.dedent("""You are a seasoned SQL expert specializing in crafting intricate, context-rich queries and explanations. 
+        system_message=textwrap.dedent(
+            """You are a seasoned SQL expert specializing in crafting intricate, context-rich queries and explanations. 
         * Use the provided contextual tags as instructions for generation. Reference the provided Context to ensure relevance and appropriate complexity.
-        """),
+        """
+        ),
         fields=[
             DataFieldDefinition(
                 name="sql_context",
