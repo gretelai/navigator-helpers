@@ -23,6 +23,10 @@ from navigator_helpers.llms.gretel import InferenceAPI
 
 logger = logging.getLogger(__name__)
 
+# Suppress LiteLLM's prints like this:
+# https://github.com/BerriAI/litellm/blob/v1.43.9/litellm/utils.py#L6423-L6430
+litellm.suppress_debug_info = True
+
 
 def create_router(configs: list[LLMConfig]) -> Router:
     model_list = [config.config for config in configs]
