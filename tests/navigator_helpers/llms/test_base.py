@@ -7,15 +7,18 @@ import yaml
 from navigator_helpers.llms import init_llms
 
 
-def test_fails_on_missing_secrets():
-    config = read_sample_config("sample_config.yaml")
+@pytest.fixture()
+def test_config():
+    return read_sample_config("test_config.yaml")
+
+
+def test_fails_on_missing_secrets(test_config: dict[str, Any]):
     with pytest.raises(ValueError):
-        init_llms(config)
+        init_llms(test_config)
 
 
-def test_find_by_tags():
-    config = read_sample_config("sample_config.yaml")
-    llms = init_llms(config, fail_on_error=False)
+def test_find_by_tags(test_config: dict[str, Any]):
+    llms = init_llms(test_config, fail_on_error=False)
 
     base_llms = llms.find_by_tags({"base"})
     assert len(base_llms) == 1
@@ -28,11 +31,10 @@ def test_find_by_tags():
     }
 
 
-def test_resolves_secrets(monkeypatch):
+def test_resolves_secrets(monkeypatch, test_config: dict[str, Any]):
     monkeypatch.setenv("THIS_WILL_NEVER_BE_SET", "maybe_it_will")
 
-    config = read_sample_config("sample_config.yaml")
-    llms = init_llms(config, fail_on_error=True)
+    llms = init_llms(test_config, fail_on_error=True)
 
     base_llms = llms.find_by_tags({"base"})
     assert len(base_llms) == 1
