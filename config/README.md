@@ -20,12 +20,13 @@ Here's an example:
 ### Usage
 
 Load configuration from a file and filter by a tag.
+
 ```python
 from pathlib import Path
 from navigator_helpers.llms import init_llms
 
 registry = init_llms(Path("llm_config_prod.yaml"))
-llm_configs = registry.get_by_tag("base")
+llm_configs = registry.find_by_tags({"base"})
 ```
 
 Using it directly through the `completion` API.

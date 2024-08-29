@@ -16,7 +16,7 @@ def main(config_path: str) -> None:
     llm_registry = init_llms(Path(config_path), fail_on_error=False)
 
     # Filter configs by tag
-    llm_configs = list(llm_registry.get_by_tag("base"))
+    llm_configs = llm_registry.find_by_tags({"base"})
 
     # Use it with autogen
     run_autogen_example(llm_configs)

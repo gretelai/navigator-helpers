@@ -2,7 +2,7 @@ import logging
 import os
 
 from pathlib import Path
-from typing import Any, Callable, Iterator, Union
+from typing import Any, Callable, Optional, Union
 
 import yaml
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMConfig:
-    _litellm_control_params = {"model", "api_key", "base_url", "extra_headers"}
+    _litellm_control_params = {"model", "api_key", "api_base", "extra_headers"}
 
     def __init__(self, config: dict[str, Any]):
         self._config = config
@@ -24,6 +24,19 @@ class LLMConfig:
         return self._config["model_name"]
 
     @property
+    def api_type(self) -> Optional[str]:
+        """
+        Type of the API backend this config is using.
+        This right now corresponds to litellm's provider (i.e. "openai" in model "openai/something")
+        """
+        if model := self._config.get("litellm_params", {}).get("model", None):
+            split = str(model).split("/", maxsplit=1)
+            if len(split) > 1:
+                return split[0]
+
+        return None
+
+    @property
     def params(self) -> dict[str, Any]:
         params = self._config["litellm_params"]
         return {
@@ -35,13 +48,16 @@ class LLMRegistry:
     def __init__(self, model_list: list[dict[str, Any]]):
         self._model_list = model_list
 
-    def get_by_tag(self, tag: str) -> Iterator[LLMConfig]:
+    def find_by_tags(self, tags: Union[list[str], set[str]]) -> list[LLMConfig]:
         """
-        Get all LLMs that have a specific tag.
+        Get all LLMs that are tagged with any of the provided tags.
         """
-        for model in self._model_list:
-            if tag in model.get("tags", []):
-                yield LLMConfig(model)
+        tags = set(tags)
+        return [
+            LLMConfig(model)
+            for model in self._model_list
+            if set(model.get("tags", [])).intersection(tags)
+        ]
 
     def filter(self, filters: dict[str, Any]):
         """

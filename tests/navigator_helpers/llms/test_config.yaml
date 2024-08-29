@@ -1,0 +1,18 @@
+# Config used in tests in this directory. Edit with caution.
+- model_name: gretelai-gpt-llama3-1-8b
+  litellm_params:
+    model: gretelai/gpt-llama3-1-8b
+    api_key: os.environ/THIS_WILL_NEVER_BE_SET
+    api_base: https://api.gretel.ai
+    temperature: 1.0
+  tags:
+  - gretelai/gpt-llama3-1-8b
+  - base
+
+- model_name: gretelai-mistral-nemo-2407
+  litellm_params:
+    model: gretelai/gpt-mistral-nemo-2407
+    api_key: os.environ/GRETEL_API_KEY
+    api_base: https://api.gretel.ai
+  tags:
+  - gretelai/gpt-mistral-nemo-2407
