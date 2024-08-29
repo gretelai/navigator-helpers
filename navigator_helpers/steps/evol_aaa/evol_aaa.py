@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import random
 import re
 import string
@@ -14,6 +13,9 @@ import autogen
 import pandas as pd
 
 from autogen.io import base, console
+
+from navigator_helpers.llms.autogen import AutogenAdapter
+from navigator_helpers.llms.base import LLMRegistry
 
 # Set up logging
 logging.basicConfig(
@@ -61,9 +63,11 @@ class BaseTextProcessor:
     including setting up agents and user proxies.
     """
 
-    def __init__(self, config: Union["EvolutionConfig", "AAAConfig"]) -> None:
+    def __init__(
+        self, config: Union["EvolutionConfig", "AAAConfig"], llm_registry: LLMRegistry
+    ) -> None:
         self.config = config
-        self.agents = self._setup_agents()
+        self.agents = self._setup_agents(llm_registry)
         self.user_proxy = self._setup_user_proxy()
         self._setup_logging()
 
@@ -78,7 +82,9 @@ class BaseTextProcessor:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    def _setup_agents(self) -> Dict[str, autogen.AssistantAgent]:
+    def _setup_agents(
+        self, llm_registry: LLMRegistry
+    ) -> Dict[str, autogen.AssistantAgent]:
         """
         Set up the autogen agents for text processing.
 
@@ -102,49 +108,50 @@ class BaseTextProcessor:
         - Statistical Understanding: You can perform and interpret basic statistical analyses to support your evaluations.
         """
 
-        LLM_CONFIG_LIST = json.loads(os.environ.get("LLM_CONFIG_LIST"))
-        PRIMARY_CONFIG_LIST_TO_USE = autogen.filter_config(
-            LLM_CONFIG_LIST, {"tags": self.config.primary_model_tags}
-        )
+        primary_configs = llm_registry.find_by_tags(set(self.config.primary_model_tags))
 
         agents = {}
         # Setup primary agent
-        if PRIMARY_CONFIG_LIST_TO_USE:
-            primary_model_config = PRIMARY_CONFIG_LIST_TO_USE[0]
-            primary_model_name = primary_model_config.get("model", "unknown")
-            primary_api_type = primary_model_config.get("api_type", "unknown")
+        if primary_configs:
+            # Just take the first one, even if there are multiple models with that tag.
+            primary_model_config = primary_configs[0]
+            primary_model_name = primary_model_config.model_name
+            primary_api_type = primary_model_config.api_type or "unknown"
             primary_agent_name = f"PrimaryAgent_{primary_api_type}-{primary_model_name}"
 
-            primary_llm_config = dict(primary_model_config)
-            primary_llm_config.update(
+            adapter = AutogenAdapter([primary_model_config])
+            llm_config = adapter.create_llm_config()
+            llm_config.update(
                 {
                     "temperature": self.config.temperature,
                     "cache_seed": None,  # Disable caching
                 }
             )
 
-            agents["primary"] = autogen.AssistantAgent(
-                name=primary_agent_name,
-                llm_config=primary_llm_config,
-                system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
+            agents["primary"] = adapter.initialize_agent(
+                autogen.AssistantAgent(
+                    name=primary_agent_name,
+                    llm_config=llm_config,
+                    system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
+                )
             )
         else:
             raise ValueError("No primary model configuration found.")
 
         # Setup co-teaching agents only if co_teaching_model_tags are provided
         if hasattr(self.config, "co_teaching_model_tags"):
-            CO_TEACHING_CONFIG_LIST_TO_USE = autogen.filter_config(
-                LLM_CONFIG_LIST, {"tags": self.config.co_teaching_model_tags}
+            co_teaching_configs = llm_registry.find_by_tags(
+                set(self.config.co_teaching_model_tags)
             )
+
             for i in range(self.config.num_co_teachers):
-                model_config = CO_TEACHING_CONFIG_LIST_TO_USE[
-                    i % len(CO_TEACHING_CONFIG_LIST_TO_USE)
-                ]
-                model_name = model_config.get("model", "unknown")
-                api_type = model_config.get("api_type", "unknown")
+                model_config = co_teaching_configs[i % len(co_teaching_configs)]
+                model_name = model_config.model_name
+                api_type = model_config.api_type or "unknown"
                 agent_name = f"CoTeachAgent_{i}_{api_type}-{model_name}"
 
-                llm_config = dict(model_config)
+                adapter = AutogenAdapter([primary_model_config])
+                llm_config = adapter.create_llm_config()
                 llm_config.update(
                     {
                         "temperature": self.config.co_teach_temperature,
@@ -152,10 +159,12 @@ class BaseTextProcessor:
                     }
                 )
 
-                agents[f"co_teach_{i}"] = autogen.AssistantAgent(
-                    name=agent_name,
-                    llm_config=llm_config,
-                    system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
+                agents[f"co_teach_{i}"] = adapter.initialize_agent(
+                    autogen.AssistantAgent(
+                        name=agent_name,
+                        llm_config=llm_config,
+                        system_message=DEFAULT_DATA_SYSTEM_MESSAGE,
+                    )
                 )
 
         return agents
@@ -293,8 +302,8 @@ class EvolutionTextProcessor(BaseTextProcessor):
     Text processor that uses an evolutionary algorithm to improve text.
     """
 
-    def __init__(self, evolution_config: EvolutionConfig):
-        super().__init__(evolution_config)
+    def __init__(self, evolution_config: EvolutionConfig, llm_registry: LLMRegistry):
+        super().__init__(evolution_config, llm_registry)
 
     def _convert_to_jsonl(self, df: pd.DataFrame) -> str:
         return df.to_json(orient="records", lines=True)
@@ -334,7 +343,7 @@ class EvolutionTextProcessor(BaseTextProcessor):
 
         # Clear all agent conversation histories
         for agent in self.agents.values():
-            self.user_proxy.reset()
+            agent.reset()
 
         if self.config.verbose:
             logger.info("🧬 🧬 🧬 Starting the Evolution process ...")
@@ -553,8 +562,8 @@ class AAATextProcessor(BaseTextProcessor):
     Text processor that uses the AI-Align-AI (AAA) method to improve text.
     """
 
-    def __init__(self, aaa_config: AAAConfig):
-        super().__init__(aaa_config)
+    def __init__(self, aaa_config: AAAConfig, llm_registry: LLMRegistry):
+        super().__init__(aaa_config, llm_registry)
 
     def _convert_to_jsonl(self, df: pd.DataFrame) -> str:
         return df.to_json(orient="records", lines=True)
