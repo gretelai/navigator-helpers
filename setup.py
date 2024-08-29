@@ -11,10 +11,13 @@ def reqs(file_path: str) -> list[str]:
             if not (r.startswith("#") or r.startswith("\n"))
         ]
 
+
 setup(
     name="navigator-helpers",
     version="0.1.2",  # Incremented version number
-    packages=find_packages(exclude=["tests", "examples"], include=["navigator_helpers"]),
+    packages=find_packages(
+        exclude=["tests", "examples"], include=["navigator_helpers*"]
+    ),
     python_requires=">=3.9",
     install_requires=reqs("requirements.txt"),
     extras_require={
