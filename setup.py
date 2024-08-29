@@ -15,7 +15,7 @@ def reqs(file_path: str) -> list[str]:
 setup(
     name="navigator-helpers",
     version="0.1.0",
-    packages=find_packages(exclude=["tests"], include=["navigator_helpers"]),
+    packages=find_packages(exclude=["tests"], include=["navigator_helpers*"]),
     python_requires=">=3.9",
     install_requires=reqs("requirements.txt"),
     extras_require={
