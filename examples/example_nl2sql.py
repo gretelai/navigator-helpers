@@ -1,3 +1,10 @@
+"""
+This script generates synthetic data for NL2SQL tasks.
+
+It uses an LLM to create natural language questions based on complex SQL schemas, 
+and then generates corresponding SQL queries and detailed explanations.
+"""
+
 import textwrap
 
 import pandas as pd

@@ -1,3 +1,10 @@
+"""
+This script generates synthetic data for closed question-answer pairs based on snippets from Wikipedia.
+
+It uses an LLM to create context-specific questions and concise, informative answers 
+based solely on the provided context.
+"""
+
 import textwrap
 
 import pandas as pd
@@ -11,7 +18,6 @@ from navigator_helpers import (
 
 
 def main():
-    # Define the configuration
     config = GeneratorConfig(
         api_key="prompt",
         llm_model="gretelai/gpt-auto",

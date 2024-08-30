@@ -1,6 +1,16 @@
+"""
+This script generates synthetic data for GSM8K-like training examples.
+
+It uses an LLM to create math problems similar to those found in the GSM8K dataset, 
+focusing on grade school math word problems with step-by-step solutions.
+"""
+
 import textwrap
+
 from typing import Dict, List
+
 import pandas as pd
+
 from navigator_helpers import (
     DataFieldDefinition,
     DataModelDefinition,
@@ -190,8 +200,6 @@ def main():
         df_steps,
         df_student_age_group,
     )
-
-    print(contextual_tags)
 
     generator = EvolDataGenerator(
         config,
