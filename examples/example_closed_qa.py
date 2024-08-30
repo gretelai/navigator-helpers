@@ -61,7 +61,7 @@ def main():
     synthetic_data = generator.generate_data(
         contextual_tags, output_file="closed_qa_synthetic_data.jsonl"
     )
-    print("Synthetic data generation complete.")
+    print("Closed Question/Ansewr data generation complete.")
 
 
 if __name__ == "__main__":

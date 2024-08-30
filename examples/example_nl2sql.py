@@ -74,7 +74,7 @@ def main():
     synthetic_data = generator.generate_data(
         contextual_tags, output_file="nl2sql_synthetic_data.jsonl"
     )
-    print("Synthetic data generation complete.")
+    print("NL2SQL data generation complete.")
 
 
 if __name__ == "__main__":
