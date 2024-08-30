@@ -9,6 +9,7 @@ import textwrap
 
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 
 from navigator_helpers import (
@@ -20,11 +21,20 @@ from navigator_helpers import (
 
 
 def create_contextual_tags(num_rows, *dataframes):
+    # Calculate the total number of unique combinations possible
+    total_combinations = np.prod([len(df.drop_duplicates()) for df in dataframes])
+
+    print(
+        f"Total number of unique combinations possible given contextual tags: {total_combinations}"
+    )
+
+    # Sample from the dataframes and concatenate them to create the contextual tags
     sampled_dfs = [
         df.sample(n=num_rows, replace=True).reset_index(drop=True) for df in dataframes
     ]
     df_contextual_tags = pd.concat(sampled_dfs, axis=1)
     df_contextual_tags.insert(0, "id", range(num_rows))
+
     return df_contextual_tags
 
 
