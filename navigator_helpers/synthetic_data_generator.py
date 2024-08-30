@@ -329,11 +329,14 @@ class EvolDataGenerator:
             if valid_record:
                 passed_judge, judge_response = self._llm_judge_check(record)
                 if passed_judge:
-                    self._print_record(record)
-                    results.append(record)
+                    # Combine the context and the generated record
+                    merged_record = {**context, **record}
+                    self._print_record(merged_record)
+                    results.append(merged_record)  
+
                     self.success_count += 1  # Increment success count
                     if output_file:
-                        self._write_to_output(record, output_file)
+                        self._write_to_output(merged_record, output_file)
                     self.logger.debug(
                         f"Record passed LLM judge check: {judge_response}"
                     )
@@ -351,6 +354,7 @@ class EvolDataGenerator:
             )
 
         return results
+
 
     def _print_record(self, record: Dict[str, Any]):
         print("\nGenerated Record:")
