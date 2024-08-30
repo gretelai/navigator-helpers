@@ -308,6 +308,11 @@ class EvolDataGenerator:
         results = []
         contexts = self._process_contextual_tags(contextual_tags)
 
+        # Open the output file in write mode to overwrite it each time
+        if output_file:
+            with open(output_file, "w") as f:
+                f.write("")
+
         for i, context in enumerate(contexts):
             self.logger.info(f"Generating record {i+1}/{len(contexts)}")
             self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
@@ -332,7 +337,7 @@ class EvolDataGenerator:
                     # Combine the context and the generated record
                     merged_record = {**context, **record}
                     self._print_record(merged_record)
-                    results.append(merged_record)  
+                    results.append(merged_record)
 
                     self.success_count += 1  # Increment success count
                     if output_file:
@@ -354,7 +359,6 @@ class EvolDataGenerator:
             )
 
         return results
-
 
     def _print_record(self, record: Dict[str, Any]):
         print("\nGenerated Record:")
