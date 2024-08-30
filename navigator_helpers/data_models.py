@@ -8,7 +8,7 @@ class DataFieldDefinition(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolutionary_strategies: List[str] = Field(default=["improve"])
+    evolution_strategies: List[str] = Field(default=["improve"])
     evolution_rate: Optional[float] = Field(default=0.6)
     additional_params: Dict[str, Any] = {}
 
