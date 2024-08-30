@@ -31,28 +31,28 @@ def main():
                 type="str",
                 description="A single string comprising multiple valid PostgreSQL `CREATE TABLE` statements and a complex schema similar to a production application including multiple tables, separated by semicolons. The schema should be based on the provided Context, particularly the domain and domain_description.",
                 validator="sql:postgres",
-                mutation_strategies=["complexity", "improve"],
+                evolution_strategies=["complexity", "improve"],
             ),
             DataFieldDefinition(
                 name="prompt",
                 type="str",
                 description="A detailed, nuanced natural language question related to SQL and databases, based on the provided `sql_context` field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.",
                 validator="A natural language question or command written in English",
-                mutation_strategies=["diversity", "complexity", "improve"],
+                evolution_strategies=["diversity", "complexity", "improve"],
             ),
             DataFieldDefinition(
                 name="sql",
                 type="str",
                 description="A fully executable SQL query that directly answers the `prompt` using the schema in `sql_context`, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.",
                 validator="sql:postgres",
-                mutation_strategies=["complexity", "improve"],
+                evolution_strategies=["complexity", "improve"],
             ),
             DataFieldDefinition(
                 name="sql_explanation",
                 type="str",
                 description="A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `prompt` and the purpose of each part. Include references to the domain-specific context.",
                 validator="A natural language explanation written in English",
-                mutation_strategies=["simplify", "improve"],
+                evolution_strategies=["simplify", "improve"],
             ),
         ],
     )
@@ -65,7 +65,7 @@ def main():
 
     # Generate the data
     synthetic_data = generator.generate_data(
-        contextual_tags, output_file="output.jsonl"
+        contextual_tags, output_file="nl2sql_synthetic_data.jsonl"
     )
     print("Synthetic data generation complete.")
 

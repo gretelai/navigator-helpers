@@ -29,14 +29,14 @@ def main():
                 type="str",
                 description="""Generate a specific and clear question directly related to a key point in the given context. The question should include enough background information to be understood without prior knowledge, while being answerable using only the information provided. Do not reveal the answer in the question. Ensure the question is focused and can be answered concisely if the information allows, but also accommodate for more detailed responses when appropriate.""",
                 validator="Question",
-                mutation_strategies=["complexity", "improve", "diversity", "simplify"],
+                evolution_strategies=["complexity", "improve", "diversity", "simplify"],
             ),
             DataFieldDefinition(
                 name="response",
                 type="str",
                 description="""Generate an informative answer to the given question. Use only the information provided in the original context. The response should be as concise as possible while fully addressing the question, including relevant context and explanations where necessary. For complex topics, provide a more detailed response. Ensure the answer provides enough background information to be understood by someone unfamiliar with the topic.""",
                 validator="Answer",
-                mutation_strategies=["complexity", "improve", "simplify"],
+                evolution_strategies=["complexity", "improve", "simplify"],
             ),
         ],
     )
@@ -53,7 +53,7 @@ def main():
 
     # Generate the data
     synthetic_data = generator.generate_data(
-        contextual_tags, output_file="output.jsonl"
+        contextual_tags, output_file="closed_qa_synthetic_data.jsonl"
     )
     print("Synthetic data generation complete.")
 
