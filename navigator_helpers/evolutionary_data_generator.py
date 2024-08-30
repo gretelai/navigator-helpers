@@ -327,7 +327,7 @@ class EvolDataGenerator:
                 )
                 if not is_valid:
                     valid_record = False
-                    self.fail_count += 1  # Increment fail count
+                    self.fail_count += 1 
                     break
                 record[field.name] = field_value
 
@@ -339,7 +339,7 @@ class EvolDataGenerator:
                     self._print_record(merged_record)
                     results.append(merged_record)
 
-                    self.success_count += 1  # Increment success count
+                    self.success_count += 1
                     if output_file:
                         self._write_to_output(merged_record, output_file)
                     self.logger.debug(
@@ -349,7 +349,7 @@ class EvolDataGenerator:
                     self.logger.warning(
                         f"Record failed LLM judge check and was dropped: {judge_response}\n\n{record}\n\n"
                     )
-                    self.fail_count += 1  # Increment fail count
+                    self.fail_count += 1
             else:
                 self.logger.warning("Record failed validation and was dropped")
 
