@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 from pathlib import Path
@@ -7,85 +9,63 @@ import numpy as np
 import pandas as pd
 
 from gretel_client.gretel.config_setup import smart_load_yaml
-from pydantic import BaseModel
 from tqdm import tqdm
 
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
-from navigator_helpers.tasks.text_to_code.llm_suite import LLMSuiteType
-from navigator_helpers.tasks.text_to_code.task_suite import TextToCodeTaskSuite
+from navigator_helpers.tasks.text_to_code.config import (
+    NL2CodeAutoConfig,
+    NL2CodeManualConfig,
+)
+from navigator_helpers.tasks.text_to_code.task_suite import (
+    ContextualTags,
+    NL2CodeTaskSuite,
+)
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
-class PipelineConfig(BaseModel):
-    llm_suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"
+ConfigLike = Union[NL2CodeAutoConfig, NL2CodeManualConfig, dict, str, Path]
 
 
-class TextToCodeAutoConfig(PipelineConfig, BaseModel):
-    num_domains: int = 10
-    num_topics_per_domain: int = 10
-    num_complexity_levels: int = 4
+class NL2CodePipeline:
 
-
-class TextToCodeManualConfig(PipelineConfig, BaseModel):
-    domain_and_topics: dict[str, list[str]]
-    complexity_levels: list[str]
-
-
-class ContextualTags(BaseModel):
-    domain_and_topics: dict[str, list[str]]
-    complexity_levels: list[str]
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"
-
-
-ConfigLike = Union[TextToCodeAutoConfig, TextToCodeManualConfig, dict, str, Path]
-
-
-class TextToCodePipeline:
-
-    def __init__(self, config: ConfigLike = TextToCodeAutoConfig(), **session_kwargs):
+    def __init__(self, config: ConfigLike = NL2CodeAutoConfig(), **session_kwargs):
         self._setup(config)
-        self.tasks = TextToCodeTaskSuite(self.config.llm_suite_type, **session_kwargs)
+        self.tasks = NL2CodeTaskSuite(self.config.llm_suite_type, **session_kwargs)
 
     def _setup(self, config: ConfigLike):
-        self.config = config
+        logger.info("🚀 Setting up NL2code pipeline")
         self.tags = None
-        logger.info("🚀 Setting up TextToCodePipeline")
-        if not isinstance(config, (TextToCodeManualConfig, TextToCodeAutoConfig)):
+        self.config = config
+        if not isinstance(config, (NL2CodeManualConfig, NL2CodeAutoConfig)):
             config = smart_load_yaml(config)
-            if "num_domains" in config:
-                self.config = TextToCodeAutoConfig(**config)
-            else:
-                self.config = TextToCodeManualConfig(**config)
-        if isinstance(self.config, TextToCodeManualConfig):
+            self.config = (
+                NL2CodeAutoConfig(**config)
+                if "num_domains" in config
+                else NL2CodeManualConfig(**config)
+            )
+        if isinstance(self.config, NL2CodeManualConfig):
+            logger.info("🏷️ Loading contextual tags from config")
             self.tags = ContextualTags(
                 domain_and_topics=self.config.domain_and_topics,
                 complexity_levels=self.config.complexity_levels,
             )
-        self.topics = None
-        self.complexity_levels = None
+
+        self.topics: Optional[ContextualTags] = None
+        self.complexity_levels: Optional[list[str]] = None
 
     def prepare_contextual_tags(self):
         if self.tags is not None:
-            _, topics, complexity = self.tasks.generate_contextual_tags(
-                num_domains=self.config.num_domains,
-                num_topics_per_domain=self.config.num_topics_per_domain,
-                num_complexity_levels=self.config.num_complexity_levels,
-            )
-            self.tags = ContextualTags(
-                domain_and_topics=topics, complexity_levels=complexity
-            )
-        else:
             raise ValueError(
-                "Contextual tags are already set. If you want to update them, use `update_contextual_tags`."
+                "Contextual tags are already set. If you want to change them, use `set_contextual_tags`."
             )
+        self.tags = self.tasks.generate_contextual_tags(
+            num_domains=self.config.num_domains,
+            num_topics_per_domain=self.config.num_topics_per_domain,
+            num_complexity_levels=self.config.num_complexity_levels,
+        )
 
-    def update_contextual_tags(
+    def set_contextual_tags(
         self,
         *,
         domain_and_topics: Optional[dict[str, list[str]]] = None,
@@ -104,10 +84,7 @@ class TextToCodePipeline:
 
         synthetic_dataset = []
         for num in tqdm(range(num_samples), desc="🤖 Generating synthetic dataset"):
-            domain, topic, complexity = self.tasks.sample_contextual_tags(
-                self.tags.domain_and_topics,
-                self.tags.complexity_levels,
-            )
+            domain, topic, complexity = self.tags.sample()
             text_to_code_prompt = self.tasks.generate_text_to_code_prompt(
                 domain, topic, complexity
             )

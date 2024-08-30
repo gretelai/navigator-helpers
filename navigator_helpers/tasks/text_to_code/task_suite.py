@@ -1,22 +1,46 @@
+from __future__ import annotations
+
 import ast
 import random
 import re
 
 import numpy as np
 
+from pydantic import BaseModel
+
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
-from navigator_helpers.tasks.prompt_templates import TextToCodePromptTemplates
+from navigator_helpers.tasks.prompt_templates import nl2code_prompts
 from navigator_helpers.tasks.text_to_code import utils
 from navigator_helpers.tasks.text_to_code.llm_suite import GretelLLMSuite, LLMSuiteType
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
-templates = TextToCodePromptTemplates()
+
+class ContextualTags(BaseModel):
+    domain_and_topics: dict[str, list[str]]
+    complexity_levels: list[str]
+
+    @property
+    def domains(self) -> list[str]:
+        return list(self.domain_and_topics.keys())
+
+    @property
+    def num_domains(self) -> int:
+        return len(self.domain_and_topics)
+
+    def sample(self) -> tuple[str, str, str]:
+        domain = random.choice(list(self.domain_and_topics.keys()))
+        topic = random.choice(self.domain_and_topics[domain])
+        complexity = random.choice(self.complexity_levels)
+        return domain, topic, complexity
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"
 
 
-class TextToCodeTaskSuite:
+class NL2CodeTaskSuite:
 
-    def __init__(self, suite_type: LLMSuiteType, **kwargs):
+    def __init__(self, suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE, **kwargs):
         self.llm = GretelLLMSuite(suite_type=suite_type, **kwargs)
 
     @staticmethod
@@ -31,36 +55,25 @@ class TextToCodeTaskSuite:
             raise ValueError(f"Unsupported language: {lang}")
         return message
 
-    @staticmethod
-    def sample_contextual_tags(
-        topics: dict[str, list[str]],
-        complexity_levels: list[str],
-    ):
-
-        domain = random.choice(list(topics.keys()))
-        topic = random.choice(topics[domain])
-        complexity = random.choice(complexity_levels)
-        return domain, topic, complexity
-
     def generate_domains(
         self, num_domains: int = 10, lang: str = "Python"
     ) -> list[str]:
-        logger.info("👩‍💻 Generating domains")
-        response = self.llm.nl.generate(
-            templates.domains(num_domains=num_domains, lang=lang)
-        )
         domain_list = []
+        logger.info("🏷️ Generating domains")
+        response = self.llm.nl.generate(
+            nl2code_prompts.domains(num_domains=num_domains, lang=lang)
+        )
         domain_list = utils.parse_json_str(response)
         return domain_list
 
     def generate_topics_from_domains(
         self, domain_list: list[str], num_topics_per_domain: int = 5
-    ) -> list[str]:
+    ) -> dict[str, list[str]]:
         topics = {}
-        logger.info("📚 Generating topics for each domain")
+        logger.info("🏷️ Generating topics for each domain")
         for domain in domain_list:
             response = self.llm.nl.generate(
-                templates.topics_from_domains(
+                nl2code_prompts.topics_from_domains(
                     num_topics=num_topics_per_domain, domain=domain
                 )
             )
@@ -71,9 +84,9 @@ class TextToCodeTaskSuite:
         self, num_levels: int = 3, lang: str = "Python"
     ) -> list[str]:
         levels = []
-        logger.info("📈 Generating levels of coding complexity")
+        logger.info("🏷️ Generating levels of coding complexity")
         response = self.llm.nl.generate(
-            templates.complexity(lang=lang, num_levels=num_levels)
+            nl2code_prompts.complexity(lang=lang, num_levels=num_levels)
         )
         levels = utils.parse_json_str(response)
         return levels
@@ -82,7 +95,7 @@ class TextToCodeTaskSuite:
         self, project_type: str, max_dependencies: int = 10
     ) -> list[str]:
         response = self.llm.code.generate(
-            templates.python_dependency_list(
+            nl2code_prompts.python_suggested_packages(
                 project_type=project_type, max_dependencies=max_dependencies
             )
         )
@@ -111,7 +124,7 @@ class TextToCodeTaskSuite:
         lang: str = "Python",
     ) -> str:
         response = self.llm.nl.generate(
-            templates.text_to_code_prompt(
+            nl2code_prompts.text_to_code_prompt(
                 complexity=complexity, domain=domain, topic=topic, lang=lang
             )
         )
@@ -125,7 +138,7 @@ class TextToCodeTaskSuite:
         complexity: str,
         dependency_list: list[str],
     ):
-        final_prompt = templates.generate_code(
+        final_prompt = nl2code_prompts.generate_code(
             text_to_code_prompt=text_to_code_prompt,
             domain=domain,
             topic=topic,
@@ -157,12 +170,14 @@ class TextToCodeTaskSuite:
         num_topics_per_domain: int = 10,
         num_complexity_levels: int = 4,
         lang: str = "Python",
-    ):
+    ) -> ContextualTags:
         domain_list = self.generate_domains(num_domains=num_domains, lang=lang)
-        topic_list = self.generate_topics_from_domains(
+        domain_and_topics = self.generate_topics_from_domains(
             domain_list, num_topics_per_domain=num_topics_per_domain
         )
         complexity_levels = self.generate_levels_of_complexity(
             num_levels=num_complexity_levels, lang=lang
         )
-        return domain_list, topic_list, complexity_levels
+        return ContextualTags(
+            domain_and_topics=domain_and_topics, complexity_levels=complexity_levels
+        )

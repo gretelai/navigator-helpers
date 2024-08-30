@@ -1,0 +1,5 @@
+llm_suite_type: open_license
+
+num_domains: 10
+num_topics_per_domain: 10
+num_complexity_levels: 4
