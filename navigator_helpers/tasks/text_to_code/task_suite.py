@@ -155,8 +155,8 @@ class NL2CodeTaskSuite:
 
         code_string = response
 
-        if "```python" in response:
-            code_string = response[response.find("```python") : response.rfind("```")]
+        if m := re.search(r"```python\n?", response, flags=re.IGNORECASE):
+            code_string = response[m.end() : response.rfind("```")]
             if code_string is None or len(code_string) == 0:
                 code_string = ""
                 logger.warning(f"WARNING: Empty code block in response:\n{response}")
