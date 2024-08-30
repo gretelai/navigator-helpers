@@ -1,6 +1,8 @@
 import logging
 import sys
 
+from typing import Optional
+
 LOG_FORMAT = (
     "%(asctime)s.%(msecs)03dZ "
     "[%(process)d] - "
@@ -9,9 +11,12 @@ LOG_FORMAT = (
     "%(message)s"
 )
 
+SIMPLE_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 
-def configure_logger(*, level: int = logging.INFO) -> None:
-    formatter = logging.Formatter(LOG_FORMAT)
+
+def configure_logger(*, level: int = logging.INFO, fmt: Optional[str] = None) -> None:
+
+    formatter = logging.Formatter(fmt or LOG_FORMAT)
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(formatter)
 
@@ -25,3 +30,12 @@ def configure_logger(*, level: int = logging.INFO) -> None:
 
     logging.getLogger("LiteLLM Router").setLevel(logging.WARNING)
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
+
+def get_logger(
+    name: str, *, level: int = logging.INFO, fmt: Optional[str] = None
+) -> logging.Logger:
+    configure_logger(level=level, fmt=fmt)
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    return logger
