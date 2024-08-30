@@ -8,13 +8,14 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
-from gretel_client.gretel.config_setup import smart_load_yaml
 from tqdm import tqdm
 
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.text_to_code.config import (
+    ConfigLike,
     NL2CodeAutoConfig,
     NL2CodeManualConfig,
+    smart_load_pipeline_config,
 )
 from navigator_helpers.tasks.text_to_code.task_suite import (
     ContextualTags,
@@ -24,9 +25,6 @@ from navigator_helpers.tasks.text_to_code.task_suite import (
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
-ConfigLike = Union[NL2CodeAutoConfig, NL2CodeManualConfig, dict, str, Path]
-
-
 class NL2CodePipeline:
 
     def __init__(self, config: ConfigLike = NL2CodeAutoConfig(), **session_kwargs):
@@ -34,16 +32,9 @@ class NL2CodePipeline:
         self.tasks = NL2CodeTaskSuite(self.config.llm_suite_type, **session_kwargs)
 
     def _setup(self, config: ConfigLike):
-        logger.info("🚀 Setting up NL2code pipeline")
+        logger.info("⚙️ Setting up NL2code pipeline")
         self.tags = None
-        self.config = config
-        if not isinstance(config, (NL2CodeManualConfig, NL2CodeAutoConfig)):
-            config = smart_load_yaml(config)
-            self.config = (
-                NL2CodeAutoConfig(**config)
-                if "num_domains" in config
-                else NL2CodeManualConfig(**config)
-            )
+        self.config = smart_load_pipeline_config(config)
         if isinstance(self.config, NL2CodeManualConfig):
             logger.info("🏷️ Loading contextual tags from config")
             self.tags = ContextualTags(
@@ -57,7 +48,8 @@ class NL2CodePipeline:
     def prepare_contextual_tags(self):
         if self.tags is not None:
             raise ValueError(
-                "Contextual tags are already set. If you want to change them, use `set_contextual_tags`."
+                "Contextual tags are already set. If you want to change them, "
+                "use `set_contextual_tags`."
             )
         self.tags = self.tasks.generate_contextual_tags(
             num_domains=self.config.num_domains,
@@ -79,6 +71,7 @@ class NL2CodePipeline:
     def run(
         self, num_samples: int = 10, save_json_path: Optional[Union[str, Path]] = None
     ):
+        logger.info("🚀 Starting NL2Code pipeline")
         if self.tags is None:
             self.prepare_contextual_tags()
 

@@ -160,7 +160,7 @@ class NL2CodeTaskSuite:
             if code_string is None or len(code_string) == 0:
                 code_string = ""
                 logger.warning(f"WARNING: Empty code block in response:\n{response}")
-            code_string = code_string.lstrip("```python").rstrip("```").strip()
+            code_string = code_string.lstrip("`pythonPYTHON").rstrip("`").strip()
 
         return final_prompt, code_string
 
