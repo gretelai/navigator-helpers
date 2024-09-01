@@ -31,23 +31,21 @@ logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 @dataclass
 class PipelineResults:
-    synthetic_dataset: pd.DataFrame
+    dataframe: pd.DataFrame
     contextual_tags: ContextualTags
     config: ConfigLike
 
     def display_sample(self, index: Optional[int] = None, **kwargs):
         if index is None:
-            record = self.synthetic_dataset.sample(1).iloc[0]
+            record = self.dataframe.sample(1).iloc[0]
         else:
-            record = self.synthetic_dataset.loc[index]
+            record = self.dataframe.loc[index]
         display_nl2code_sample(record, **kwargs)
 
     def save_artifacts(self, path: str | Path):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
-        self.synthetic_dataset.to_json(
-            path / "synthetic_dataset.json", orient="records"
-        )
+        self.dataframe.to_json(path / "synthetic_dataset.json", orient="records")
         with open(path / "contextual_tags.json", "w") as f:
             json.dump(self.contextual_tags.model_dump(), f)
         with open(path / "config.json", "w") as f:
@@ -229,7 +227,7 @@ class NL2CodePipeline:
 
         logger.info("🥳 Synthetic dataset generation complete!")
         return PipelineResults(
-            synthetic_dataset=pd.DataFrame(synthetic_dataset),
+            dataframe=pd.DataFrame(synthetic_dataset),
             contextual_tags=self.contextual_tags,
             config=self.config,
         )
