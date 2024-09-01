@@ -102,16 +102,16 @@ with partitioning and ordering"]'
 """,
     text_to_sql_prompt="""\
 Generate a natural language prompt that describes an SQL query. Base your prompt the following 
-table CREATE statements and/or view CREATE statements.
+CREATE statements for tables and/or views:
 
-### SQL Context:
+### CREATE statements:
 {sql_context}
 
 ### Instructions:
     * Provide a well-formulated question or command in everyday English, representing a user query to a database.
     * The response to your prompt should require SQL of complexity "{complexity}".
     * The prompt should be in the "{domain}" domain and pertain to "{topic}".
-    * Return only the prompt without any code or other comments.
+    * Make sure there is no text of any kind preceding or following SQL code.
     
 ### Prompt:
 """,
@@ -119,14 +119,14 @@ table CREATE statements and/or view CREATE statements.
 ### Natural Language Prompt:
 {text_to_sql_prompt}
 
-### SQL Context:
+### CREATE statements:
 {sql_context}
 
 ### Instructions
     * Provide a complete and executable SQL query used to answer/execute the natural language prompt
     * Base the SQL on the CREATE statements above.
     * The generated SQL should have a complexity of "{complexity}".
-    * Include only the code, without any comments or additional text.
+    * Make sure there is no text of any kind preceding or following SQL code.
 """,
     sql_table_and_views="""\
 You are a data and SQL expert in the {domain} domain.
@@ -138,6 +138,8 @@ Write SQL statements that create tables and views that already exist in a databa
     * Provide up to {max_statements} tables/views that are relevant to the user's natural language prompt.
     * Table names and schemas should correspond to the "{domain}" domain within a "{topic}" context.
     * Include only SQL, without any comments or additional text.
+    * Do not number the tables/views.
+    * Make sure there is no text of any kind preceding or following SQL code.
 """,
 )
 

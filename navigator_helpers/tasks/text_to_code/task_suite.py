@@ -80,9 +80,8 @@ class NL2CodeTaskSuite:
             code_string = text[m.end() : text.rfind("```")]
             if code_string is None or len(code_string) == 0:
                 code_string = ""
-                logger.warning(f"WARNING: Empty code block in response:\n{text}")
-            code_string = code_string.lstrip("`pythonPYTHONsqlSQL").rstrip("`").strip()
-        return code_string
+                logger.warning(f"Empty code block in response:\n{text}")
+        return code_string.strip()
 
     def generate_domains(self, num_domains: int = 10) -> list[str]:
         logger.info("🏷️ Generating domains")
@@ -154,7 +153,7 @@ class NL2CodeTaskSuite:
                 domain=domain, topic=topic, max_statements=max_statements
             )
         )
-        return response
+        return self.extract_code(response)
 
     def generate_text_to_sql_prompt(
         self, domain: str, topic: str, complexity: str, sql_context: str

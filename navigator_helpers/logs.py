@@ -12,12 +12,12 @@ LOG_FORMAT = (
     "%(message)s"
 )
 
-SIMPLE_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+SIMPLE_LOG_FORMAT = "%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s"
 
 
 def configure_logger(*, level: int = logging.INFO, fmt: Optional[str] = None) -> None:
 
-    formatter = logging.Formatter(fmt or LOG_FORMAT)
+    formatter = logging.Formatter(fmt or LOG_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(formatter)
 

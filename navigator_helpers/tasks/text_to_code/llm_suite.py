@@ -50,9 +50,9 @@ class GretelLLMSuite:
                 f"Supported types: {[t.value for t in LLMSuiteType]}"
             )
 
+        logger.info("🦜 Initializing LLM suite")
         with silence_iapi_initialization_logs():
             config = suite_config[suite_type]
-            logger.info("👏 Initializing open license LLM suite")
 
             logger.info(f"📖 Natural language LLM: {config['nl']}")
             self._nl = self.__gretel.factories.initialize_navigator_api(
@@ -66,7 +66,7 @@ class GretelLLMSuite:
             )
             self._code_gen_kwargs = config["generate_kwargs"]["code"]
 
-            logger.info(f"👩‍⚖️ Judge LLM: {config['judge']}")
+            logger.info(f"⚖️ Judge LLM: {config['judge']}")
             self._judge = self.__gretel.factories.initialize_navigator_api(
                 "natural_language", backend_model=config["judge"]
             )

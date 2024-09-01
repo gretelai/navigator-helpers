@@ -58,7 +58,7 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
             word_wrap=True,
             background_color=background_color,
         ),
-        title="Generated Code",
+        title="Code",
     )
     console.print(panel)
 

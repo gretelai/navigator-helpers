@@ -25,7 +25,7 @@ from navigator_helpers.tasks.text_to_code.task_suite import (
 )
 from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
-PBAR_PREFIX = "Running Pipeline"
+PBAR_TEMPLATE = "Running Pipeline [current task: {}]".format
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
@@ -67,15 +67,15 @@ def create_nl2python_record(
     complexity: str,
     progress_bar: Optional[tqdm] = None,
 ) -> dict:
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: suggest python packages]")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('suggest python packages')}")
     suggested_packages = tasks.generate_suggested_python_packages(
         domain, topic, max_dependencies=np.random.randint(5, 8)
     )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: text-to-python prompt]")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('text-to-python prompt')}")
     text_to_code_prompt = tasks.generate_text_to_python_prompt(
         domain, topic, complexity
     )
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_PREFIX} [task: python code generation]")
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('python code generation')}")
     prompt, code = tasks.python_code_generation(
         text_to_code_prompt,
         domain,
@@ -103,15 +103,15 @@ def create_nl2sql_record(
     complexity: str,
     progress_bar: Optional[tqdm] = None,
 ) -> dict:
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: SQL tables and views]")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('SQL tables and views')}")
     sql_context = tasks.generate_sql_tables_and_views(
         domain, topic, max_statements=np.random.randint(3, 6)
     )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: text-to-SQL prompt]")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('text-to-SQL prompt')}")
     text_to_code_prompt = tasks.generate_text_to_sql_prompt(
         domain, topic, complexity, sql_context
     )
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_PREFIX} [task: SQL generation]")
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('SQL generation')}")
     prompt, code = tasks.sql_code_generation(
         text_to_code_prompt, domain, topic, complexity, sql_context
     )
@@ -149,18 +149,20 @@ def create_record(
 class NL2CodePipeline:
 
     def __init__(self, config: ConfigLike, **session_kwargs):
+        self.contextual_tags = None
         self._setup(config)
         self.tasks = NL2CodeTaskSuite(
             self.config.code_lang, self.config.llm_suite_type, **session_kwargs
         )
 
     def _setup(self, config: ConfigLike):
-        self.tags = None
         self.config = smart_load_pipeline_config(config)
         logger.info(f"⚙️ Setting up Text-to-{self.config.code_lang.title} pipeline")
+        if self.config.artifact_path is not None:
+            logger.info(f"📦 Artifact path: {self.config.artifact_path}")
         if isinstance(self.config, NL2CodeManualConfig):
             logger.info("🏷️ Loading contextual tags from config")
-            self.tags = ContextualTags(
+            self.contextual_tags = ContextualTags(
                 domain_and_topics=self.config.domain_and_topics,
                 complexity_levels=self.config.complexity_levels,
             )
@@ -172,30 +174,29 @@ class NL2CodePipeline:
             with open(self.config.artifact_path / f"{name}.json", "w") as f:
                 json.dump(artifact, f)
 
-    def prepare_contextual_tags(self):
-        if self.tags is not None:
+    def create_contextual_tags(self):
+        if self.contextual_tags is not None:
             raise ValueError(
                 "Contextual tags are already set. If you want to change them, "
                 "use `set_contextual_tags`."
             )
-        self.tags = self.tasks.generate_contextual_tags(
+        self.contextual_tags = self.tasks.generate_contextual_tags(
             num_domains=self.config.num_domains,
             num_topics_per_domain=self.config.num_topics_per_domain,
             num_complexity_levels=self.config.num_complexity_levels,
         )
-        self._save_artifact("contextual_tags", self.tags.model_dump())
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
         if isinstance(tags, dict):
-            self.tags = ContextualTags(**tags)
+            self.contextual_tags = ContextualTags(**tags)
         elif isinstance(tags, ContextualTags):
-            self.tags = tags
+            self.contextual_tags = tags
         else:
             raise ValueError(
                 f"Unsupported type for contextual tags: {type(tags)}. "
                 f"Expected types: [dict, ContextualTags]"
             )
-        self._save_artifact("contextual_tags", self.tags.model_dump())
+        self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
 
     def run(
         self, num_samples: int = 10, disable_progress_bar: bool = False
@@ -203,14 +204,14 @@ class NL2CodePipeline:
         logger.info(
             f"🚀 Starting Text-to-{self.config.code_lang.title} synthetic data pipeline"
         )
-        if self.tags is None:
-            self.prepare_contextual_tags()
+        if self.contextual_tags is None:
+            self.create_contextual_tags()
 
         synthetic_dataset = []
 
         with tqdm(total=num_samples, disable=disable_progress_bar) as pbar:
             for _ in range(num_samples):
-                domain, topic, complexity = self.tags.sample()
+                domain, topic, complexity = self.contextual_tags.sample()
                 record = create_record(
                     tasks=self.tasks,
                     domain=domain,
@@ -224,9 +225,11 @@ class NL2CodePipeline:
                 pbar.update(1)
 
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
+        self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
+
         logger.info("🥳 Synthetic dataset generation complete!")
         return PipelineResults(
             synthetic_dataset=pd.DataFrame(synthetic_dataset),
-            contextual_tags=self.tags,
+            contextual_tags=self.contextual_tags,
             config=self.config,
         )
