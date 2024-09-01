@@ -27,25 +27,25 @@ Come up with a list of {num_levels} complexity levels for software in the Python
     '["Beginner: Basic syntax and data types", "Intermediate: Functions and control structures", '
     '"Advanced: Object-oriented programming and error handling"]'
 """,
-    text_to_python_prompt="""\
+    python_natural_language="""\
 Generate a natural language prompt that describes a Python coding task.
 
 ### Instructions:
     * Use a code complexity of "{complexity}".
     * Imagine the code will be used in the "{domain}" domain.
     * Write code that might be used in a "{topic}" context.
-    * Return only the prompt without any code or other comments.
+    * Return only the natural language prompt without any code or other comments.
     
 ### Prompt:
 """,
     python_code_generation="""\
-{text_to_python_prompt}
+{python_natural_language}
 
 ### Instructions
     * The code should have a complexity of "{complexity}".
     * Write code that might be used in the "{domain}" industry within a "{topic}" context.
     * Try to include at least 1 of the following Python packages: {suggested_packages}.
-    * Include only the code, without any comments or additional text.
+    * Include ONLY a SINGLE block of code without any additional text.
 """,
     python_suggested_packages="""\
 Create the contents of a Python requirements.txt file with dependencies for a "{domain}" project.
@@ -100,7 +100,7 @@ Come up with a list of {num_levels} SQL techniques/concepts of increasing comple
 '"Expert: window functions (e.g., ROW_NUMBER, LEAD, LAG, RANK, NTILE, PERCENT_RANK, etc.)\
 with partitioning and ordering"]'
 """,
-    text_to_sql_prompt="""\
+    sql_natural_language="""\
 Generate a natural language prompt that describes an SQL query. Base your prompt the following 
 CREATE statements for tables and/or views:
 
@@ -111,13 +111,13 @@ CREATE statements for tables and/or views:
     * Provide a well-formulated question or command in everyday English, representing a user query to a database.
     * The response to your prompt should require SQL of complexity "{complexity}".
     * The prompt should be in the "{domain}" domain and pertain to "{topic}".
-    * Make sure there is no text of any kind preceding or following SQL code.
+    * Return only the natural language prompt without any code or other comments.
     
 ### Prompt:
 """,
     sql_code_generation="""\
 ### Natural Language Prompt:
-{text_to_sql_prompt}
+{sql_natural_language}
 
 ### CREATE statements:
 {sql_context}

@@ -19,7 +19,6 @@ from navigator_helpers.tasks.text_to_code.config import (
     smart_load_pipeline_config,
 )
 from navigator_helpers.tasks.text_to_code.task_suite import (
-    CodeLang,
     ContextualTags,
     NL2CodeTaskSuite,
 )
@@ -69,18 +68,18 @@ def create_nl2python_record(
     suggested_packages = tasks.generate_suggested_python_packages(
         domain, topic, max_dependencies=np.random.randint(5, 8)
     )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('text-to-python prompt')}")
-    text_to_code_prompt = tasks.generate_text_to_python_prompt(
-        domain, topic, complexity
-    )
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}")
+    natural_language = tasks.generate_python_natural_language(domain, topic, complexity)
     _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('python code generation')}")
     prompt, code = tasks.python_code_generation(
-        text_to_code_prompt,
+        natural_language,
         domain,
         topic,
         complexity,
         ",".join([f" `{dep}`" for dep in suggested_packages]),
     )
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
+    syntax_validation = tasks.validate_code(code)
     return {
         "uid": uuid.uuid4().hex,
         "domain": domain,
@@ -88,9 +87,9 @@ def create_nl2python_record(
         "complexity": complexity,
         "suggested_packages": suggested_packages,
         "full_prompt": prompt,
-        "natural_language": text_to_code_prompt,
+        "natural_language": natural_language,
         "code": code,
-        "syntax_validation": tasks.validate_code(code),
+        "syntax_validation": syntax_validation,
     }
 
 
@@ -105,14 +104,16 @@ def create_nl2sql_record(
     sql_context = tasks.generate_sql_tables_and_views(
         domain, topic, max_statements=np.random.randint(3, 6)
     )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('text-to-SQL prompt')}")
-    text_to_code_prompt = tasks.generate_text_to_sql_prompt(
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}")
+    natural_language = tasks.generate_sql_natural_language(
         domain, topic, complexity, sql_context
     )
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('SQL generation')}")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('SQL generation')}")
     prompt, code = tasks.sql_code_generation(
-        text_to_code_prompt, domain, topic, complexity, sql_context
+        natural_language, domain, topic, complexity, sql_context
     )
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
+    syntax_validation = tasks.validate_code(code)
     return {
         "uid": uuid.uuid4().hex,
         "domain": domain,
@@ -120,8 +121,9 @@ def create_nl2sql_record(
         "complexity": complexity,
         "sql_context": sql_context,
         "full_prompt": prompt,
-        "natural_language": text_to_code_prompt,
+        "natural_language": natural_language,
         "code": code,
+        "syntax_validation": syntax_validation,
     }
 
 
@@ -131,17 +133,10 @@ def create_record(
     topic: str,
     complexity: str,
     progress_bar: Optional[tqdm] = None,
-    code_lang: CodeLang = CodeLang.PYTHON,
 ) -> dict:
-    if code_lang == CodeLang.PYTHON:
-        return create_nl2python_record(tasks, domain, topic, complexity, progress_bar)
-    elif code_lang == CodeLang.SQL:
-        return create_nl2sql_record(tasks, domain, topic, complexity, progress_bar)
-    else:
-        raise ValueError(
-            f"Unsupported code language: {code_lang}. "
-            f"Supported languages: {[lang.value for lang in CodeLang]}"
-        )
+    return globals()[f"create_nl2{tasks.code_lang.value}_record"](
+        tasks, domain, topic, complexity, progress_bar
+    )
 
 
 class NL2CodePipeline:
@@ -216,7 +211,6 @@ class NL2CodePipeline:
                     topic=topic,
                     complexity=complexity,
                     progress_bar=pbar,
-                    code_lang=self.config.code_lang,
                 )
                 synthetic_dataset.append(record)
                 self._save_artifact("synthetic_dataset", synthetic_dataset)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import ast
+import logging
 import random
 import re
 
@@ -10,12 +10,17 @@ import numpy as np
 
 from pydantic import BaseModel
 
+from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
 from navigator_helpers.tasks.text_to_code import utils
 from navigator_helpers.tasks.text_to_code.llm_suite import GretelLLMSuite, LLMSuiteType
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
+validator = ContentValidator()
+
+fluff_logger = logging.getLogger("sqlfluff")
+fluff_logger.setLevel(logging.ERROR)
 
 
 class CodeLang(str, Enum):
@@ -24,9 +29,7 @@ class CodeLang(str, Enum):
 
     @property
     def title(self) -> str:
-        return (
-            self.value.capitalize() if self == CodeLang.PYTHON else self.value.upper()
-        )
+        return self.value.upper() if self == CodeLang.SQL else self.value.capitalize()
 
 
 class ContextualTags(BaseModel):
@@ -55,23 +58,19 @@ class NL2CodeTaskSuite:
 
     def __init__(
         self,
-        code_lang: CodeLang = "python",
+        code_lang: CodeLang = CodeLang.PYTHON,
         suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE,
         **kwargs,
     ):
-        self.lang = CodeLang(code_lang)
+        self.code_lang = CodeLang(code_lang)
         self.llm = GretelLLMSuite(suite_type=suite_type, **kwargs)
-        self.prompts = load_prompt_template_suite(self.lang.value)
+        self.prompts = load_prompt_template_suite(self.code_lang.value)
 
     def validate_code(self, code_string: str) -> str:
-        if self.lang == CodeLang.PYTHON:
-            try:
-                ast.parse(code_string)
-                message = "passed"
-            except SyntaxError as e:
-                message = str(e)
-        else:
-            raise ValueError(f"Unsupported language: {self.lang}")
+        message = getattr(validator, f"validate_{self.code_lang.value}")(
+            code_string, None
+        )
+        message = "passed" if message is None else message
         return message
 
     def extract_code(self, text: str) -> str:
@@ -103,7 +102,7 @@ class NL2CodeTaskSuite:
         return topics
 
     def generate_levels_of_complexity(self, num_levels: int = 3) -> list[str]:
-        logger.info(f"🏷️ Generating levels of {self.lang.title} complexity")
+        logger.info(f"🏷️ Generating levels of {self.code_lang.title} complexity")
         response = self.llm.nl_generate(self.prompts.complexity(num_levels=num_levels))
         return utils.parse_json_str(response) or []
 
@@ -155,11 +154,11 @@ class NL2CodeTaskSuite:
         )
         return self.extract_code(response)
 
-    def generate_text_to_sql_prompt(
+    def generate_sql_natural_language(
         self, domain: str, topic: str, complexity: str, sql_context: str
     ) -> str:
         response = self.llm.nl_generate(
-            self.prompts.text_to_sql_prompt(
+            self.prompts.sql_natural_language(
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
@@ -168,11 +167,11 @@ class NL2CodeTaskSuite:
         )
         return response.strip('"')
 
-    def generate_text_to_python_prompt(
+    def generate_python_natural_language(
         self, domain: str, topic: str, complexity: str
     ) -> str:
         response = self.llm.nl_generate(
-            self.prompts.text_to_python_prompt(
+            self.prompts.python_natural_language(
                 domain=domain, topic=topic, complexity=complexity
             )
         )
@@ -180,14 +179,14 @@ class NL2CodeTaskSuite:
 
     def python_code_generation(
         self,
-        text_to_python_prompt: str,
+        python_natural_language: str,
         domain: str,
         topic: str,
         complexity: str,
         suggested_packages: str,
     ):
         final_prompt = self.prompts.python_code_generation(
-            text_to_python_prompt=text_to_python_prompt,
+            python_natural_language=python_natural_language,
             domain=domain,
             topic=topic,
             complexity=complexity,
@@ -207,14 +206,14 @@ class NL2CodeTaskSuite:
 
     def sql_code_generation(
         self,
-        text_to_sql_prompt: str,
+        sql_natural_language: str,
         domain: str,
         topic: str,
         complexity: str,
         sql_context: str,
     ):
         final_prompt = self.prompts.sql_code_generation(
-            text_to_sql_prompt=text_to_sql_prompt,
+            sql_natural_language=sql_natural_language,
             domain=domain,
             topic=topic,
             complexity=complexity,
