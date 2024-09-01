@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from contextlib import contextmanager
 from typing import Optional
 
 LOG_FORMAT = (
@@ -39,3 +40,15 @@ def get_logger(
     logger = logging.getLogger(name)
     logger.setLevel(level)
     return logger
+
+
+@contextmanager
+def silence_iapi_initialization_logs():
+    from gretel_client.factories import logger as factories_logger
+    from gretel_client.inference_api.base import logger as iapi_logger
+
+    factories_logger.setLevel(logging.ERROR)
+    iapi_logger.setLevel(logging.ERROR)
+    yield
+    factories_logger.setLevel(logging.INFO)
+    iapi_logger.setLevel(logging.INFO)

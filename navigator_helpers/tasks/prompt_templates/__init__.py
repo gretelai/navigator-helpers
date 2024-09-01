@@ -1,4 +1,1 @@
-from navigator_helpers.tasks.prompt_templates.suite import PromptTemplateSuite
-from navigator_helpers.tasks.prompt_templates.text_to_code import nl2code_template_dict
-
-nl2code_prompts = PromptTemplateSuite(nl2code_template_dict)
+from navigator_helpers.tasks.prompt_templates.suite import load_prompt_template_suite

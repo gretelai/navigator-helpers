@@ -22,28 +22,38 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
     table.add_column("Complexity")
     rows = [record.domain, record.topic, record.complexity]
 
-    if "dependency_list" in record:
+    if "suggested_packages" in record:
         table.add_column("Suggested Packages")
-        rows.append(", ".join(record.dependency_list))
+        rows.append(", ".join(record.suggested_packages))
 
     table.add_row(*rows)
     console.print(table)
 
-    panel = Panel(Text(record.prompt, justify="left", overflow="fold"), title="Prompt")
-    console.print(panel)
-
-    if "ast_parse" in record:
-        console.print(
-            Text(
-                f"Code Validation: {'✅' if record.ast_parse == 'passed' else '❌'}",
+    lexer = "python"
+    if "sql_context" in record:
+        lexer = "sql"
+        panel = Panel(
+            Syntax(
+                record.sql_context,
+                lexer,
+                theme=theme,
+                word_wrap=True,
+                background_color=background_color,
             ),
-            justify="center",
+            title="SQL Context",
         )
+        console.print(panel)
+
+    panel = Panel(
+        Text(record.natural_language, justify="left", overflow="fold"),
+        title="Natural Language",
+    )
+    console.print(panel)
 
     panel = Panel(
         Syntax(
             record.code,
-            "python",
+            lexer,
             theme=theme,
             word_wrap=True,
             background_color=background_color,
@@ -51,6 +61,14 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
         title="Generated Code",
     )
     console.print(panel)
+
+    if "syntax_validation" in record:
+        console.print(
+            Text(
+                f"Syntax Validation: {'✅' if record.syntax_validation == 'passed' else '❌'}",
+            ),
+            justify="right",
+        )
 
 
 def parse_json_str(json_str):

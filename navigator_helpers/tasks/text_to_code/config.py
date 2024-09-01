@@ -1,14 +1,25 @@
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from gretel_client.gretel.config_setup import smart_load_yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from navigator_helpers.tasks.text_to_code.llm_suite import LLMSuiteType
+from navigator_helpers.tasks.text_to_code.task_suite import CodeLang
 
 
 class PipelineConfig(BaseModel):
+    code_lang: CodeLang = CodeLang.PYTHON
     llm_suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE
+    artifact_path: Optional[Union[str, Path]] = Path("./nl2code-artifacts")
+
+    @model_validator(mode="after")
+    def validate_artifact_path(self):
+        if self.artifact_path is not None:
+            self.artifact_path = Path(self.artifact_path)
+            self.artifact_path = self.artifact_path / f"{self.code_lang.value}"
+            self.artifact_path.mkdir(parents=True, exist_ok=True)
+        return self
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"

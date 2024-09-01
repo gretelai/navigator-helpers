@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import uuid
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -13,37 +15,162 @@ from tqdm import tqdm
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.text_to_code.config import (
     ConfigLike,
-    NL2CodeAutoConfig,
     NL2CodeManualConfig,
     smart_load_pipeline_config,
 )
 from navigator_helpers.tasks.text_to_code.task_suite import (
+    CodeLang,
     ContextualTags,
     NL2CodeTaskSuite,
 )
+from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
+PBAR_PREFIX = "Running Pipeline"
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
+
+
+@dataclass
+class PipelineResults:
+    synthetic_dataset: pd.DataFrame
+    contextual_tags: ContextualTags
+    config: ConfigLike
+
+    def display_sample(self, index: Optional[int] = None, **kwargs):
+        if index is None:
+            record = self.synthetic_dataset.sample(1).iloc[0]
+        else:
+            record = self.synthetic_dataset.loc[index]
+        display_nl2code_sample(record, **kwargs)
+
+    def save_artifacts(self, path: str | Path):
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        self.synthetic_dataset.to_json(
+            path / "synthetic_dataset.json", orient="records"
+        )
+        with open(path / "contextual_tags.json", "w") as f:
+            json.dump(self.contextual_tags.model_dump(), f)
+        with open(path / "config.json", "w") as f:
+            json.dump(json.loads(self.config.model_dump_json()), f)
+
+
+def _update_pbar_desc(pbar: tqdm, desc: str):
+    if pbar is not None:
+        pbar.set_description(desc)
+        pbar.refresh()
+
+
+def create_nl2python_record(
+    tasks: NL2CodeTaskSuite,
+    domain: str,
+    topic: str,
+    complexity: str,
+    progress_bar: Optional[tqdm] = None,
+) -> dict:
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: suggest python packages]")
+    suggested_packages = tasks.generate_suggested_python_packages(
+        domain, topic, max_dependencies=np.random.randint(5, 8)
+    )
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: text-to-python prompt]")
+    text_to_code_prompt = tasks.generate_text_to_python_prompt(
+        domain, topic, complexity
+    )
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_PREFIX} [task: python code generation]")
+    prompt, code = tasks.python_code_generation(
+        text_to_code_prompt,
+        domain,
+        topic,
+        complexity,
+        ",".join([f" `{dep}`" for dep in suggested_packages]),
+    )
+    return {
+        "uid": uuid.uuid4().hex,
+        "domain": domain,
+        "topic": topic,
+        "complexity": complexity,
+        "suggested_packages": suggested_packages,
+        "full_prompt": prompt,
+        "natural_language": text_to_code_prompt,
+        "code": code,
+        "syntax_validation": tasks.validate_code(code),
+    }
+
+
+def create_nl2sql_record(
+    tasks: NL2CodeTaskSuite,
+    domain: str,
+    topic: str,
+    complexity: str,
+    progress_bar: Optional[tqdm] = None,
+) -> dict:
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: SQL tables and views]")
+    sql_context = tasks.generate_sql_tables_and_views(
+        domain, topic, max_statements=np.random.randint(3, 6)
+    )
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_PREFIX} [task: text-to-SQL prompt]")
+    text_to_code_prompt = tasks.generate_text_to_sql_prompt(
+        domain, topic, complexity, sql_context
+    )
+    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_PREFIX} [task: SQL generation]")
+    prompt, code = tasks.sql_code_generation(
+        text_to_code_prompt, domain, topic, complexity, sql_context
+    )
+    return {
+        "uid": uuid.uuid4().hex,
+        "domain": domain,
+        "topic": topic,
+        "complexity": complexity,
+        "sql_context": sql_context,
+        "full_prompt": prompt,
+        "natural_language": text_to_code_prompt,
+        "code": code,
+    }
+
+
+def create_record(
+    tasks: NL2CodeTaskSuite,
+    domain: str,
+    topic: str,
+    complexity: str,
+    progress_bar: Optional[tqdm] = None,
+    code_lang: CodeLang = CodeLang.PYTHON,
+) -> dict:
+    if code_lang == CodeLang.PYTHON:
+        return create_nl2python_record(tasks, domain, topic, complexity, progress_bar)
+    elif code_lang == CodeLang.SQL:
+        return create_nl2sql_record(tasks, domain, topic, complexity, progress_bar)
+    else:
+        raise ValueError(
+            f"Unsupported code language: {code_lang}. "
+            f"Supported languages: {[lang.value for lang in CodeLang]}"
+        )
 
 
 class NL2CodePipeline:
 
-    def __init__(self, config: ConfigLike = NL2CodeAutoConfig(), **session_kwargs):
+    def __init__(self, config: ConfigLike, **session_kwargs):
         self._setup(config)
-        self.tasks = NL2CodeTaskSuite(self.config.llm_suite_type, **session_kwargs)
+        self.tasks = NL2CodeTaskSuite(
+            self.config.code_lang, self.config.llm_suite_type, **session_kwargs
+        )
 
     def _setup(self, config: ConfigLike):
-        logger.info("⚙️ Setting up NL2code pipeline")
         self.tags = None
         self.config = smart_load_pipeline_config(config)
+        logger.info(f"⚙️ Setting up Text-to-{self.config.code_lang.title} pipeline")
         if isinstance(self.config, NL2CodeManualConfig):
             logger.info("🏷️ Loading contextual tags from config")
             self.tags = ContextualTags(
                 domain_and_topics=self.config.domain_and_topics,
                 complexity_levels=self.config.complexity_levels,
             )
-
         self.topics: Optional[ContextualTags] = None
         self.complexity_levels: Optional[list[str]] = None
+
+    def _save_artifact(self, name: str, artifact: dict | list[dict]):
+        if self.config.artifact_path is not None:
+            with open(self.config.artifact_path / f"{name}.json", "w") as f:
+                json.dump(artifact, f)
 
     def prepare_contextual_tags(self):
         if self.tags is not None:
@@ -56,51 +183,50 @@ class NL2CodePipeline:
             num_topics_per_domain=self.config.num_topics_per_domain,
             num_complexity_levels=self.config.num_complexity_levels,
         )
+        self._save_artifact("contextual_tags", self.tags.model_dump())
 
-    def set_contextual_tags(
-        self,
-        *,
-        domain_and_topics: Optional[dict[str, list[str]]] = None,
-        complexity_levels: Optional[list[str]] = None,
-    ):
-        if domain_and_topics is not None:
-            self.tags.domain_and_topics = domain_and_topics
-        if complexity_levels is not None:
-            self.tags.complexity_levels = complexity_levels
+    def set_contextual_tags(self, tags: ContextualTags | dict):
+        if isinstance(tags, dict):
+            self.tags = ContextualTags(**tags)
+        elif isinstance(tags, ContextualTags):
+            self.tags = tags
+        else:
+            raise ValueError(
+                f"Unsupported type for contextual tags: {type(tags)}. "
+                f"Expected types: [dict, ContextualTags]"
+            )
+        self._save_artifact("contextual_tags", self.tags.model_dump())
 
     def run(
-        self, num_samples: int = 10, save_json_path: Optional[Union[str, Path]] = None
-    ):
-        logger.info("🚀 Starting NL2Code pipeline")
+        self, num_samples: int = 10, disable_progress_bar: bool = False
+    ) -> PipelineResults:
+        logger.info(
+            f"🚀 Starting Text-to-{self.config.code_lang.title} synthetic data pipeline"
+        )
         if self.tags is None:
             self.prepare_contextual_tags()
 
         synthetic_dataset = []
-        for num in tqdm(range(num_samples), desc="🤖 Generating synthetic dataset"):
-            domain, topic, complexity = self.tags.sample()
-            text_to_code_prompt = self.tasks.generate_text_to_code_prompt(
-                domain, topic, complexity
-            )
-            dependency_list = self.tasks.generate_python_dependency_list(
-                domain, max_dependencies=np.random.randint(5, 8)
-            )
-            prompt, code = self.tasks.generate_code(
-                text_to_code_prompt, domain, topic, complexity, dependency_list
-            )
-            synthetic_dataset.append(
-                {
-                    "id": num,
-                    "domain": domain,
-                    "topic": topic,
-                    "complexity": complexity,
-                    "prompt": prompt,
-                    "dependency_list": dependency_list,
-                    "code": code,
-                    "ast_parse": self.tasks.validate_code(code),
-                }
-            )
-            if save_json_path is not None:
-                with open(save_json_path, "w") as f:
-                    json.dump(synthetic_dataset, f)
+
+        with tqdm(total=num_samples, disable=disable_progress_bar) as pbar:
+            for _ in range(num_samples):
+                domain, topic, complexity = self.tags.sample()
+                record = create_record(
+                    tasks=self.tasks,
+                    domain=domain,
+                    topic=topic,
+                    complexity=complexity,
+                    progress_bar=pbar,
+                    code_lang=self.config.code_lang,
+                )
+                synthetic_dataset.append(record)
+                self._save_artifact("synthetic_dataset", synthetic_dataset)
+                pbar.update(1)
+
+        self._save_artifact("config", json.loads(self.config.model_dump_json()))
         logger.info("🥳 Synthetic dataset generation complete!")
-        return pd.DataFrame(synthetic_dataset)
+        return PipelineResults(
+            synthetic_dataset=pd.DataFrame(synthetic_dataset),
+            contextual_tags=self.tags,
+            config=self.config,
+        )
