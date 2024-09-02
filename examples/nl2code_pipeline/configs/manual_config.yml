@@ -28,4 +28,7 @@ complexity_levels:
     - "Intermediate: Control structures, loops, and functions"
     - "Advanced: Object-oriented programming and error handling"
     - "Expert: Asynchronous programming, decorators, and metaclasses"
+
     
+llm_as_a_judge: true
+syntax_validation: true

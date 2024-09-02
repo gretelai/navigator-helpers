@@ -65,6 +65,7 @@ class NL2CodeTaskSuite:
         self.code_lang = CodeLang(code_lang)
         self.llm = GretelLLMSuite(suite_type=suite_type, **kwargs)
         self.prompts = load_prompt_template_suite(self.code_lang.value)
+        self.llm_as_a_judge_prompts = load_prompt_template_suite("llm_as_a_judge")
 
     def validate_code(self, code_string: str) -> str:
         message = getattr(validator, f"validate_{self.code_lang.value}")(
@@ -98,7 +99,7 @@ class NL2CodeTaskSuite:
                     num_topics=num_topics_per_domain, domain=domain
                 )
             )
-            topics[domain] = utils.parse_json_str(response) or []
+            topics[domain] = utils.parse_json_str(response) or {}
         return topics
 
     def generate_levels_of_complexity(self, num_levels: int = 3) -> list[str]:
@@ -247,3 +248,34 @@ class NL2CodeTaskSuite:
         return ContextualTags(
             domain_and_topics=domain_and_topics, complexity_levels=complexity_levels
         )
+
+    def eval_python_with_llm_as_judge(
+        self,
+        natural_language: str,
+        code: str,
+    ) -> dict:
+        prompt = self.llm_as_a_judge_prompts.python_quality_rubric(
+            natural_language=natural_language, code=code
+        )
+        scores = {}
+        response = utils.parse_json_str(self.llm.judge_generate(prompt)) or {}
+        for k, v in response.items():
+            scores[f"{k}_score"] = v["score"]
+            scores[f"{k}_reasoning"] = v["reasoning"]
+        return scores
+
+    def eval_sql_with_llm_as_judge(
+        self,
+        natural_language: str,
+        code: str,
+        sql_context: str,
+    ) -> dict:
+        prompt = self.llm_as_a_judge_prompts.sql_quality_rubric(
+            natural_language=natural_language, sql_context=sql_context, code=code
+        )
+        scores = {}
+        response = utils.parse_json_str(self.llm.judge_generate(prompt)) or {}
+        for k, v in response.items():
+            scores[f"{k}_score"] = v["score"]
+            scores[f"{k}_reasoning"] = v["reasoning"]
+        return scores

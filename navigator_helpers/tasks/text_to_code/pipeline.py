@@ -62,6 +62,8 @@ def create_nl2python_record(
     domain: str,
     topic: str,
     complexity: str,
+    llm_as_a_judge: bool,
+    syntax_validation: bool,
     progress_bar: Optional[tqdm] = None,
 ) -> dict:
     _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('suggest python packages')}")
@@ -78,9 +80,7 @@ def create_nl2python_record(
         complexity,
         ",".join([f" `{dep}`" for dep in suggested_packages]),
     )
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
-    syntax_validation = tasks.validate_code(code)
-    return {
+    record = {
         "uid": uuid.uuid4().hex,
         "domain": domain,
         "topic": topic,
@@ -89,8 +89,18 @@ def create_nl2python_record(
         "full_prompt": prompt,
         "natural_language": natural_language,
         "code": code,
-        "syntax_validation": syntax_validation,
     }
+    if llm_as_a_judge:
+        _update_pbar_desc(
+            progress_bar, f"⏳ {PBAR_TEMPLATE('llm-as-a-judge evaluation')}"
+        )
+        scores = tasks.eval_python_with_llm_as_judge(natural_language, code)
+        record.update(scores)
+    if syntax_validation:
+        _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
+        syntax_validation = tasks.validate_code(code)
+        record["syntax_validation"] = syntax_validation
+    return record
 
 
 def create_nl2sql_record(
@@ -98,9 +108,11 @@ def create_nl2sql_record(
     domain: str,
     topic: str,
     complexity: str,
+    llm_as_a_judge: bool,
+    syntax_validation: bool,
     progress_bar: Optional[tqdm] = None,
 ) -> dict:
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('SQL tables and views')}")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('sql tables and views')}")
     sql_context = tasks.generate_sql_tables_and_views(
         domain, topic, max_statements=np.random.randint(3, 6)
     )
@@ -108,13 +120,11 @@ def create_nl2sql_record(
     natural_language = tasks.generate_sql_natural_language(
         domain, topic, complexity, sql_context
     )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('SQL generation')}")
+    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('sql generation')}")
     prompt, code = tasks.sql_code_generation(
         natural_language, domain, topic, complexity, sql_context
     )
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
-    syntax_validation = tasks.validate_code(code)
-    return {
+    record = {
         "uid": uuid.uuid4().hex,
         "domain": domain,
         "topic": topic,
@@ -123,8 +133,18 @@ def create_nl2sql_record(
         "full_prompt": prompt,
         "natural_language": natural_language,
         "code": code,
-        "syntax_validation": syntax_validation,
     }
+    if llm_as_a_judge:
+        _update_pbar_desc(
+            progress_bar, f"⏳ {PBAR_TEMPLATE('llm-as-a-judge evaluation')}"
+        )
+        scores = tasks.eval_sql_with_llm_as_judge(natural_language, code, sql_context)
+        record.update(scores)
+    if syntax_validation:
+        _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
+        syntax_validation = tasks.validate_code(code)
+        record["syntax_validation"] = syntax_validation
+    return record
 
 
 def create_record(
@@ -132,10 +152,18 @@ def create_record(
     domain: str,
     topic: str,
     complexity: str,
+    llm_as_a_judge: bool,
+    syntax_validation: bool,
     progress_bar: Optional[tqdm] = None,
 ) -> dict:
     return globals()[f"create_nl2{tasks.code_lang.value}_record"](
-        tasks, domain, topic, complexity, progress_bar
+        tasks=tasks,
+        domain=domain,
+        topic=topic,
+        complexity=complexity,
+        llm_as_a_judge=llm_as_a_judge,
+        syntax_validation=syntax_validation,
+        progress_bar=progress_bar,
     )
 
 
@@ -210,6 +238,8 @@ class NL2CodePipeline:
                     domain=domain,
                     topic=topic,
                     complexity=complexity,
+                    llm_as_a_judge=self.config.llm_as_a_judge,
+                    syntax_validation=self.config.syntax_validation,
                     progress_bar=pbar,
                 )
                 synthetic_dataset.append(record)

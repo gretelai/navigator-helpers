@@ -1,7 +1,20 @@
 from copy import deepcopy
+from enum import Enum
 from string import Formatter
 
-from navigator_helpers.tasks.prompt_templates.text_to_code import nl2code_template_dicts
+from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
+    llm_as_a_judge_template_dict,
+)
+from navigator_helpers.tasks.prompt_templates.text_to_code import (
+    nl2python_template_dict,
+    nl2sql_template_dict,
+)
+
+
+class TemplateType(str, Enum):
+    SQL = "sql"
+    PYTHON = "python"
+    LLM_AS_A_JUDGE = "llm_as_a_judge"
 
 
 class PromptTemplateSuite:
@@ -30,5 +43,12 @@ class PromptTemplateSuite:
         return r + "\n)"
 
 
-def load_prompt_template_suite(which: str) -> PromptTemplateSuite:
-    return PromptTemplateSuite(deepcopy(nl2code_template_dicts[which]))
+TEMPLATE_DICT = {
+    "llm_as_a_judge": llm_as_a_judge_template_dict,
+    "python": nl2python_template_dict,
+    "sql": nl2sql_template_dict,
+}
+
+
+def load_prompt_template_suite(which: TemplateType) -> PromptTemplateSuite:
+    return PromptTemplateSuite(deepcopy(TEMPLATE_DICT[TemplateType(which).value]))
