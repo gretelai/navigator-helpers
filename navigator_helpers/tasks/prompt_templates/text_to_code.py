@@ -1,3 +1,17 @@
+PYTHON_NL_TASK_LIST = [
+    "a natural language prompt that describes a Python coding task",
+    "a natural language description of Python code",
+    "an instruction to write Python code",
+    "a request to solve a problem using Python code",
+]
+SQL_NL_TASK_LIST = [
+    "a natural language prompt that describes an SQL query",
+    "a question that can be answered with an SQL query",
+    "an instruction to write an SQL query",
+    "a request to solve a problem using an SQL query",
+]
+
+
 nl2python_template_dict = dict(
     domains="""\
 Create a list of {num_domains} unique industries where you expect to find software engineers who code in Python. 
@@ -28,7 +42,7 @@ Come up with a list of {num_levels} complexity levels for software in the Python
     '"Advanced: Object-oriented programming and error handling"]'
 """,
     python_natural_language="""\
-Generate a natural language prompt that describes a Python coding task.
+Generate {nl_task_description}.
 
 ### Instructions:
     * Use a code complexity of "{complexity}".
@@ -101,8 +115,7 @@ Come up with a list of {num_levels} SQL techniques/concepts of increasing comple
 with partitioning and ordering"]'
 """,
     sql_natural_language="""\
-Generate a natural language prompt that describes an SQL query. Base your prompt the following 
-CREATE statements for tables and/or views:
+Generate {nl_task_description}. Base your prompt the following CREATE statements for tables and/or views:
 
 ### CREATE statements:
 {sql_context}

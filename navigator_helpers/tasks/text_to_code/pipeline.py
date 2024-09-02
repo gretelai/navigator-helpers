@@ -133,6 +133,7 @@ class NL2CodePipeline:
                 synthetic_dataset.append(record)
                 self._save_artifact("synthetic_dataset", synthetic_dataset)
                 pbar.update(1)
+            # HACK: The progress bar doesn't end with a newline in Colab.
             if IN_COLAB and not disable_progress_bar:
                 pbar.write("")
 
@@ -140,8 +141,8 @@ class NL2CodePipeline:
 
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
-
         logger.info("🥳 Synthetic dataset generation complete!")
+
         return PipelineResults(
             dataframe=pd.DataFrame(synthetic_dataset),
             contextual_tags=self.contextual_tags,

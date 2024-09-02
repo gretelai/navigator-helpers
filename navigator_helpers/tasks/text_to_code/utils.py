@@ -69,6 +69,7 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
 
     if "relevance_score" in record:
         table = Table(
+            title="Evaluation",
             caption="Scoring is from 0-4, with 4 being the highest score.",
             caption_justify="left",
         )
@@ -82,6 +83,8 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
     if "syntax_validation" in record:
         if table is None:
             table = Table()
+        else:
+            table.title = "Evaluation and Syntax Validation"
         table.add_column("Syntax Validation", justify="right")
         row.append("PASSED" if record.syntax_validation == "passed" else "FAILED")
 

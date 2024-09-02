@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import re
 import uuid
 
@@ -14,6 +15,10 @@ from tqdm import tqdm
 from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
+from navigator_helpers.tasks.prompt_templates.text_to_code import (
+    PYTHON_NL_TASK_LIST,
+    SQL_NL_TASK_LIST,
+)
 from navigator_helpers.tasks.text_to_code import utils
 from navigator_helpers.tasks.text_to_code.contextual_tags import ContextualTags
 from navigator_helpers.tasks.text_to_code.llm_suite import GretelLLMSuite, LLMSuiteType
@@ -148,6 +153,7 @@ class NL2CodeTaskSuite:
     ) -> str:
         response = self.llm.nl_generate(
             self.prompts.sql_natural_language(
+                nl_task_description=random.choice(SQL_NL_TASK_LIST),
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
@@ -161,7 +167,10 @@ class NL2CodeTaskSuite:
     ) -> str:
         response = self.llm.nl_generate(
             self.prompts.python_natural_language(
-                domain=domain, topic=topic, complexity=complexity
+                nl_task_description=random.choice(PYTHON_NL_TASK_LIST),
+                domain=domain,
+                topic=topic,
+                complexity=complexity,
             )
         )
         return response.strip('"')
