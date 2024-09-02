@@ -1,3 +1,14 @@
+try:
+    import warnings
+
+    import google.colab
+
+    IN_COLAB = True
+    warnings.simplefilter(action="ignore", category=FutureWarning)
+
+except ImportError:
+    IN_COLAB = False
+
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
 from .evolutionary_strategies import get_prebuilt_evolutionary_strategies

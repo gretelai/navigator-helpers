@@ -12,8 +12,8 @@ from gretel_client.inference_api.tabular import PROGRESS_BAR_FORMAT
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+from navigator_helpers import IN_COLAB
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
-from navigator_helpers.tasks.text_to_code import IN_COLAB
 from navigator_helpers.tasks.text_to_code.config import (
     ConfigLike,
     NL2CodeManualConfig,
