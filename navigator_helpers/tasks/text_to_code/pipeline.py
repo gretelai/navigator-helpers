@@ -8,7 +8,9 @@ from typing import Optional
 
 import pandas as pd
 
+from gretel_client.inference_api.tabular import PROGRESS_BAR_FORMAT
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.text_to_code.config import (
@@ -109,7 +111,14 @@ class NL2CodePipeline:
 
         synthetic_dataset = []
 
-        with tqdm(total=num_samples, disable=disable_progress_bar) as pbar:
+        pbar = tqdm(
+            total=num_samples,
+            disable=disable_progress_bar,
+            unit="sample",
+            bar_format=PROGRESS_BAR_FORMAT,
+        )
+
+        with logging_redirect_tqdm():
             for _ in range(num_samples):
                 domain, topic, complexity = self.contextual_tags.sample()
                 record = self.tasks.create_record(
@@ -123,6 +132,8 @@ class NL2CodePipeline:
                 synthetic_dataset.append(record)
                 self._save_artifact("synthetic_dataset", synthetic_dataset)
                 pbar.update(1)
+
+        pbar.close()
 
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
