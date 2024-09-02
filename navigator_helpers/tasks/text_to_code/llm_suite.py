@@ -37,7 +37,7 @@ class GretelLLMSuite:
         suite_config: Optional[dict] = None,
         **session_kwargs,
     ):
-        endpoint = session_kwargs.get("endpoint", DEV_ENDPOINT)
+        endpoint = session_kwargs.pop("endpoint", DEV_ENDPOINT)
         if endpoint != DEV_ENDPOINT:
             raise ValueError("Only the dev endpoint is currently supported")
 
