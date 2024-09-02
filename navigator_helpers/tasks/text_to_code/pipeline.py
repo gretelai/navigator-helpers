@@ -134,7 +134,7 @@ class NL2CodePipeline:
                 self._save_artifact("synthetic_dataset", synthetic_dataset)
                 pbar.update(1)
             if IN_COLAB and not disable_progress_bar:
-                pbar.write("\n")
+                pbar.write("")
 
         pbar.close()
 
