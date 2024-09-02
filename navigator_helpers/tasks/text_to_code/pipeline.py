@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-import uuid
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
@@ -18,13 +16,10 @@ from navigator_helpers.tasks.text_to_code.config import (
     NL2CodeManualConfig,
     smart_load_pipeline_config,
 )
-from navigator_helpers.tasks.text_to_code.task_suite import (
-    ContextualTags,
-    NL2CodeTaskSuite,
-)
+from navigator_helpers.tasks.text_to_code.contextual_tags import ContextualTags
+from navigator_helpers.tasks.text_to_code.task_suite import NL2CodeTaskSuite
 from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
-PBAR_TEMPLATE = "Running Pipeline [current task: {}]".format
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
@@ -51,122 +46,6 @@ class PipelineResults:
             json.dump(json.loads(self.config.model_dump_json()), f)
 
 
-def _update_pbar_desc(pbar: tqdm, desc: str):
-    if pbar is not None:
-        pbar.set_description(desc)
-        pbar.refresh()
-
-
-def create_nl2python_record(
-    tasks: NL2CodeTaskSuite,
-    domain: str,
-    topic: str,
-    complexity: str,
-    llm_as_a_judge: bool,
-    syntax_validation: bool,
-    progress_bar: Optional[tqdm] = None,
-) -> dict:
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('suggest python packages')}")
-    suggested_packages = tasks.generate_suggested_python_packages(
-        domain, topic, max_dependencies=np.random.randint(5, 8)
-    )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}")
-    natural_language = tasks.generate_python_natural_language(domain, topic, complexity)
-    _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('python code generation')}")
-    prompt, code = tasks.python_code_generation(
-        natural_language,
-        domain,
-        topic,
-        complexity,
-        ",".join([f" `{dep}`" for dep in suggested_packages]),
-    )
-    record = {
-        "uid": uuid.uuid4().hex,
-        "domain": domain,
-        "topic": topic,
-        "complexity": complexity,
-        "suggested_packages": suggested_packages,
-        "full_prompt": prompt,
-        "natural_language": natural_language,
-        "code": code,
-    }
-    if llm_as_a_judge:
-        _update_pbar_desc(
-            progress_bar, f"⏳ {PBAR_TEMPLATE('llm-as-a-judge evaluation')}"
-        )
-        scores = tasks.eval_python_with_llm_as_judge(natural_language, code)
-        record.update(scores)
-    if syntax_validation:
-        _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
-        syntax_validation = tasks.validate_code(code)
-        record["syntax_validation"] = syntax_validation
-    return record
-
-
-def create_nl2sql_record(
-    tasks: NL2CodeTaskSuite,
-    domain: str,
-    topic: str,
-    complexity: str,
-    llm_as_a_judge: bool,
-    syntax_validation: bool,
-    progress_bar: Optional[tqdm] = None,
-) -> dict:
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('sql tables and views')}")
-    sql_context = tasks.generate_sql_tables_and_views(
-        domain, topic, max_statements=np.random.randint(3, 6)
-    )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}")
-    natural_language = tasks.generate_sql_natural_language(
-        domain, topic, complexity, sql_context
-    )
-    _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('sql generation')}")
-    prompt, code = tasks.sql_code_generation(
-        natural_language, domain, topic, complexity, sql_context
-    )
-    record = {
-        "uid": uuid.uuid4().hex,
-        "domain": domain,
-        "topic": topic,
-        "complexity": complexity,
-        "sql_context": sql_context,
-        "full_prompt": prompt,
-        "natural_language": natural_language,
-        "code": code,
-    }
-    if llm_as_a_judge:
-        _update_pbar_desc(
-            progress_bar, f"⏳ {PBAR_TEMPLATE('llm-as-a-judge evaluation')}"
-        )
-        scores = tasks.eval_sql_with_llm_as_judge(natural_language, code, sql_context)
-        record.update(scores)
-    if syntax_validation:
-        _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
-        syntax_validation = tasks.validate_code(code)
-        record["syntax_validation"] = syntax_validation
-    return record
-
-
-def create_record(
-    tasks: NL2CodeTaskSuite,
-    domain: str,
-    topic: str,
-    complexity: str,
-    llm_as_a_judge: bool,
-    syntax_validation: bool,
-    progress_bar: Optional[tqdm] = None,
-) -> dict:
-    return globals()[f"create_nl2{tasks.code_lang.value}_record"](
-        tasks=tasks,
-        domain=domain,
-        topic=topic,
-        complexity=complexity,
-        llm_as_a_judge=llm_as_a_judge,
-        syntax_validation=syntax_validation,
-        progress_bar=progress_bar,
-    )
-
-
 class NL2CodePipeline:
 
     def __init__(self, config: ConfigLike, **session_kwargs):
@@ -182,13 +61,12 @@ class NL2CodePipeline:
         if self.config.artifact_path is not None:
             logger.info(f"📦 Artifact path: {self.config.artifact_path}")
         if isinstance(self.config, NL2CodeManualConfig):
-            logger.info("🏷️ Loading contextual tags from config")
-            self.contextual_tags = ContextualTags(
-                domain_and_topics=self.config.domain_and_topics,
-                complexity_levels=self.config.complexity_levels,
+            self.set_contextual_tags(
+                ContextualTags(
+                    domain_and_topics=self.config.domain_and_topics,
+                    complexity_levels=self.config.complexity_levels,
+                )
             )
-        self.topics: Optional[ContextualTags] = None
-        self.complexity_levels: Optional[list[str]] = None
 
     def _save_artifact(self, name: str, artifact: dict | list[dict]):
         if self.config.artifact_path is not None:
@@ -208,8 +86,9 @@ class NL2CodePipeline:
         )
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
+        logger.info("🏷️ Manually setting contextual tags")
         if isinstance(tags, dict):
-            self.contextual_tags = ContextualTags(**tags)
+            self.contextual_tags = ContextualTags.model_validate(tags)
         elif isinstance(tags, ContextualTags):
             self.contextual_tags = tags
         else:
@@ -233,8 +112,7 @@ class NL2CodePipeline:
         with tqdm(total=num_samples, disable=disable_progress_bar) as pbar:
             for _ in range(num_samples):
                 domain, topic, complexity = self.contextual_tags.sample()
-                record = create_record(
-                    tasks=self.tasks,
+                record = self.tasks.create_record(
                     domain=domain,
                     topic=topic,
                     complexity=complexity,

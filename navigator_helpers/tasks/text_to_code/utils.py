@@ -1,5 +1,7 @@
 import json
 
+from numbers import Number
+
 import json_repair
 
 from rich.console import Console
@@ -62,13 +64,30 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
     )
     console.print(panel)
 
-    if "syntax_validation" in record:
-        console.print(
-            Text(
-                f"Syntax Validation: {'✅' if record.syntax_validation == 'passed' else '❌'}",
-            ),
-            justify="right",
+    row = []
+    table = None
+
+    if "relevance_score" in record:
+        table = Table(
+            caption="Scoring is from 0-4, with 4 being the highest score.",
+            caption_justify="left",
         )
+        for col in [c for c in record.keys() if c.endswith("_score")]:
+            table.add_column(col.replace("_score", " Score").title(), justify="right")
+            if isinstance(getattr(record, col), Number):
+                row.append(getattr(record, col).astype(str))
+            else:
+                row.append("null")
+
+    if "syntax_validation" in record:
+        if table is None:
+            table = Table()
+        table.add_column("Syntax Validation", justify="right")
+        row.append("PASSED" if record.syntax_validation == "passed" else "FAILED")
+
+    if table is not None:
+        table.add_row(*row)
+        console.print(table)
 
 
 def parse_json_str(json_str):
