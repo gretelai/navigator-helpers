@@ -133,14 +133,15 @@ class NL2CodePipeline:
                 synthetic_dataset.append(record)
                 self._save_artifact("synthetic_dataset", synthetic_dataset)
                 pbar.update(1)
+            if IN_COLAB and not disable_progress_bar:
+                pbar.write("\n")
 
         pbar.close()
 
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
 
-        newline = "\n" if IN_COLAB else ""
-        logger.info(f"{newline}🥳 Synthetic dataset generation complete!")
+        logger.info("🥳 Synthetic dataset generation complete!")
         return PipelineResults(
             dataframe=pd.DataFrame(synthetic_dataset),
             contextual_tags=self.contextual_tags,
