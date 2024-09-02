@@ -13,6 +13,7 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
+from navigator_helpers.tasks.text_to_code import IN_COLAB
 from navigator_helpers.tasks.text_to_code.config import (
     ConfigLike,
     NL2CodeManualConfig,
@@ -138,7 +139,8 @@ class NL2CodePipeline:
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
 
-        logger.info("🥳 Synthetic dataset generation complete!")
+        newline = "\n" if IN_COLAB else ""
+        logger.info(f"{newline}🥳 Synthetic dataset generation complete!")
         return PipelineResults(
             dataframe=pd.DataFrame(synthetic_dataset),
             contextual_tags=self.contextual_tags,
