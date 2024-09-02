@@ -69,7 +69,7 @@ class NL2CodeTaskSuite:
 
     def extract_code(self, text: str) -> str:
         code_string = text
-        if m := re.search(r"```(?:python|sql)\n?", text, flags=re.IGNORECASE):
+        if m := re.search(r"```(?:(?:python|sql)\n?)?", text, flags=re.IGNORECASE):
             code_string = text[m.end() : text.rfind("```")]
             if code_string is None or len(code_string) == 0:
                 code_string = ""
