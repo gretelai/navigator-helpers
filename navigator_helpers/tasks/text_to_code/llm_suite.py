@@ -3,9 +3,13 @@ from typing import Optional
 
 from gretel_client import Gretel
 
-from navigator_helpers.logs import get_logger, silence_iapi_initialization_logs
+from navigator_helpers.logs import (
+    get_logger,
+    silence_iapi_initialization_logs,
+    SIMPLE_LOG_FORMAT,
+)
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
 class LLMSuiteType(str, Enum):
@@ -19,7 +23,7 @@ LLM_SUITE_CONFIG = {
     LLMSuiteType.OPEN_LICENSE: {
         "nl": "gretelai/gpt-mixtral-8x-22b",
         "code": "gretelai/gpt-codestral-mamba",
-        "judge": "gretelai/gpt-groq-llama-3-1-70b",
+        "judge": "gretelai/gpt-groq-llama-3-1-8b",
         "generate_kwargs": {
             "nl": {},
             "code": {"max_tokens": 4096},
