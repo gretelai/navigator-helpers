@@ -41,7 +41,7 @@ class GretelLLMSuite:
         if endpoint != DEV_ENDPOINT:
             raise ValueError("Only the dev endpoint is currently supported")
 
-        self.__gretel = Gretel(endpoint=endpoint, **session_kwargs)
+        self._gretel = Gretel(endpoint=endpoint, **session_kwargs)
 
         suite_config = suite_config or LLM_SUITE_CONFIG
         if suite_type not in suite_config:
@@ -55,19 +55,19 @@ class GretelLLMSuite:
             config = suite_config[suite_type]
 
             logger.info(f"📖 Natural language LLM: {config['nl']}")
-            self._nl = self.__gretel.factories.initialize_navigator_api(
+            self._nl = self._gretel.factories.initialize_navigator_api(
                 "natural_language", backend_model=config["nl"]
             )
             self._nl_gen_kwargs = config["generate_kwargs"]["nl"]
 
             logger.info(f"💻 Code LLM: {config['code']}")
-            self._code = self.__gretel.factories.initialize_navigator_api(
+            self._code = self._gretel.factories.initialize_navigator_api(
                 "natural_language", backend_model=config["code"]
             )
             self._code_gen_kwargs = config["generate_kwargs"]["code"]
 
             logger.info(f"⚖️ Judge LLM: {config['judge']}")
-            self._judge = self.__gretel.factories.initialize_navigator_api(
+            self._judge = self._gretel.factories.initialize_navigator_api(
                 "natural_language", backend_model=config["judge"]
             )
             self._judge_gen_kwargs = config["generate_kwargs"]["judge"]
@@ -83,3 +83,15 @@ class GretelLLMSuite:
     def judge_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._judge_gen_kwargs)
         return self._judge.generate(prompt, **kwargs)
+
+    def list_available_models(self) -> list[str]:
+        return self._gretel.factories.get_navigator_model_list("natural_language")
+
+    def set_backend_model(self, llm_type: str, model_name: str):
+        setattr(
+            self,
+            f"_{llm_type}",
+            self._gretel.factories.initialize_navigator_api(
+                "natural_language", backend_model=model_name
+            ),
+        )

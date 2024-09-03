@@ -2,13 +2,13 @@ NL_TYPE_PYTHON = {
     "prompt": "Generate a natural language prompt for a Python coding task.",
     "description": "Write a natural language description of a particular Python program.",
     "instruction": "Produce an instruction that instructs a user to write Python code for a specific task.",
-    "question": "Ask a question about how to solve a problem by writing a Python program.",
+    "question": "Ask a question about how to solve a problem using a Python program.",
 }
 NL_TYPE_SQL = {
     "prompt": "Generate a natural language prompt for an SQL query",
     "description": "Write a natural language description of a particular SQL query.",
     "instruction": "Produce an instruction that instructs a user to write an SQL query.",
-    "question": "Ask question that can be answered with an SQL query.",
+    "question": "Ask a question that can be answered with an SQL query.",
 }
 
 
@@ -45,9 +45,8 @@ Come up with a list of {num_levels} complexity levels for software in the Python
 {nl_type_description}
 
 ### Instructions:
-    * Use a code complexity of "{complexity}".
-    * Imagine the code will be used in the "{domain}" domain.
-    * Write code that might be used in a "{topic}" context.
+    * The response to your {nl_type} should require code of complexity "{complexity}".
+    * Your {nl_type} should be in the "{domain}" domain and pertain to "{topic}".
     * Return only the natural language prompt without any code or other comments.
     
 ### Prompt:
@@ -62,13 +61,13 @@ Come up with a list of {num_levels} complexity levels for software in the Python
     * Include ONLY a SINGLE block of code without any additional text.
 """,
     python_suggested_packages="""\
-Write the contents of the requirements.txt file for a Python packages related to "{topic}" in the "{domain}" domain.
+Write the contents of the requirements.txt file that would be used for a Python project in the "{domain}" domain.
 
 ### Instructions:
     * Include up to {max_dependencies} packages.
     * Do not include package version numbers.
-    * Write ONLY package names, one per line.
-    * Format the package names as they would appear in a requirements.txt file.
+    * Limit the dependencies to packages that are commonly used in the "{domain}" domain.
+    * List only the package names, without any additional text.
 
 ### Example requirements.txt:
 ```
@@ -122,9 +121,8 @@ with partitioning and ordering"]'
 {sql_context}
 
 ### Instructions:
-    * Provide a well-formulated question or command in everyday English, representing a user query to a database.
-    * The response to your prompt should require SQL of complexity "{complexity}".
-    * The prompt should be in the "{domain}" domain and pertain to "{topic}".
+    * The response to your {nl_type} should require SQL of complexity "{complexity}".
+    * Your {nl_type} should be in the "{domain}" domain and pertain to "{topic}".
     * Return only the natural language prompt without any code or other comments.
     
 ### Prompt:
@@ -144,7 +142,7 @@ with partitioning and ordering"]'
     sql_table_and_views="""\
 You are a data and SQL expert in the {domain} domain.
     
-Write SQL statements that create tables and views that already exist in a database
+Write SQL statements that create tables and views that already exist in a database.
 
 ### Instructions
     * Include complete executable SQL table CREATE statements and/or view CREATE statements with capitalized keywords.

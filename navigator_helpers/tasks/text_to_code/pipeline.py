@@ -32,6 +32,15 @@ class PipelineResults:
     contextual_tags: ContextualTags
     config: ConfigLike
 
+    @classmethod
+    def from_artifacts(cls, path: str | Path) -> PipelineResults:
+        path = Path(path)
+        with open(path / "config.json") as f:
+            config = smart_load_pipeline_config(json.load(f))
+        contextual_tags = ContextualTags.from_json(path / "contextual_tags.json")
+        dataframe = pd.read_json(path / "synthetic_dataset.json")
+        return cls(dataframe, contextual_tags, config)
+
     def display_sample(self, index: Optional[int] = None, **kwargs):
         if index is None:
             record = self.dataframe.sample(1).iloc[0]

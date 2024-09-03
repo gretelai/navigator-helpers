@@ -116,7 +116,7 @@ class NL2CodeTaskSuite:
     ) -> list[str]:
         response = self.llm.code_generate(
             self.prompts.python_suggested_packages(
-                domain=domain, topic=topic, max_dependencies=max_dependencies
+                domain=domain, max_dependencies=max_dependencies
             )
         )
         package_list = self.extract_code(response).split("\n")
@@ -149,6 +149,7 @@ class NL2CodeTaskSuite:
         response = self.llm.nl_generate(
             self.prompts.sql_natural_language(
                 nl_type_description=NL_TYPE_SQL[nl_type],
+                nl_type=nl_type,
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
@@ -164,6 +165,7 @@ class NL2CodeTaskSuite:
         response = self.llm.nl_generate(
             self.prompts.python_natural_language(
                 nl_type_description=NL_TYPE_PYTHON[nl_type],
+                nl_type=nl_type,
                 domain=domain,
                 topic=topic,
                 complexity=complexity,

@@ -48,7 +48,7 @@ def display_nl2code_sample(record, theme="dracula", background_color=None):
 
     panel = Panel(
         Text(record.natural_language, justify="left", overflow="fold"),
-        title="Natural Language",
+        title=f"Natural Language {record.nl_type.title()}",
     )
     console.print(panel)
 
