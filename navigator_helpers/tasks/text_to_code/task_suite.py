@@ -16,8 +16,8 @@ from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
 from navigator_helpers.tasks.prompt_templates.text_to_code import (
-    PYTHON_NL_TASK_LIST,
-    SQL_NL_TASK_LIST,
+    NL_TYPE_PYTHON,
+    NL_TYPE_SQL,
 )
 from navigator_helpers.tasks.text_to_code import utils
 from navigator_helpers.tasks.text_to_code.contextual_tags import ContextualTags
@@ -119,13 +119,7 @@ class NL2CodeTaskSuite:
                 domain=domain, topic=topic, max_dependencies=max_dependencies
             )
         )
-        package_list = []
-        if isinstance(response, str):
-            packages = re.search(
-                r"```([ 0-9a-zA-Z_\-]+)```", response.replace("\n", " ")
-            )
-            if packages is not None:
-                package_list = packages.group(1).split()
+        package_list = self.extract_code(response).split("\n")
         if len(package_list) == 0:
             logger.warning("No packages found in response.")
         if len(package_list) > max_dependencies:
@@ -151,29 +145,31 @@ class NL2CodeTaskSuite:
     def generate_sql_natural_language(
         self, domain: str, topic: str, complexity: str, sql_context: str
     ) -> str:
+        nl_type = random.choice(list(NL_TYPE_SQL.keys()))
         response = self.llm.nl_generate(
             self.prompts.sql_natural_language(
-                nl_task_description=random.choice(SQL_NL_TASK_LIST),
+                nl_type_description=NL_TYPE_SQL[nl_type],
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
                 sql_context=sql_context,
             )
         )
-        return response.strip('"')
+        return nl_type, response.strip('"')
 
     def generate_python_natural_language(
         self, domain: str, topic: str, complexity: str
     ) -> str:
+        nl_type = random.choice(list(NL_TYPE_PYTHON.keys()))
         response = self.llm.nl_generate(
             self.prompts.python_natural_language(
-                nl_task_description=random.choice(PYTHON_NL_TASK_LIST),
+                nl_type_description=NL_TYPE_PYTHON[nl_type],
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
             )
         )
-        return response.strip('"')
+        return nl_type, response.strip('"')
 
     def python_code_generation(
         self,
@@ -295,7 +291,7 @@ class NL2CodeTaskSuite:
         _update_pbar_desc(
             progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}"
         )
-        natural_language = self.generate_python_natural_language(
+        nl_type, natural_language = self.generate_python_natural_language(
             domain, topic, complexity
         )
         _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('python code generation')}")
@@ -312,6 +308,7 @@ class NL2CodeTaskSuite:
             "topic": topic,
             "complexity": complexity,
             "suggested_packages": suggested_packages,
+            "nl_type": nl_type,
             "full_prompt": prompt,
             "natural_language": natural_language,
             "code": code,
@@ -344,7 +341,7 @@ class NL2CodeTaskSuite:
         _update_pbar_desc(
             progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}"
         )
-        natural_language = self.generate_sql_natural_language(
+        nl_type, natural_language = self.generate_sql_natural_language(
             domain, topic, complexity, sql_context
         )
         _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('sql generation')}")
@@ -358,6 +355,7 @@ class NL2CodeTaskSuite:
             "complexity": complexity,
             "sql_context": sql_context,
             "full_prompt": prompt,
+            "nl_type": nl_type,
             "natural_language": natural_language,
             "code": code,
         }

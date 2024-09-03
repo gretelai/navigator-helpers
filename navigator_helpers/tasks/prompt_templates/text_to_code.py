@@ -1,15 +1,15 @@
-PYTHON_NL_TASK_LIST = [
-    "a natural language prompt that describes a Python coding task",
-    "a natural language description of Python code",
-    "an instruction to write Python code",
-    "a request to solve a problem using Python code",
-]
-SQL_NL_TASK_LIST = [
-    "a natural language prompt that describes an SQL query",
-    "a question that can be answered with an SQL query",
-    "an instruction to write an SQL query",
-    "a request to solve a problem using an SQL query",
-]
+NL_TYPE_PYTHON = {
+    "prompt": "Generate a natural language prompt for a Python coding task.",
+    "description": "Write a natural language description of a particular Python program.",
+    "instruction": "Produce an instruction that instructs a user to write Python code for a specific task.",
+    "question": "Ask a question about how to solve a problem by writing a Python program.",
+}
+NL_TYPE_SQL = {
+    "prompt": "Generate a natural language prompt for an SQL query",
+    "description": "Write a natural language description of a particular SQL query.",
+    "instruction": "Produce an instruction that instructs a user to write an SQL query.",
+    "question": "Ask question that can be answered with an SQL query.",
+}
 
 
 nl2python_template_dict = dict(
@@ -42,7 +42,7 @@ Come up with a list of {num_levels} complexity levels for software in the Python
     '"Advanced: Object-oriented programming and error handling"]'
 """,
     python_natural_language="""\
-Generate {nl_task_description}.
+{nl_type_description}
 
 ### Instructions:
     * Use a code complexity of "{complexity}".
@@ -62,23 +62,24 @@ Generate {nl_task_description}.
     * Include ONLY a SINGLE block of code without any additional text.
 """,
     python_suggested_packages="""\
-Create the contents of a Python requirements.txt file with dependencies for a "{domain}" project.
+Write the contents of the requirements.txt file for a Python packages related to "{topic}" in the "{domain}" domain.
 
 ### Instructions:
-    * Assume the project is related to "{topic}". 
+    * Include up to {max_dependencies} packages.
     * Do not include package version numbers.
-    * Do not include any comments.
-    * Limit the number of dependencies to the most common ones.
-    * Do not exceed {max_dependencies} dependencies.
-    * Enclose the package names in triple backticks.
+    * Write ONLY package names, one per line.
+    * Format the package names as they would appear in a requirements.txt file.
 
-### Example:
-
+### Example requirements.txt:
 ```
 package1
 package2
 package3
+package4
+package5
 ```
+
+### Output requirements.txt:
 """,
 )
 
@@ -115,7 +116,7 @@ Come up with a list of {num_levels} SQL techniques/concepts of increasing comple
 with partitioning and ordering"]'
 """,
     sql_natural_language="""\
-Generate {nl_task_description}. Base your prompt the following CREATE statements for tables and/or views:
+{nl_type_description} Base your prompt the following CREATE statements for tables and/or views:
 
 ### CREATE statements:
 {sql_context}
@@ -129,7 +130,6 @@ Generate {nl_task_description}. Base your prompt the following CREATE statements
 ### Prompt:
 """,
     sql_code_generation="""\
-### Natural Language Prompt:
 {sql_natural_language}
 
 ### CREATE statements:
