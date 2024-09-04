@@ -1,8 +1,10 @@
 import json
 
 from numbers import Number
+from typing import Optional, Union
 
 import json_repair
+import pandas as pd
 
 from rich.console import Console
 from rich.panel import Panel
@@ -16,7 +18,16 @@ console = Console()
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
-def display_nl2code_sample(record, theme="dracula", background_color=None):
+def display_nl2code_sample(
+    record: Union[dict, pd.Series],
+    theme: str = "dracula",
+    background_color: Optional[str] = None,
+):
+    if isinstance(record, (dict, pd.Series)):
+        record = pd.DataFrame([record]).iloc[0]
+    else:
+        raise ValueError("record must be a dictionary or pandas Series")
+
     table = Table(title="Contextual Tags")
 
     table.add_column("Domain")

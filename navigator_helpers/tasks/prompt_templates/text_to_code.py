@@ -5,7 +5,7 @@ NL_TYPE_PYTHON = {
     "question": "Ask a question about how to solve a problem using a Python program.",
 }
 NL_TYPE_SQL = {
-    "prompt": "Generate a natural language prompt for an SQL query",
+    "prompt": "Generate a natural language prompt for an SQL query.",
     "description": "Write a natural language description of a particular SQL query.",
     "instruction": "Produce an instruction that instructs a user to write an SQL query.",
     "question": "Ask a question that can be answered with an SQL query.",
