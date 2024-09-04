@@ -34,17 +34,21 @@ class EvolDataGenerator:
         self.validators = self._initialize_validators()
         self.evolutionary_strategies = self._initialize_evolution_strategies()
 
+        # Initialize counters for successful and failed generations
+        self.success_count = 0
+        self.fail_count = 0
+
     def _initialize_evolution_strategies(self) -> Dict[str, List[str]]:
         default_strategies = get_prebuilt_evolutionary_strategies()
         return {**default_strategies, **self.custom_evolutionary_strategies}
 
     def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
-        if not field.evolutionary_strategies:
+        if not field.evolution_strategies:
             self.logger.warning(
                 f"No evolution strategies defined for field {field.name}. Skipping evolution."
             )
             return ""
-        category = random.choice(list(field.evolutionary_strategies))
+        category = random.choice(list(field.evolution_strategies))
         return random.choice(self.evolutionary_strategies[category])
 
     def _generate_field_value(
@@ -187,11 +191,11 @@ class EvolDataGenerator:
         prompt = textwrap.dedent(
             f"""Validate if the following content is valid {content_type}:
             {content}
-            If it's valid, return 'Valid'. If not, describe the error."""
+            If it's valid, return 'VALID'. If not, describe the error."""
         )
 
         response = self.llm.generate(prompt, temperature=0.2, max_tokens=100)
-        if response.strip().lower().startswith("valid"):
+        if "VALID" in response:
             return None
         return response.strip()
 
@@ -304,6 +308,11 @@ class EvolDataGenerator:
         results = []
         contexts = self._process_contextual_tags(contextual_tags)
 
+        # Open the output file in write mode to overwrite it each time
+        if output_file:
+            with open(output_file, "w") as f:
+                f.write("")
+
         for i, context in enumerate(contexts):
             self.logger.info(f"Generating record {i+1}/{len(contexts)}")
             self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
@@ -318,25 +327,36 @@ class EvolDataGenerator:
                 )
                 if not is_valid:
                     valid_record = False
+                    self.fail_count += 1 
                     break
                 record[field.name] = field_value
 
             if valid_record:
                 passed_judge, judge_response = self._llm_judge_check(record)
                 if passed_judge:
-                    self._print_record(record)
-                    results.append(record)
+                    # Combine the context and the generated record
+                    merged_record = {**context, **record}
+                    self._print_record(merged_record)
+                    results.append(merged_record)
+
+                    self.success_count += 1
                     if output_file:
-                        self._write_to_output(record, output_file)
+                        self._write_to_output(merged_record, output_file)
                     self.logger.debug(
                         f"Record passed LLM judge check: {judge_response}"
                     )
                 else:
                     self.logger.warning(
-                        f"Record failed LLM judge check and was dropped: {judge_response}"
+                        f"Record failed LLM judge check and was dropped: {judge_response}\n\n{record}\n\n"
                     )
+                    self.fail_count += 1
             else:
                 self.logger.warning("Record failed validation and was dropped")
+
+            # Print the stats after each record generation
+            self.logger.info(
+                f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
+            )
 
         return results
 
