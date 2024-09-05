@@ -73,6 +73,7 @@ class NL2CodePipeline:
         if self.config.artifact_path is not None:
             logger.info(f"📦 Artifact path: {self.config.artifact_path}")
         if isinstance(self.config, NL2CodeManualConfig):
+            logger.info("🏷️ Setting contextual tags from config")
             self.set_contextual_tags(
                 ContextualTags(
                     domain_and_topics=self.config.domain_and_topics,
@@ -91,14 +92,15 @@ class NL2CodePipeline:
                 "Contextual tags are already set. If you want to change them, "
                 "use `set_contextual_tags`."
             )
-        self.contextual_tags = self.tasks.generate_contextual_tags(
-            num_domains=self.config.num_domains,
-            num_topics_per_domain=self.config.num_topics_per_domain,
-            num_complexity_levels=self.config.num_complexity_levels,
+        self.set_contextual_tags(
+            self.tasks.generate_contextual_tags(
+                num_domains=self.config.num_domains,
+                num_topics_per_domain=self.config.num_topics_per_domain,
+                num_complexity_levels=self.config.num_complexity_levels,
+            )
         )
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
-        logger.info("🏷️ Manually setting contextual tags")
         if isinstance(tags, dict):
             self.contextual_tags = ContextualTags.model_validate(tags)
         elif isinstance(tags, ContextualTags):
