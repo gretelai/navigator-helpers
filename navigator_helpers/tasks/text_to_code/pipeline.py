@@ -80,6 +80,7 @@ class NL2CodePipeline:
                     complexity_levels=self.config.complexity_levels,
                 )
             )
+        self._save_artifact("config", json.loads(self.config.model_dump_json()))
 
     def _save_artifact(self, name: str, artifact: dict | list[dict]):
         if self.config.artifact_path is not None:
