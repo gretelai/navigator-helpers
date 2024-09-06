@@ -62,3 +62,5 @@ def is_valid_python_with_mypy(code_str: str) -> Tuple[bool, str]:
             return False, stdout
     else:
         return False, "Failed to run mypy"
+
+# TODO: Add ruff implementation
