@@ -11,7 +11,6 @@ from navigator_helpers.tasks.text_to_code.task_suite import CodeLang
 class PipelineConfig(BaseModel):
     code_lang: CodeLang = CodeLang.PYTHON
     llm_suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE
-    domain_context: Optional[str] = None  # Add this field for specifying contexts like "fintech"
     artifact_path: Optional[Union[str, Path]] = Path("./nl2code-artifacts")
     llm_as_a_judge: bool = True
     syntax_validation: bool = True
@@ -27,6 +26,7 @@ class PipelineConfig(BaseModel):
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"
+
 
 class NL2CodeAutoConfig(PipelineConfig, BaseModel):
     num_domains: int = 10
