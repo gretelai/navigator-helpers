@@ -7,8 +7,10 @@ from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
 )
 from navigator_helpers.tasks.prompt_templates.text_to_code import (
     nl2python_template_dict,
-    nl2python_fintech_template_dict,
     nl2sql_template_dict,
+    nl2python_fintech_template_dict,
+    nl2python_healthcare_template_dict,
+    nl2python_education_template_dict,
 )
 
 
