@@ -132,8 +132,6 @@ class NL2CodePipeline:
             logger.info("🏷️ Generating topics for each domain with missing topics")
         
         for domain in missing_domains:
-            # Log domain-specific topic generation
-            logger.info(f"Generating topics for domain: {domain}")
             domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
                 domain_list=[domain],
                 num_topics_per_domain=self.config.num_topics_per_domain,
