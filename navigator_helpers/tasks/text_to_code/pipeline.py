@@ -103,6 +103,17 @@ class NL2CodePipeline:
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
         if isinstance(tags, dict):
+            # Check if topics or complexity levels are empty and generate them
+            if not tags.get("domain_and_topics") or any(not topics for topics in tags["domain_and_topics"].values()):
+                logger.info("Generating missing topics for domains...")
+                tags["domain_and_topics"] = self._generate_missing_topics(tags["domain_and_topics"])
+            
+            if not tags.get("complexity_levels") or len(tags["complexity_levels"]) == 0:
+                logger.info("Generating missing complexity levels...")
+                tags["complexity_levels"] = self.tasks.generate_levels_of_complexity(
+                    num_levels=self.config.num_complexity_levels
+                )
+
             self.contextual_tags = ContextualTags.model_validate(tags)
         elif isinstance(tags, ContextualTags):
             self.contextual_tags = tags
@@ -112,6 +123,17 @@ class NL2CodePipeline:
                 f"Expected types: [dict, ContextualTags]"
             )
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
+
+    def _generate_missing_topics(self, domain_and_topics):
+        """Generate missing topics for domains that have an empty list."""
+        for domain, topics in domain_and_topics.items():
+            if not topics:
+                logger.info(f"Generating topics for domain: {domain}")
+                domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
+                    domain_list=[domain],
+                    num_topics_per_domain=self.config.num_topics_per_domain,
+                )[domain]
+        return domain_and_topics
 
     def _generate_sample(self, progress_bar):
         """Helper function to generate a single sample."""
