@@ -1,6 +1,7 @@
 from copy import deepcopy
 from enum import Enum
 from string import Formatter
+from typing import Optional
 
 from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
     llm_as_a_judge_template_dict,
