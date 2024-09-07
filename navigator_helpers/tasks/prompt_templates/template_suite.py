@@ -7,6 +7,7 @@ from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
 )
 from navigator_helpers.tasks.prompt_templates.text_to_code import (
     nl2python_template_dict,
+    nl2python_fintech_template_dict,
     nl2sql_template_dict,
 )
 
@@ -46,6 +47,7 @@ class PromptTemplateSuite:
 TEMPLATE_DICT = {
     "llm_as_a_judge": llm_as_a_judge_template_dict,
     "python": nl2python_template_dict,
+    "python[fintech]": nl2python_fintech_template_dict,
     "sql": nl2sql_template_dict,
 }
 
