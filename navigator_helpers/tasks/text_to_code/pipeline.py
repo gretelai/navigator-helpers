@@ -11,6 +11,7 @@ import pandas as pd
 from gretel_client.inference_api.tabular import PROGRESS_BAR_FORMAT
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from navigator_helpers import IN_COLAB
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
@@ -113,7 +114,7 @@ class NL2CodePipeline:
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
 
     def run(
-        self, num_samples: int = 10, disable_progress_bar: bool = False
+        self, num_samples: int = 10, disable_progress_bar: bool = False, max_workers: int = 4
     ) -> PipelineResults:
         logger.info(
             f"🚀 Starting Text-to-{self.config.code_lang.title} synthetic data pipeline"
@@ -123,6 +124,7 @@ class NL2CodePipeline:
 
         synthetic_dataset = []
 
+        # Progress bar setup
         pbar = tqdm(
             total=num_samples,
             disable=disable_progress_bar,
@@ -131,20 +133,20 @@ class NL2CodePipeline:
         )
 
         with logging_redirect_tqdm():
-            for _ in range(num_samples):
-                domain, topic, complexity = self.contextual_tags.sample()
-                record = self.tasks.create_record(
-                    domain=domain,
-                    topic=topic,
-                    complexity=complexity,
-                    llm_as_a_judge=self.config.llm_as_a_judge,
-                    syntax_validation=self.config.syntax_validation,
-                    semantic_validation=self.config.semantic_validation,
-                    progress_bar=pbar,
-                )
-                synthetic_dataset.append(record)
-                self._save_artifact("synthetic_dataset", synthetic_dataset)
-                pbar.update(1)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(self._generate_sample, pbar) for _ in range(num_samples)
+                ]
+                
+                for future in as_completed(futures):
+                    try:
+                        record = future.result()
+                        synthetic_dataset.append(record)
+                        self._save_artifact("synthetic_dataset", synthetic_dataset)
+                    except Exception as exc:
+                        logger.error(f"Error generating sample: {exc}")
+                    pbar.update(1)
+
             # HACK: The progress bar doesn't end with a newline in Colab.
             if IN_COLAB and not disable_progress_bar:
                 pbar.write("")

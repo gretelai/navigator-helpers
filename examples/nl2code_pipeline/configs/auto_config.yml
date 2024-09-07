@@ -7,3 +7,4 @@ num_complexity_levels: 4
 
 llm_as_a_judge: true
 syntax_validation: true
+semantic_validation: true
