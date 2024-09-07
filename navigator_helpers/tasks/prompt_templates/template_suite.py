@@ -68,12 +68,14 @@ def load_prompt_template_suite(which: TemplateType, domain_context: Optional[str
     # Load the base template suite for Python or SQL
     template_suite = deepcopy(TEMPLATE_DICT[TemplateType(which).value])
     
+    logger.info(f"The python domain is {domain_context}.")
+
     # If domain context is provided, check if there's a corresponding template dict
     if which == TemplateType.PYTHON and domain_context in DOMAIN_TEMPLATE_DICTS:
         domain_template_dict = DOMAIN_TEMPLATE_DICTS[domain_context]
         template_suite.update(domain_template_dict)
         logger.info(f"Loaded {domain_context} template for Python.")
     else:
-        logger.info(f"Loaded {which.value} template.")
+        logger.info(f"Loaded {TemplateType(which).value} template.")
     
     return PromptTemplateSuite(template_suite)
