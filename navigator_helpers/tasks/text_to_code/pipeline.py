@@ -113,8 +113,22 @@ class NL2CodePipeline:
             )
         self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
 
+    def _generate_sample(self, progress_bar):
+        """Helper function to generate a single sample."""
+        domain, topic, complexity = self.contextual_tags.sample()
+        record = self.tasks.create_record(
+            domain=domain,
+            topic=topic,
+            complexity=complexity,
+            llm_as_a_judge=self.config.llm_as_a_judge,
+            syntax_validation=self.config.syntax_validation,
+            semantic_validation=self.config.semantic_validation,
+            progress_bar=progress_bar,
+        )
+        return record
+
     def run(
-        self, num_samples: int = 10, disable_progress_bar: bool = False, max_workers: int = 4
+        self, num_samples: int = 10, disable_progress_bar: bool = False, max_workers: int = 1
     ) -> PipelineResults:
         logger.info(
             f"🚀 Starting Text-to-{self.config.code_lang.title} synthetic data pipeline"
