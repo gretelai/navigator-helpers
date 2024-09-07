@@ -51,6 +51,20 @@ TEMPLATE_DICT = {
     "sql": nl2sql_template_dict,
 }
 
+DOMAIN_TEMPLATE_DICTS = {
+    "fintech": nl2python_fintech_template_dict,
+    "healthcare": nl2python_healthcare_template_dict,
+    "education": nl2python_education_template_dict,
+    # Add more domain-specific template dictionaries here
+}
 
-def load_prompt_template_suite(which: TemplateType) -> PromptTemplateSuite:
-    return PromptTemplateSuite(deepcopy(TEMPLATE_DICT[TemplateType(which).value]))
+def load_prompt_template_suite(which: TemplateType, domain_context: Optional[str] = None) -> PromptTemplateSuite:
+    # Load the base template suite for Python or SQL
+    template_suite = deepcopy(TEMPLATE_DICT[TemplateType(which).value])
+    
+    # If domain context is provided, check if there's a corresponding template dict
+    if which == TemplateType.PYTHON and domain_context in DOMAIN_TEMPLATE_DICTS:
+        domain_template_dict = DOMAIN_TEMPLATE_DICTS[domain_context]
+        template_suite.update(domain_template_dict)
+    
+    return PromptTemplateSuite(template_suite)
