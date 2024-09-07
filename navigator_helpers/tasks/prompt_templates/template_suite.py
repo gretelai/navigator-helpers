@@ -1,7 +1,12 @@
+import logging
 from copy import deepcopy
 from enum import Enum
 from string import Formatter
 from typing import Optional
+
+# Set up logging for sqlfluff and adjust its level
+fluff_logger = logging.getLogger("sqlfluff")
+fluff_logger.setLevel(logging.ERROR)
 
 from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
     llm_as_a_judge_template_dict,
@@ -14,12 +19,10 @@ from navigator_helpers.tasks.prompt_templates.text_to_code import (
     nl2python_education_template_dict,
 )
 
-
 class TemplateType(str, Enum):
     SQL = "sql"
     PYTHON = "python"
     LLM_AS_A_JUDGE = "llm_as_a_judge"
-
 
 class PromptTemplateSuite:
     def __init__(self, template_dict):
@@ -46,7 +49,6 @@ class PromptTemplateSuite:
             r += f"\n    {name}: {tuple(self.get_template_keywords(name))}"
         return r + "\n)"
 
-
 TEMPLATE_DICT = {
     "llm_as_a_judge": llm_as_a_judge_template_dict,
     "python": nl2python_template_dict,
@@ -69,5 +71,8 @@ def load_prompt_template_suite(which: TemplateType, domain_context: Optional[str
     if which == TemplateType.PYTHON and domain_context in DOMAIN_TEMPLATE_DICTS:
         domain_template_dict = DOMAIN_TEMPLATE_DICTS[domain_context]
         template_suite.update(domain_template_dict)
+        fluff_logger.info(f"Loaded {domain_context} template for Python.")
+    else:
+        fluff_logger.info(f"Loaded {which.value} template.")
     
     return PromptTemplateSuite(template_suite)
