@@ -125,16 +125,19 @@ class NL2CodePipeline:
     def _generate_missing_topics(self, domain_and_topics):
         """Generate missing topics for domains that have an empty list."""
         
-        # Print this once before iterating through the domains
-        logger.info("🏷️ Checking for missing topics in domains")
-
-        for domain, topics in domain_and_topics.items():
-            if not topics:
-                # Log domain-specific topic generation
-                domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
-                    domain_list=[domain],
-                    num_topics_per_domain=self.config.num_topics_per_domain,
-                )[domain]
+        # Only log once if any domain is missing topics
+        missing_domains = [domain for domain, topics in domain_and_topics.items() if not topics]
+        
+        if missing_domains:
+            logger.info("🏷️ Generating topics for each domain with missing topics")
+        
+        for domain in missing_domains:
+            # Log domain-specific topic generation
+            logger.info(f"Generating topics for domain: {domain}")
+            domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
+                domain_list=[domain],
+                num_topics_per_domain=self.config.num_topics_per_domain,
+            )[domain]
         
         return domain_and_topics
 

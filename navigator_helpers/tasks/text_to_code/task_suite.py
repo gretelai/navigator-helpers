@@ -104,10 +104,7 @@ class NL2CodeTaskSuite:
         self, domain_list: list[str], num_topics_per_domain: int = 5
     ) -> dict[str, list[str]]:
         topics = {}
-        
-        # Print this once before iterating through the domains
-        logger.info("🏷️ Generating topics for each domain")
-        
+
         for domain in domain_list:
             # Log individual domain generation message
             logger.info(f"Generating topics for domain: {domain}")
@@ -118,8 +115,9 @@ class NL2CodeTaskSuite:
                 )
             )
             topics[domain] = utils.parse_json_str(response) or {}
-        
+
         return topics
+
 
     def generate_levels_of_complexity(self, num_levels: int = 3) -> list[str]:
         logger.info(f"🏷️ Generating levels of {self.code_lang.title} complexity")
