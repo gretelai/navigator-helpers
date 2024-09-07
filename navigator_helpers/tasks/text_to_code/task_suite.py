@@ -12,6 +12,12 @@ import numpy as np
 
 from tqdm import tqdm
 
+import tempfile
+from io import StringIO
+from pylint.lint import Run
+from pylint.reporters.text import TextReporter
+
+
 from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
@@ -66,6 +72,19 @@ class NL2CodeTaskSuite:
         )
         message = "passed" if message is None else message
         return message
+
+    def check_semantic_correctness(self, code_string: str) -> float:
+        """Evaluate the code using pylint and return the score."""
+        pylint_output = StringIO()
+        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
+            f.write(code_string)
+            f.flush()
+            pylint_opts = [f.name, "--disable=all", "--enable=C0114,C0115,C0116,W0311,E0401"]
+            reporter = TextReporter(pylint_output)
+            lint_results = Run(pylint_opts, reporter=reporter, exit=False)
+            pylint_output.seek(0)
+            score = lint_results.linter.stats.global_note
+            return score
 
     def extract_code(self, text: str) -> str:
         code_string = text
@@ -282,6 +301,7 @@ class NL2CodeTaskSuite:
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         _update_pbar_desc(
@@ -325,6 +345,10 @@ class NL2CodeTaskSuite:
             _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
             syntax_validation = self.validate_code(code)
             record["syntax_validation"] = syntax_validation
+        if semantic_validation:
+            _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('semantic validation')}")
+            semantic_score = self.check_semantic_correctness(code)  # Call semantic validation
+            record["semantic_validation"] = semantic_score
         return record
 
     def create_nl2sql_record(

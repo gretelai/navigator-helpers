@@ -32,3 +32,4 @@ complexity_levels:
     
 llm_as_a_judge: true
 syntax_validation: true
+semantic_validation: true

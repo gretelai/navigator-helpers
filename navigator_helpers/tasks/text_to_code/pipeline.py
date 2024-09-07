@@ -139,6 +139,7 @@ class NL2CodePipeline:
                     complexity=complexity,
                     llm_as_a_judge=self.config.llm_as_a_judge,
                     syntax_validation=self.config.syntax_validation,
+                    semantic_validation=self.config.semantic_validation,
                     progress_bar=pbar,
                 )
                 synthetic_dataset.append(record)
