@@ -358,6 +358,7 @@ class NL2CodeTaskSuite:
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         _update_pbar_desc(progress_bar, f"⏳ {PBAR_TEMPLATE('sql tables and views')}")
@@ -397,6 +398,11 @@ class NL2CodeTaskSuite:
             _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}")
             syntax_validation = self.validate_code(code)
             record["syntax_validation"] = syntax_validation
+        if semantic_validation:
+            _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('semantic validation')}")
+            semantic_score = self.check_semantic_correctness(code)
+            record["semantic_validation"] = semantic_score
+
         return record
 
     def create_record(
@@ -406,6 +412,7 @@ class NL2CodeTaskSuite:
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         return getattr(self, f"create_nl2{self.code_lang.value}_record")(
@@ -414,5 +421,6 @@ class NL2CodeTaskSuite:
             complexity=complexity,
             llm_as_a_judge=llm_as_a_judge,
             syntax_validation=syntax_validation,
+            semantic_validation=semantic_validation,
             progress_bar=progress_bar,
         )
