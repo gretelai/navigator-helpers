@@ -22,6 +22,8 @@ class TextInference:
         elif system_message is None:
             system_message = DEFAULT_SYSTEM_PROMPT
 
+        field_name = kwargs.get("field_name", "")
+
         params = {
             "temperature": kwargs.get("temperature", 0.8),
             "max_tokens": kwargs.get("max_tokens", 2048),
@@ -41,6 +43,7 @@ class TextInference:
             result = self._remove_excess_newlines(response)
 
         self.logger.info(
+            f"\n{field_name.upper()}:\n"
             f"--------------------------------------------------\n"
             f"'''\n{result}\n'''\n"
         )
