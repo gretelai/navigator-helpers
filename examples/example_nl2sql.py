@@ -22,12 +22,13 @@ def main():
     config = GeneratorConfig(
         api_key="prompt",
         llm_model="gretelai/gpt-auto",
-        num_generations=2,
+        num_generations=1,
         log_level="INFO",
+        use_reflection=True,
     )
 
     model_def = DataModelDefinition(
-        system_message=textwrap.dedent(
+        generation_instructions=textwrap.dedent(
             """You are a seasoned SQL expert specializing in crafting intricate, context-rich queries and explanations. 
         * Use the provided contextual tags as instructions for generation. Reference the provided Context to ensure relevance and appropriate complexity.
         """
@@ -36,9 +37,10 @@ def main():
             DataFieldDefinition(
                 name="sql_context",
                 type="str",
-                description="A single string comprising multiple valid PostgreSQL `CREATE TABLE` statements and a complex schema similar to a production application including multiple tables, separated by semicolons. The schema should be based on the provided Context, particularly the domain and domain_description.",
+                description="An executable SQL query containing multiple valid PostgreSQL CREATE TABLE statements that define a complex schema, resembling a production environment. The schema includes multiple interrelated tables, separated by semicolons, and should be generated without any additional markup. The structure must align with the provided context, especially the specified domain and its description.",
                 validator="sql:postgres",
                 evolution_strategies=["complexity", "improve"],
+                evolution_rate=0.0,
             ),
             DataFieldDefinition(
                 name="prompt",
@@ -46,6 +48,7 @@ def main():
                 description="A detailed, nuanced natural language question related to SQL and databases, based on the provided `sql_context` field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.",
                 validator="A natural language question or command written in English",
                 evolution_strategies=["diversity", "complexity", "improve"],
+                evolution_rate=0.0,
             ),
             DataFieldDefinition(
                 name="sql",
@@ -53,6 +56,7 @@ def main():
                 description="A fully executable SQL query that directly answers the `prompt` using the schema in `sql_context`, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.",
                 validator="sql:postgres",
                 evolution_strategies=["complexity", "improve"],
+                evolution_rate=0.0,
             ),
             DataFieldDefinition(
                 name="sql_explanation",
@@ -60,6 +64,7 @@ def main():
                 description="A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `prompt` and the purpose of each part. Include references to the domain-specific context.",
                 validator="A natural language explanation written in English",
                 evolution_strategies=["simplify", "improve"],
+                evolution_rate=0.0,
             ),
         ],
     )
