@@ -6,6 +6,7 @@ based solely on the provided context.
 """
 
 import textwrap
+from typing import Dict, List
 
 import pandas as pd
 
@@ -16,17 +17,14 @@ from navigator_helpers import (
     GeneratorConfig,
 )
 
+# Constants
+CONTEXT_CSV_URL = "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv"
+NUM_ROWS = 10
+OUTPUT_FILE = "closed_qa_synthetic_data.jsonl"
 
-def main():
-    config = GeneratorConfig(
-        api_key="prompt",
-        llm_model="gretelai/gpt-auto",
-        num_generations=1,
-        log_level="INFO",
-        use_reflection=True,
-    )
-
-    model_def = DataModelDefinition(
+def create_model_definition() -> DataModelDefinition:
+    """Creates and returns the DataModelDefinition for question-answer pairs."""
+    return DataModelDefinition(
         generation_instructions=textwrap.dedent(
             """You are an expert in generating balanced, context-rich questions and comprehensive answers based on given contexts. Your task is to:
             1. Create questions that are specific, clear, and directly related to key points in the given context.
@@ -71,22 +69,42 @@ def main():
         ],
     )
 
-    # Load Wikipedia snippets from Databricks Dolly as contextual tags
-    contextual_tags = pd.read_csv(
-        "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv",
-        nrows=10,
+def load_contextual_tags() -> pd.DataFrame:
+    """Loads Wikipedia snippets from Databricks Dolly as contextual tags."""
+    return pd.read_csv(
+        CONTEXT_CSV_URL,
+        nrows=NUM_ROWS,
         usecols=["context"],
     )
 
+def main():
+    """Main function to generate synthetic closed question-answer pairs."""
+    print("Starting closed question-answer pair generation...")
+
+    # Set up generator configuration
+    config = GeneratorConfig(
+        api_key="prompt",
+        llm_model="gretelai/gpt-auto",
+        num_generations=1,
+        log_level="INFO",
+        use_reflection=True,
+    )
+
+    # Load contextual tags
+    contextual_tags = load_contextual_tags()
+
     # Initialize the SyntheticDataGenerator
-    generator = EvolDataGenerator(config, model_def)
+    generator = EvolDataGenerator(
+        config,
+        create_model_definition(),
+    )
 
     # Generate the data
     synthetic_data = generator.generate_data(
-        contextual_tags, output_file="closed_qa_synthetic_data.jsonl"
+        contextual_tags, output_file=OUTPUT_FILE
     )
-    print("Closed Question/Ansewr data generation complete.")
 
+    print(f"Closed Question/Answer data generation complete. Output saved to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()

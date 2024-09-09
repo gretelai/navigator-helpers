@@ -8,7 +8,6 @@ focusing on grade school math word problems with step-by-step solutions.
 import textwrap
 from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 from navigator_helpers import (
@@ -16,56 +15,14 @@ from navigator_helpers import (
     DataModelDefinition,
     EvolDataGenerator,
     GeneratorConfig,
+    mix_contextual_tags
 )
 
+# Constants
+NUM_TAGS = 100
+OUTPUT_FILE = "gsm8k_synthetic_data.jsonl"
 
-def create_contextual_tags(
-    num_rows: int, *dataframes: List[pd.DataFrame]
-) -> pd.DataFrame:
-    """
-    Creates contextual tags by sampling and combining data from provided dataframes.
-
-    Args:
-        num_rows (int): Number of rows to generate.
-        dataframes (List[pd.DataFrame]): List of pandas dataframes from which to sample.
-
-    Returns:
-        pd.DataFrame: A dataframe containing the generated contextual tags.
-    """
-    total_combinations = np.prod([len(df.drop_duplicates()) for df in dataframes])
-    print(
-        f"Total number of unique combinations possible given contextual tags: {total_combinations}"
-    )
-
-    sampled_dfs = [
-        df.sample(n=num_rows, replace=True).reset_index(drop=True) for df in dataframes
-    ]
-    df_contextual_tags = pd.concat(sampled_dfs, axis=1)
-    df_contextual_tags.insert(0, "id", range(num_rows))
-
-    print(f"Generated contextual tags:\n{df_contextual_tags.head()}")
-    return df_contextual_tags
-
-
-def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
-    """
-    Returns a dictionary of evolutionary strategies to apply to the GSM8K-like dataset.
-
-    Returns:
-        Dict[str, List[str]]: Dictionary of strategies for improving questions and answers.
-    """
-    return {
-        "improve_questions": [
-            "Enhance the problem statement to improve diversity by introducing varied names, contexts, or scenarios, while ensuring it ends with a clear question and includes a question mark.",
-            "Update the problem statement for improved coherence, making sure it logically flows and concludes with a specific question that prompts the solver to find a solution, including a question mark.",
-            "Enhance the problem statement for improved readability, simplifying complex sentences and ensuring it ends with a well-formed question and a question mark.",
-        ],
-        "improve_answers": [
-            "Rewrite the solution to the problem using clear step-by-step reasoning with one line per step, beginning with 'Let's solve this step by step:'. Arithmetic operations in each step must be annotated with <<calculation=result>>, and the final answer must be clearly separated and formatted as '#### (answer)'."
-        ],
-    }
-
-
+# Configuration
 GENERATION_PROMPT = textwrap.dedent(
     """
     You are tasked with generating diverse math problems similar to those in the GSM8K dataset. These problems should span from basic to advanced levels, covering various topics and requiring different levels of reasoning. Use diverse names, ethnicities, locations, and activities.
@@ -118,19 +75,13 @@ GENERATION_PROMPT = textwrap.dedent(
        #### 1450
 
     Remember to vary the complexity and ensure all problems are solvable with the information provided.
-"""
+    """
 )
 
-
-def main():
+def get_contextual_dataframes() -> List[pd.DataFrame]:
     """
-    Main function to generate synthetic GSM8K-like math problems.
+    Returns a list of dataframes used for contextual tags.
     """
-    print("Starting GSM8K-like data generation...")
-
-    NUM_TAGS = 100
-
-    # Define the dataframes for the contextual tags
     df_topics = pd.DataFrame(
         {
             "topic": [
@@ -159,18 +110,6 @@ def main():
     df_contexts = pd.DataFrame(
         {
             "context": [
-                "shopping",
-                "sports",
-                "cooking",
-                "travel",
-                "school",
-                "family",
-                "outdoor activities",
-                "hobbies and crafts",
-                "holidays and celebrations",
-                "animals and nature",
-            ],
-            "context_description": [
                 "Scenarios involving purchases, discounts, allowances, and saving money",
                 "Problems related to scores, team statistics, and basic sports math",
                 "Recipe scaling, ingredient measurements, and cooking times",
@@ -206,17 +145,29 @@ def main():
             ],
         }
     )
+    
+    return [df_difficulties, df_topics, df_contexts, df_student_age_group]
 
-    # Set up generator configuration
-    config = GeneratorConfig(
-        api_key="prompt",
-        llm_model="gretelai/gpt-auto",
-        num_generations=1,
-        log_level="INFO",
-        use_reflection=True,
-    )
+def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
+    """
+    Returns a dictionary of evolutionary strategies to apply to the GSM8K-like dataset.
+    """
+    return {
+        "improve_questions": [
+            "Enhance the problem statement to improve diversity by introducing varied names, contexts, or scenarios, while ensuring it ends with a clear question and includes a question mark.",
+            "Update the problem statement for improved coherence, making sure it logically flows and concludes with a specific question that prompts the solver to find a solution, including a question mark.",
+            "Enhance the problem statement for improved readability, simplifying complex sentences and ensuring it ends with a well-formed question and a question mark.",
+        ],
+        "improve_answers": [
+            "Rewrite the solution to the problem using clear step-by-step reasoning with one line per step, beginning with 'Let's solve this step by step:'. Arithmetic operations in each step must be annotated with <<calculation=result>>, and the final answer must be clearly separated and formatted as '#### (answer)'."
+        ],
+    }
 
-    model_def = DataModelDefinition(
+def create_model_definition() -> DataModelDefinition:
+    """
+    Creates and returns the DataModelDefinition for GSM8K-like problems.
+    """
+    return DataModelDefinition(
         generation_instructions=GENERATION_PROMPT,
         fields=[
             DataFieldDefinition(
@@ -234,34 +185,42 @@ def main():
                 description="Detailed step-by-step solution with explanations, annotated arithmetic operations. Must end with '#### ' followed by the final numeric answer.",
                 evolution_strategies=["improve_answers"],
                 evolution_rate=0.0,
-                store_full_reflection=False,
+                store_full_reflection=True,
             ),
         ],
     )
 
+def main():
+    """
+    Main function to generate synthetic GSM8K-like math problems.
+    """
+    print("Starting GSM8K-like data generation...")
+
     # Create contextual tags
-    contextual_tags = create_contextual_tags(
-        NUM_TAGS,
-        df_difficulties,
-        df_topics,
-        df_contexts,
-        df_student_age_group,
+    contextual_tags = mix_contextual_tags(NUM_TAGS, get_contextual_dataframes())
+
+    # Set up generator configuration
+    config = GeneratorConfig(
+        api_key="prompt",
+        llm_model="gretelai/gpt-auto",
+        num_generations=1,
+        log_level="INFO",
+        use_reflection=True,
     )
 
     # Initialize and run the synthetic data generator
     generator = EvolDataGenerator(
         config,
-        model_def,
+        create_model_definition(),
         custom_evolutionary_strategies=get_gsm8k_evolutionary_strategies(),
     )
 
     synthetic_data = generator.generate_data(
         contextual_tags,
-        output_file="gsm8k_synthetic_data.jsonl",
+        output_file=OUTPUT_FILE,
     )
 
-    print("GSM8K-like problems generation complete.")
-
+    print(f"GSM8K-like problems generation complete. Output saved to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()
