@@ -14,7 +14,59 @@ Gretel Navigator is a compound AI-based system for generating high-quality synth
 
 ## Installation
 
-[... keep existing installation instructions ...]
+# Navigator Helpers 🚀
+
+Gretel Navigator is a compound AI-based system for generating high-quality synthetic data using contextual tags and an evolutionary approach. This method iteratively improves, validates, and evaluates outputs to create synthetic data with greater quality than an underlying LLM could do on its own, and to combat hallucinations in AI-generated content.
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [New Features](#new-features)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+
+## Installation
+
+### Standard Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/gretelai/navigator-helpers.git
+   cd navigator-helpers
+   ```
+
+2. Create a virtual environment and activate it:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Development Setup
+
+For developers, additional setup is required to facilitate ongoing development:
+
+1. Install the package in editable mode:
+   ```bash
+   make pip_install_dev
+   ```
+
+2. Common development tasks are available as `make` commands:
+   - Apply consistent formatting:
+     ```bash
+     make style
+     ```
+   - Run tests:
+     ```bash
+     make test
+     ```
 
 ## Basic Usage
 
