@@ -6,6 +6,7 @@ Gretel Navigator is a compound AI-based system for generating high-quality synth
 
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
+- [Key Features](#key-features)
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
@@ -13,43 +14,7 @@ Gretel Navigator is a compound AI-based system for generating high-quality synth
 
 ## Installation
 
-### Standard Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/gretelai/navigator-helpers.git
-   cd navigator-helpers
-   ```
-
-2. Create a virtual environment and activate it:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Development Setup
-
-For developers, additional setup is required to facilitate ongoing development:
-
-1. Install the package in editable mode:
-   ```bash
-   make pip_install_dev
-   ```
-
-2. Common development tasks are available as `make` commands:
-   - Apply consistent formatting:
-     ```bash
-     make style
-     ```
-   - Run tests:
-     ```bash
-     make test
-     ```
+[... keep existing installation instructions ...]
 
 ## Basic Usage
 
@@ -65,9 +30,10 @@ The data synthesis configuration is created using the `GeneratorConfig` class:
 config = GeneratorConfig(
     api_key="your_api_key",
     llm_model="gretelai/gpt-auto",
-    num_generations=3,
+    num_generations=3,  # Number of evolutionary generations
     evolution_rate=0.5,
     log_level="INFO",
+    use_reflection=True,  # Enable Reflection feature
 )
 ```
 
@@ -85,6 +51,7 @@ model_def = DataModelDefinition(
             description="Field description",
             validator="your_validator",
             evolutionary_strategies=["strategy1", "strategy2"],
+            store_full_reflection=True,  # Enable storing reflection outputs
         ),
         # Add more fields as needed
     ],
@@ -104,7 +71,31 @@ evolved_data = generator.generate_data(
 )
 ```
 
-For more detailed usage, including custom evolutionary strategies and validators, see [ADVANCED_USAGE.md](ADVANCED_USAGE.md).
+## Key Features
+
+1. **Evolutionary Generations**: The `num_generations` parameter in `GeneratorConfig` specifies the number of evolutionary generations to run. Each generation improves upon the previous one.
+
+2. **Contextual Tags**: The number of synthetic records created is determined by the total number of contextual tags provided to the model.
+
+3. **Built-in Evolutionary Strategies**: There are four built-in strategies you can use:
+   - `simplify`: Reduces complexity while maintaining core information
+   - `diversity`: Introduces variations to create more diverse outputs
+   - `complexity`: Increases the sophistication of the content
+   - `improve`: Enhances the quality of the content
+
+4. **Custom Evolutionary Strategies**: You can modify existing strategies or provide your own by passing a `custom_evolutionary_strategies` dictionary to the `EvolDataGenerator`.
+
+5. **Validators**: In the `DataModelDefinition`, you can use existing validators or have the LLM compose one for you (see Advanced Usage for details).
+
+6. **Reflection**: This process allows the AI to analyze and improve its own outputs. In Navigator, reflection is used for any generative process and works in concert with the evolutionary approach. It's particularly effective for:
+   - Reducing hallucinations in generated content
+   - Breaking complex problems down into smaller pieces
+   - Enhancing the overall quality and coherence of outputs
+   - Generating instruction tags for training other LLMs in advanced reasoning
+
+7. **Storing Reflection Outputs**: Set `store_full_reflection=True` in your `DataFieldDefinition` to retain reflection tags (e.g., `<thinking>`, `<output>`) in the generated data. This is a promising approach to teach AI more advanced reasoning capabilities.
+
+For more detailed information on these features, please refer to [ADVANCED_USAGE.md](ADVANCED_USAGE.md).
 
 ## Examples
 
