@@ -1,13 +1,15 @@
-import pandas as pd
 import textwrap
-from typing import List, Dict
+
+from typing import Dict, List
+
+import pandas as pd
 
 from navigator_helpers import (
+    batch_and_write_data,
     DataFieldDefinition,
     DataModelDefinition,
     EvolDataGenerator,
     GeneratorConfig,
-    batch_and_write_data,
     mix_contextual_tags,
 )
 
@@ -15,95 +17,201 @@ from navigator_helpers import (
 NUM_TAGS = 100000  # Total number of synthetic records to generate
 BATCH_SIZE = 20  # Save to disk at this frequency
 
+
 def get_contextual_dataframes() -> List[pd.DataFrame]:
     """Returns a list of dataframes used for contextual tags."""
-    
-    df_sql_complexity = pd.DataFrame({
-        "complexity": ["Moderate", "Complex", "Very Complex", "Expert"],
-        "complexity_description": [
-            "Requires 2-3 SQL operations to solve the problem",
-            "Requires 4-5 SQL operations and intermediate result handling",
-            "Requires 6+ SQL operations, subqueries, and complex logic",
-            "Requires advanced SQL features, recursive queries, or dynamic SQL",
-        ],
-    })
 
-    df_sql_concepts = pd.DataFrame({
-        "concept": [
-            "Multi-table Joins", "Subqueries", "Window Functions", "Common Table Expressions (CTEs)",
-            "Set Operations", "Advanced Aggregations", "Recursive Queries", "Pivoting and Unpivoting",
-            "Date and Time Operations", "String Manipulations", "Conditional Logic", "Data Type Conversions",
-            "Hierarchical Data Queries", "Complex Grouping", "Advanced Filtering", "JSON Operations",
-            "Full-Text Search", "Geospatial Queries", "Temporal Data Handling", "Dynamic SQL Generation",
-        ],
-        "weight": [18, 18, 15, 15, 10, 12, 8, 10, 15, 15, 15, 12, 7, 10, 15, 10, 7, 7, 10, 8],
-    })
+    df_sql_complexity = pd.DataFrame(
+        {
+            "complexity": ["Moderate", "Complex", "Very Complex", "Expert"],
+            "complexity_description": [
+                "Requires 2-3 SQL operations to solve the problem",
+                "Requires 4-5 SQL operations and intermediate result handling",
+                "Requires 6+ SQL operations, subqueries, and complex logic",
+                "Requires advanced SQL features, recursive queries, or dynamic SQL",
+            ],
+        }
+    )
 
-    df_domains = pd.DataFrame({
-        "domain": [
-            "Healthcare", "Finance", "E-commerce", "Retail", "Manufacturing", "Telecommunications",
-            "Insurance", "Education", "Real Estate", "Transportation and Logistics", "Energy and Utilities",
-            "Media and Entertainment", "Government", "Nonprofit", "Agriculture", "Hospitality", "IoT",
-            "Gaming", "Social Media", "Cybersecurity",
-        ],
-        "description": [
-            "Managing patient records, clinical data, and healthcare operations.",
-            "Banking, investment, and financial management systems.",
-            "Online stores, shopping carts, and transaction management.",
-            "Physical stores and supply chain management for retail operations.",
-            "Production processes, inventory, and automation in factories.",
-            "Mobile networks, internet services, and communication technologies.",
-            "Risk assessment, claims, and policy management in insurance.",
-            "Learning management systems and student data in educational institutions.",
-            "Property listings, management, and real estate transactions.",
-            "Managing supply chain, logistics, and transportation systems.",
-            "Power generation, utility management, and resource optimization.",
-            "Content creation, streaming services, and audience engagement.",
-            "Public sector operations, citizen services, and governmental data.",
-            "Charitable organizations and their management of resources and services.",
-            "Farming, livestock, and crop management for agricultural operations.",
-            "Hospital and tourism operations, bookings, and customer service.",
-            "Internet of Things devices and their data management.",
-            "Video game development, player analytics, and real-time processing.",
-            "User-generated content, engagement, and platform management.",
-            "Data security, intrusion detection, and threat monitoring.",
-        ],
-    })
+    df_sql_concepts = pd.DataFrame(
+        {
+            "concept": [
+                "Multi-table Joins",
+                "Subqueries",
+                "Window Functions",
+                "Common Table Expressions (CTEs)",
+                "Set Operations",
+                "Advanced Aggregations",
+                "Recursive Queries",
+                "Pivoting and Unpivoting",
+                "Date and Time Operations",
+                "String Manipulations",
+                "Conditional Logic",
+                "Data Type Conversions",
+                "Hierarchical Data Queries",
+                "Complex Grouping",
+                "Advanced Filtering",
+                "JSON Operations",
+                "Full-Text Search",
+                "Geospatial Queries",
+                "Temporal Data Handling",
+                "Dynamic SQL Generation",
+            ],
+            "weight": [
+                18,
+                18,
+                15,
+                15,
+                10,
+                12,
+                8,
+                10,
+                15,
+                15,
+                15,
+                12,
+                7,
+                10,
+                15,
+                10,
+                7,
+                7,
+                10,
+                8,
+            ],
+        }
+    )
 
-    df_data_structures = pd.DataFrame({
-        "data_structure": [
-            "Relational Tables", "JSON Documents", "XML Documents", "Key-Value Pairs", "Time Series",
-            "Graph Data", "Geospatial Data", "Hierarchical Data", "Document Store", "Column-Oriented",
-        ],
-        "weight": [100, 20, 10, 5, 15, 5, 10, 10, 5, 5],
-    })
+    df_domains = pd.DataFrame(
+        {
+            "domain": [
+                "Healthcare",
+                "Finance",
+                "E-commerce",
+                "Retail",
+                "Manufacturing",
+                "Telecommunications",
+                "Insurance",
+                "Education",
+                "Real Estate",
+                "Transportation and Logistics",
+                "Energy and Utilities",
+                "Media and Entertainment",
+                "Government",
+                "Nonprofit",
+                "Agriculture",
+                "Hospitality",
+                "IoT",
+                "Gaming",
+                "Social Media",
+                "Cybersecurity",
+            ],
+            "description": [
+                "Managing patient records, clinical data, and healthcare operations.",
+                "Banking, investment, and financial management systems.",
+                "Online stores, shopping carts, and transaction management.",
+                "Physical stores and supply chain management for retail operations.",
+                "Production processes, inventory, and automation in factories.",
+                "Mobile networks, internet services, and communication technologies.",
+                "Risk assessment, claims, and policy management in insurance.",
+                "Learning management systems and student data in educational institutions.",
+                "Property listings, management, and real estate transactions.",
+                "Managing supply chain, logistics, and transportation systems.",
+                "Power generation, utility management, and resource optimization.",
+                "Content creation, streaming services, and audience engagement.",
+                "Public sector operations, citizen services, and governmental data.",
+                "Charitable organizations and their management of resources and services.",
+                "Farming, livestock, and crop management for agricultural operations.",
+                "Hospital and tourism operations, bookings, and customer service.",
+                "Internet of Things devices and their data management.",
+                "Video game development, player analytics, and real-time processing.",
+                "User-generated content, engagement, and platform management.",
+                "Data security, intrusion detection, and threat monitoring.",
+            ],
+        }
+    )
 
-    df_data_types = pd.DataFrame({
-        "data_type_combination": [
-            "Integer, Varchar, Date, Timestamp", "Integer, Float, Varchar, Text, Timestamp",
-            "Integer, Decimal, Varchar, Date", "Integer, Varchar, Text, JSON",
-            "Integer, Varchar, Timestamp, UUID", "Integer, Varchar, Date, Boolean",
-            "Integer, Float, Varchar, Geometry", "Integer, Varchar, XML, Timestamp",
-            "Integer, Varchar, JSONB, Array", "Integer, Varchar, Date, Interval",
-            "Integer, Varchar, Decimal, UUID", "Integer, Varchar, JSONB, Boolean",
-            "Integer, Varchar, Date, ENUM", "Integer, Varchar, BLOB, Timestamp",
-        ],
-        "weight": [20, 20, 15, 12, 8, 10, 5, 3, 7, 2, 5, 6, 3, 2],
-    })
+    df_data_structures = pd.DataFrame(
+        {
+            "data_structure": [
+                "Relational Tables",
+                "JSON Documents",
+                "XML Documents",
+                "Key-Value Pairs",
+                "Time Series",
+                "Graph Data",
+                "Geospatial Data",
+                "Hierarchical Data",
+                "Document Store",
+                "Column-Oriented",
+            ],
+            "weight": [100, 20, 10, 5, 15, 5, 10, 10, 5, 5],
+        }
+    )
 
-    df_analysis_types = pd.DataFrame({
-        "analysis_type": [
-            "Trend Analysis", "Cohort Analysis", "Funnel Analysis", "Anomaly Detection",
-            "Predictive Modeling", "Customer Segmentation", "A/B Testing", "Time Series Analysis",
-            "Geospatial Analysis", "Network Analysis", "Sentiment Analysis", "Risk Assessment",
-            "Resource Optimization", "Performance Benchmarking", "Impact Analysis", "Fraud Detection",
-            "Inventory Optimization", "Churn Prediction", "Recommendation Systems", "User Behavior Analysis",
-            "Supply Chain Optimization", "Credit Scoring", "Deep Learning-based Analysis",
-            "Market Segmentation", "Operational Efficiency",
-        ]
-    })
+    df_data_types = pd.DataFrame(
+        {
+            "data_type_combination": [
+                "Integer, Varchar, Date, Timestamp",
+                "Integer, Float, Varchar, Text, Timestamp",
+                "Integer, Decimal, Varchar, Date",
+                "Integer, Varchar, Text, JSON",
+                "Integer, Varchar, Timestamp, UUID",
+                "Integer, Varchar, Date, Boolean",
+                "Integer, Float, Varchar, Geometry",
+                "Integer, Varchar, XML, Timestamp",
+                "Integer, Varchar, JSONB, Array",
+                "Integer, Varchar, Date, Interval",
+                "Integer, Varchar, Decimal, UUID",
+                "Integer, Varchar, JSONB, Boolean",
+                "Integer, Varchar, Date, ENUM",
+                "Integer, Varchar, BLOB, Timestamp",
+            ],
+            "weight": [20, 20, 15, 12, 8, 10, 5, 3, 7, 2, 5, 6, 3, 2],
+        }
+    )
 
-    return [df_sql_complexity, df_sql_concepts, df_domains, df_data_structures, df_data_types, df_analysis_types]
+    df_analysis_types = pd.DataFrame(
+        {
+            "analysis_type": [
+                "Trend Analysis",
+                "Cohort Analysis",
+                "Funnel Analysis",
+                "Anomaly Detection",
+                "Predictive Modeling",
+                "Customer Segmentation",
+                "A/B Testing",
+                "Time Series Analysis",
+                "Geospatial Analysis",
+                "Network Analysis",
+                "Sentiment Analysis",
+                "Risk Assessment",
+                "Resource Optimization",
+                "Performance Benchmarking",
+                "Impact Analysis",
+                "Fraud Detection",
+                "Inventory Optimization",
+                "Churn Prediction",
+                "Recommendation Systems",
+                "User Behavior Analysis",
+                "Supply Chain Optimization",
+                "Credit Scoring",
+                "Deep Learning-based Analysis",
+                "Market Segmentation",
+                "Operational Efficiency",
+            ]
+        }
+    )
+
+    return [
+        df_sql_complexity,
+        df_sql_concepts,
+        df_domains,
+        df_data_structures,
+        df_data_types,
+        df_analysis_types,
+    ]
+
 
 def get_sql_evolutionary_strategies() -> Dict[str, List[str]]:
     """Returns a dictionary of evolutionary strategies for SQL generation."""
@@ -131,6 +239,7 @@ def get_sql_evolutionary_strategies() -> Dict[str, List[str]]:
             "Ensure the explanation is tailored to a domain expert audience, using appropriate industry terminology.",
         ],
     }
+
 
 def create_model_definition() -> DataModelDefinition:
     """Creates and returns the DataModelDefinition for SQL scenarios."""
@@ -178,6 +287,7 @@ def create_model_definition() -> DataModelDefinition:
         ],
     )
 
+
 def main():
     """Main function to generate synthetic SQL scenarios."""
     print("Starting advanced SQL scenario generation...")
@@ -215,6 +325,7 @@ def main():
     )
 
     print("Advanced SQL scenario generation complete.")
+
 
 if __name__ == "__main__":
     main()

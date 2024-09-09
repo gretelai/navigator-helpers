@@ -6,20 +6,24 @@ focusing on grade school math word problems with step-by-step solutions.
 """
 
 import textwrap
+
 from typing import Dict, List
+
 import pandas as pd
+
 from navigator_helpers import (
+    batch_and_write_data,
     DataFieldDefinition,
     DataModelDefinition,
     EvolDataGenerator,
     GeneratorConfig,
     mix_contextual_tags,
-    batch_and_write_data,
 )
 
 # Constants
 NUM_TAGS = 100000
 BATCH_SIZE = 20
+
 
 def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
     """
@@ -41,6 +45,7 @@ def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
         ],
     }
 
+
 def get_contextual_dataframes() -> List[pd.DataFrame]:
     """
     Returns a list of dataframes used for contextual tags.
@@ -48,9 +53,19 @@ def get_contextual_dataframes() -> List[pd.DataFrame]:
     df_topics = pd.DataFrame(
         {
             "topic": [
-                "arithmetic", "fractions", "percentages", "geometry", "algebra",
-                "data interpretation", "ratios", "proportions", "compound interest",
-                "polynomials", "exponential growth/decay", "probability", "optimization",
+                "arithmetic",
+                "fractions",
+                "percentages",
+                "geometry",
+                "algebra",
+                "data interpretation",
+                "ratios",
+                "proportions",
+                "compound interest",
+                "polynomials",
+                "exponential growth/decay",
+                "probability",
+                "optimization",
             ]
         }
     )
@@ -58,8 +73,15 @@ def get_contextual_dataframes() -> List[pd.DataFrame]:
     df_contexts = pd.DataFrame(
         {
             "context": [
-                "shopping", "sports", "cooking", "travel", "school", "family",
-                "outdoor activities", "hobbies and crafts", "holidays and celebrations",
+                "shopping",
+                "sports",
+                "cooking",
+                "travel",
+                "school",
+                "family",
+                "outdoor activities",
+                "hobbies and crafts",
+                "holidays and celebrations",
                 "animals and nature",
             ]
         }
@@ -86,12 +108,24 @@ def get_contextual_dataframes() -> List[pd.DataFrame]:
     diverse_cultures = pd.DataFrame(
         {
             "culture": [
-                "American", "Mexican", "Canadian", "European", "Asian", "African",
+                "American",
+                "Mexican",
+                "Canadian",
+                "European",
+                "Asian",
+                "African",
             ]
         }
     )
 
-    return [df_difficulties, df_topics, df_contexts, df_student_age_group, diverse_cultures]
+    return [
+        df_difficulties,
+        df_topics,
+        df_contexts,
+        df_student_age_group,
+        diverse_cultures,
+    ]
+
 
 def create_model_definition() -> DataModelDefinition:
     """
@@ -166,6 +200,7 @@ def create_model_definition() -> DataModelDefinition:
         ],
     )
 
+
 def main():
     """
     Main function to generate synthetic GSM8K-like math problems.
@@ -196,6 +231,7 @@ def main():
     )
 
     print("Advanced GSM8k scenario generation complete.")
+
 
 if __name__ == "__main__":
     main()

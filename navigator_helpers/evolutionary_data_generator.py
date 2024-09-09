@@ -12,13 +12,13 @@ from gretel_client import Gretel
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
 from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
-from .text_inference import TextInference
 from .prompts import (
-    LLM_JUDGE_PROMPT,
     CONTENT_CORRECTION_PROMPT,
     FIELD_GENERATION_PROMPT,
+    LLM_JUDGE_PROMPT,
     MUTATION_PROMPT,
 )
+from .text_inference import TextInference
 
 MAX_TOKENS = 2048  # Max generation tokens
 

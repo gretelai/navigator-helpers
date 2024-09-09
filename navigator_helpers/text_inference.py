@@ -1,7 +1,9 @@
-import re
 import logging
+import re
+
 from typing import Optional, Tuple
-from .prompts import REFLECTION_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT
+
+from .prompts import DEFAULT_SYSTEM_PROMPT, REFLECTION_SYSTEM_PROMPT
 
 
 class TextInference:
@@ -17,6 +19,7 @@ class TextInference:
         system_message: Optional[str] = None,
         **kwargs,
     ) -> str:
+
         if use_reflection:
             system_message = REFLECTION_SYSTEM_PROMPT
         elif system_message is None:

@@ -5,6 +5,7 @@ and then generates corresponding SQL queries and detailed explanations.
 """
 
 import textwrap
+
 from typing import Dict, List
 
 import pandas as pd
@@ -19,6 +20,7 @@ from navigator_helpers import (
 # Constants
 CONTEXTUAL_TAGS_FILE = "./docs/data/sql_contextual_tags.csv"
 OUTPUT_FILE = "nl2sql_synthetic_data.jsonl"
+
 
 def create_model_definition() -> DataModelDefinition:
     """Creates and returns the DataModelDefinition for NL2SQL tasks."""
@@ -68,9 +70,11 @@ def create_model_definition() -> DataModelDefinition:
         ],
     )
 
+
 def load_contextual_tags() -> pd.DataFrame:
     """Loads contextual tags from a CSV file."""
     return pd.read_csv(CONTEXTUAL_TAGS_FILE)
+
 
 def main():
     """Main function to generate synthetic NL2SQL data."""
@@ -95,11 +99,10 @@ def main():
     )
 
     # Generate the data
-    synthetic_data = generator.generate_data(
-        contextual_tags, output_file=OUTPUT_FILE
-    )
+    synthetic_data = generator.generate_data(contextual_tags, output_file=OUTPUT_FILE)
 
     print(f"NL2SQL data generation complete. Output saved to {OUTPUT_FILE}")
+
 
 if __name__ == "__main__":
     main()

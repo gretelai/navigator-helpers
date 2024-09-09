@@ -6,6 +6,7 @@ based solely on the provided context.
 """
 
 import textwrap
+
 from typing import Dict, List
 
 import pandas as pd
@@ -21,6 +22,7 @@ from navigator_helpers import (
 CONTEXT_CSV_URL = "https://gretel-public-website.s3.us-west-2.amazonaws.com/datasets/llm-training-data/databricks_dolly_instruction_set.csv"
 NUM_ROWS = 10
 OUTPUT_FILE = "closed_qa_synthetic_data.jsonl"
+
 
 def create_model_definition() -> DataModelDefinition:
     """Creates and returns the DataModelDefinition for question-answer pairs."""
@@ -69,6 +71,7 @@ def create_model_definition() -> DataModelDefinition:
         ],
     )
 
+
 def load_contextual_tags() -> pd.DataFrame:
     """Loads Wikipedia snippets from Databricks Dolly as contextual tags."""
     return pd.read_csv(
@@ -76,6 +79,7 @@ def load_contextual_tags() -> pd.DataFrame:
         nrows=NUM_ROWS,
         usecols=["context"],
     )
+
 
 def main():
     """Main function to generate synthetic closed question-answer pairs."""
@@ -100,11 +104,12 @@ def main():
     )
 
     # Generate the data
-    synthetic_data = generator.generate_data(
-        contextual_tags, output_file=OUTPUT_FILE
+    synthetic_data = generator.generate_data(contextual_tags, output_file=OUTPUT_FILE)
+
+    print(
+        f"Closed Question/Answer data generation complete. Output saved to {OUTPUT_FILE}"
     )
 
-    print(f"Closed Question/Answer data generation complete. Output saved to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     main()

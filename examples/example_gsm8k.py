@@ -6,6 +6,7 @@ focusing on grade school math word problems with step-by-step solutions.
 """
 
 import textwrap
+
 from typing import Dict, List
 
 import pandas as pd
@@ -15,7 +16,7 @@ from navigator_helpers import (
     DataModelDefinition,
     EvolDataGenerator,
     GeneratorConfig,
-    mix_contextual_tags
+    mix_contextual_tags,
 )
 
 # Constants
@@ -77,6 +78,7 @@ GENERATION_PROMPT = textwrap.dedent(
     Remember to vary the complexity and ensure all problems are solvable with the information provided.
     """
 )
+
 
 def get_contextual_dataframes() -> List[pd.DataFrame]:
     """
@@ -145,8 +147,9 @@ def get_contextual_dataframes() -> List[pd.DataFrame]:
             ],
         }
     )
-    
+
     return [df_difficulties, df_topics, df_contexts, df_student_age_group]
+
 
 def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
     """
@@ -162,6 +165,7 @@ def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
             "Rewrite the solution to the problem using clear step-by-step reasoning with one line per step, beginning with 'Let's solve this step by step:'. Arithmetic operations in each step must be annotated with <<calculation=result>>, and the final answer must be clearly separated and formatted as '#### (answer)'."
         ],
     }
+
 
 def create_model_definition() -> DataModelDefinition:
     """
@@ -189,6 +193,7 @@ def create_model_definition() -> DataModelDefinition:
             ),
         ],
     )
+
 
 def main():
     """
@@ -221,6 +226,7 @@ def main():
     )
 
     print(f"GSM8K-like problems generation complete. Output saved to {OUTPUT_FILE}")
+
 
 if __name__ == "__main__":
     main()
