@@ -133,17 +133,17 @@ class EvolDataGenerator:
             prompt,
             use_reflection=self.use_reflection,
             return_full_reflection=False,
-            temperature=0.2,
+            temperature=0.1,
             field_name="LLM_JUDGE",
         )
 
-        if "PASS" in response:
-            self.logger.info("LLM judge check: PASS")
-            return True, response.strip()
-        else:
+        if "FAIL" in response:
             self.logger.info("LLM judge check: FAIL")
             self.logger.debug(f"LLM judge failure reason:\n{response.strip()}")
             return False, response.strip()
+        else:
+            self.logger.info("LLM judge check: PASS")
+            return True, response.strip()
 
     def _validate_and_correct_field_value(
         self, value: Any, field: DataFieldDefinition
