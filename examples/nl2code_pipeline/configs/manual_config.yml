@@ -1,0 +1,34 @@
+code_language: python
+llm_suite_type: open_license
+
+
+domain_and_topics: 
+    Astronomy: 
+        - Exoplanets
+        - Life in the Universe
+        - The Solar System
+        - Stellar Evolution
+        - Cosmology
+    Artificial Intelligence: 
+        - Deep Learning
+        - Computer Vision
+        - Natural Language Processing
+        - Large Language Models
+        - Reinforcement Learning
+    Web App Development:
+        - Frontend Development
+        - Backend Development
+        - API Integration
+        - User Experience Design
+        - Database Management
+      
+
+complexity_levels:
+    - "Novice: Basic syntax, variables, and data types"
+    - "Intermediate: Control structures, loops, and functions"
+    - "Advanced: Object-oriented programming and error handling"
+    - "Expert: Asynchronous programming, decorators, and metaclasses"
+
+    
+llm_as_a_judge: true
+syntax_validation: true
