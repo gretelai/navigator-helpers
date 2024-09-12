@@ -32,8 +32,8 @@ LLM_SUITE_CONFIG = {
         },
     }
     LLMSuiteType.OPEN_LICENSE_V1: {
-        "nl": "gretelai/gpt-mixtral-8x-22b",
-        "code": "gretelai/gpt-mixtral-8x-22b",
+        "nl": "gretelai/gpt-llama3-1-8b",
+        "code": "gretelai/gpt-llama3-1-8b",
         "judge": "gretelai/gpt-llama3-1-8b",
         "generate_kwargs": {
             "nl": {},
