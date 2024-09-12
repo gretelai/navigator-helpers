@@ -107,7 +107,7 @@ class NL2CodeTaskSuite:
 
         for domain in domain_list:
             # Log individual domain generation message
-            logger.info(f"Generating topics for domain: {domain}")
+            logger.info(f"🔖 Generating topics for domain: {domain}")
             
             response = self.llm.nl_generate(
                 self.prompts.topics_from_domains(
