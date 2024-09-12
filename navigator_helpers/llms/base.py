@@ -88,6 +88,12 @@ def init_llms(
     # `resolve_keys` modifies the config in place
     resolve_keys(loaded_config, fail_on_error=fail_on_error)
 
+    # litellm will fail loading a config without "api_key", but we don't need it
+    for model in loaded_config:
+        litellm_params = model["litellm_params"]
+        if litellm_params.get("api_key") is None:
+            litellm_params["api_key"] = "not-used-but-required"
+
     return LLMRegistry(loaded_config)
 
 
