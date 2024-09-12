@@ -14,6 +14,7 @@ logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 class LLMSuiteType(str, Enum):
     OPEN_LICENSE = "open_license"
+    OPEN_LICENSE_V1 = "open_license_v1"
 
 
 DEV_ENDPOINT = "https://api-dev.gretel.cloud"
@@ -23,6 +24,16 @@ LLM_SUITE_CONFIG = {
     LLMSuiteType.OPEN_LICENSE: {
         "nl": "gretelai/gpt-mixtral-8x-22b",
         "code": "gretelai/gpt-codestral-mamba",
+        "judge": "gretelai/gpt-llama3-1-8b",
+        "generate_kwargs": {
+            "nl": {},
+            "code": {"max_tokens": 4096},
+            "judge": {"temperature": 0.1, "max_tokens": 2048},
+        },
+    }
+    LLMSuiteType.OPEN_LICENSE_V1: {
+        "nl": "gretelai/gpt-mixtral-8x-22b",
+        "code": "gretelai/gpt-mixtral-8x-22b",
         "judge": "gretelai/gpt-llama3-1-8b",
         "generate_kwargs": {
             "nl": {},
