@@ -1,0 +1,32 @@
+- model_name: gretelai/gpt-mixtral-8x-22b
+  litellm_params:
+    model: openai/gretelai/gpt-mixtral-8x-22b
+    api_key: "NA"
+    base_url: https://llmproxy.dev.gretel.cloud/v1/
+    extra_headers:
+      Authorization: os.environ/GRETEL_DEV_API_KEY
+  tags:
+  - open_license
+  - nl
+
+- model_name: gretelai/gpt-codestral-mamba
+  litellm_params:
+    model: openai/gretelai/gpt-codestral-mamba
+    api_key: "NA"
+    base_url: https://llmproxy.dev.gretel.cloud/v1/
+    extra_headers:
+      Authorization: os.environ/GRETEL_DEV_API_KEY
+  tags:
+  - open_license
+  - code
+
+- model_name: gretelai/gpt-groq-llama-3-1-8b
+  litellm_params:
+    model: openai/gretelai/gpt-groq-llama-3-1-8b
+    api_key: "NA"
+    base_url: https://llmproxy.dev.gretel.cloud/v1/
+    extra_headers:
+      Authorization: os.environ/GRETEL_DEV_API_KEY
+  tags:
+  - open_license
+  - judge

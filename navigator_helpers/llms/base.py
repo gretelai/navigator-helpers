@@ -48,15 +48,18 @@ class LLMRegistry:
     def __init__(self, model_list: list[dict[str, Any]]):
         self._model_list = model_list
 
-    def find_by_tags(self, tags: Union[list[str], set[str]]) -> list[LLMConfig]:
+    def find_by_tags(
+        self, required_tags: Union[list[str], set[str]]
+    ) -> list[LLMConfig]:
         """
-        Get all LLMs that are tagged with any of the provided tags.
+        Get all LLMs that are tagged with all the `required_tags`.
+        LLMConfig will only be returned if it's tagged with ALL the tags.
         """
-        tags = set(tags)
+        required_tags = set(required_tags)
         return [
             LLMConfig(model)
             for model in self._model_list
-            if set(model.get("tags", [])).intersection(tags)
+            if set(model.get("tags", [])).intersection(required_tags) == required_tags
         ]
 
     def filter(self, filters: dict[str, Any]):
