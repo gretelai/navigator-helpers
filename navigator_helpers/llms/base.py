@@ -80,7 +80,7 @@ def init_llms(
 
     elif isinstance(config, str):
         # TODO: check if it's S3 link, so we can fetch from there
-        loaded_config = yaml.safe_load(Path(config).read_text())
+        loaded_config = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
 
     # `resolve_keys` modifies the config in place
     resolve_keys(loaded_config, fail_on_error=fail_on_error)

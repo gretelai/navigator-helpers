@@ -13,6 +13,7 @@ import numpy as np
 from tqdm import tqdm
 
 from navigator_helpers.content_validator import ContentValidator
+from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
 from navigator_helpers.tasks.prompt_templates.text_to_code import (
@@ -51,12 +52,15 @@ class NL2CodeTaskSuite:
 
     def __init__(
         self,
+        llm_registry: LLMRegistry,
         code_lang: CodeLang = CodeLang.PYTHON,
         suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE,
         **kwargs,
     ):
         self.code_lang = CodeLang(code_lang)
-        self.llm = GretelLLMSuite(suite_type=suite_type, **kwargs)
+        self.llm = GretelLLMSuite(
+            suite_type=suite_type, llm_registry=llm_registry, **kwargs
+        )
         self.prompts = load_prompt_template_suite(self.code_lang.value)
         self.llm_as_a_judge_prompts = load_prompt_template_suite("llm_as_a_judge")
 
