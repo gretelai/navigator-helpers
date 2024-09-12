@@ -21,9 +21,9 @@ DEV_ENDPOINT = "https://api-dev.gretel.cloud"
 
 LLM_SUITE_CONFIG = {
     LLMSuiteType.OPEN_LICENSE: {
-        "nl": "gretelai/gpt-llama3-1-8b",
-        "code": "gretelai/gpt-llama3-1-8b",
-        "judge": "gretelai/gpt-llama3-1-8b",
+        "nl": "gretelai/gpt-mixtral-8x-22b",
+        "code": "gretelai/gpt-codestral-mamba",
+        "judge": "gretelai/gpt-groq-llama-3-1-8b",
         "generate_kwargs": {
             "nl": {},
             "code": {"max_tokens": 4096},

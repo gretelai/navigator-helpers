@@ -187,6 +187,7 @@ class NL2CodePipeline:
                         logger.error(f"Error generating sample: {exc}")
                     pbar.update(1)
 
+                pbar.update(1)
             # HACK: The progress bar doesn't end with a newline in Colab.
             if IN_COLAB and not disable_progress_bar:
                 pbar.write("")
