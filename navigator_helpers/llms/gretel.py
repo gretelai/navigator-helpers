@@ -36,10 +36,17 @@ class InferenceAPI(CustomLLM):
         # Gretel Inference currently only supports a single string input, so we need to
         # "flatten" the messages to a single string.
 
-        # NOTE: since this doesn't work the "native" prompt template
-        # (with special tokens, etc.) the performance of this will likely be lower than
-        # using the model directly.
-        inference_input = "\n\n".join(_message_to_str(message) for message in messages)
+        if len(messages) == 1:
+            # Single message - just send the contents
+            inference_input = messages[0]["content"]
+        else:
+            # NOTE: since this doesn't work the "native" prompt template
+            # (with special tokens, etc.) the performance of this will likely be lower than
+            # using the model directly.
+            inference_input = "\n\n".join(
+                _message_to_str(message) for message in messages
+            )
+
         logger.debug(f"Calling Gretel Inference API with payload\n{inference_input}")
 
         response = iapi.generate(inference_input, **generate_params)
@@ -61,6 +68,7 @@ class InferenceAPI(CustomLLM):
         if "api_base" in kwargs:
             # NOTE: endpoint cannot have a trailing slash!
             session_kwargs["endpoint"] = kwargs["api_base"].rstrip("/")
+
         gretel_session = configure_session(**session_kwargs)
 
         return NaturalLanguageInferenceAPI(backend_model, session=gretel_session)
