@@ -1,39 +1,29 @@
 from typing import Any, Dict, List, Optional
-
 from pydantic import BaseModel, Field
-
-from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
+from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 
 
 class DataFieldDefinition(BaseModel):
     """
-    Defines a single field in the data model with attributes for validation, evolution strategies,
-    and reflection options. Fields represent individual components of the synthetic data.
+    Defines a single field in the data model with attributes for validation, evolutionary strategies,
+    and reflection options. Fields represent individual components of the synthetic data model.
 
     Attributes:
         name (str): The name of the field.
-        type (str): The data type of the field (e.g., 'str', 'int').
-        description (str): A brief description of the field's purpose and usage.
-        validator (Optional[str]): An optional validator (e.g., 'sql:postgres') that verifies
-            the content of the field.
-        evolution_strategies (Dict[str, List[str]]): A dictionary where the key is an evolutionary strategy
-            (e.g., "improve", "simplify") and the value is a list of prompts or instructions that define how
-            the field's content should evolve across generations.
-        evolution_rate (float): A value determining how much the field evolves during the
-            evolutionary process. Defaults to 0.0.
-        store_full_reflection (bool): If True, stores the AI's reflection output, which can be
-            useful for analyzing and improving reasoning. Defaults to False.
-        additional_params (Dict[str, Any]): Additional parameters for the field, which can
-            be used for custom configurations.
+        type (str): The data type of the field (e.g., 'str', 'int', etc.).
+        description (str): A brief description of the field's purpose and role.
+        validator (Optional[str]): An optional validator to verify the content of the field (e.g., 'sql:postgres').
+        evolution_strategies (List[str]): A list of evolutionary strategies to apply. Defaults to DEFAULT_EVOLUTION_STRATEGIES.
+        evolution_rate (float): A rate determining how much the field evolves during the evolutionary process.
+        store_full_reflection (bool): If True, the full reflection output for this field will be stored.
+        additional_params (Dict[str, Any]): Any additional parameters specific to the field.
     """
 
     name: str
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: Dict[str, List[str]] = Field(
-        default_factory=get_prebuilt_evolutionary_strategies
-    )
+    evolution_strategies: List[str] = Field(default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES)
     evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
     additional_params: Dict[str, Any] = {}
