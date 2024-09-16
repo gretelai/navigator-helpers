@@ -65,8 +65,8 @@ class EvolDataGenerator:
 
     def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
         """
-        Select a random evolutionary strategy for a given field. If no custom strategies
-        are provided for the field, use the default strategies.
+        Select a random evolutionary strategy for a given field. The field's evolutionary strategies
+        will default to the global DEFAULT_EVOLUTION_STRATEGIES if no custom strategies are provided.
 
         Args:
             field (DataFieldDefinition): The field for which to select a strategy.
@@ -74,7 +74,7 @@ class EvolDataGenerator:
         Returns:
             str: The selected evolutionary strategy.
         """
-        strategies = field.get_evolution_strategies()
+        strategies = field.evolution_strategies
         if not strategies:
             self.logger.warning(
                 f"No evolution strategies defined for field {field.name}. Skipping evolution."
@@ -305,7 +305,7 @@ class EvolDataGenerator:
         self, contextual_tags: Optional[pd.DataFrame]
     ) -> List[Dict[str, Any]]:
         if contextual_tags is None:
-            return [{}]  
+            return [{}]
         return contextual_tags.to_dict("records")
 
     def _create_field_prompt(
