@@ -20,8 +20,6 @@ from .prompts import (
 )
 from .text_inference import TextInference
 
-MAX_TOKENS = 2048  # Max generation tokens
-
 
 class EvolDataGenerator:
     def __init__(
@@ -196,11 +194,7 @@ class EvolDataGenerator:
         field_value = self._generate_field_value(context, field, current_record)
         self.logger.debug(f"Initial value for {field.name}: {field_value}")
 
-        evolution_rate = (
-            field.evolution_rate
-            if field.evolution_rate is not None
-            else self.config.evolution_rate
-        )
+        evolution_rate = field.evolution_rate
 
         for gen in range(self.config.num_generations):
             if random.random() < evolution_rate:
