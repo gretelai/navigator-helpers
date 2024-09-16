@@ -11,9 +11,14 @@ from gretel_client import Gretel
 
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
-from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
-
-MAX_TOKENS = 2048  # Max generation tokens
+from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
+from .prompts import (
+    CONTENT_CORRECTION_PROMPT,
+    FIELD_GENERATION_PROMPT,
+    LLM_JUDGE_PROMPT,
+    MUTATION_PROMPT,
+)
+from .text_inference import TextInference
 
 
 class EvolDataGenerator:
@@ -21,35 +26,61 @@ class EvolDataGenerator:
         self,
         config: GeneratorConfig,
         model_definition: DataModelDefinition,
-        custom_evolutionary_strategies: Optional[Dict[str, List[str]]] = None,
+        custom_evolutionary_strategies: Optional[List[str]] = None,
     ):
         self.config = config
         self.model_definition = model_definition
-        self.custom_evolutionary_strategies = custom_evolutionary_strategies or {}
+        self._setup_logging()
         self.gretel = Gretel(api_key=self.config.api_key)
         self.llm = self.gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=self.config.llm_model
         )
-        self._setup_logging()
+        self.custom_evolutionary_strategies = (
+            list(custom_evolutionary_strategies)
+            if custom_evolutionary_strategies
+            else []
+        )
+        self.text_inference = TextInference(self.llm, self.logger)
+        self.use_reflection = config.use_reflection
         self.validators = self._initialize_validators()
         self.evolutionary_strategies = self._initialize_evolution_strategies()
 
-        # Initialize counters for successful and failed generations
         self.success_count = 0
         self.fail_count = 0
 
-    def _initialize_evolution_strategies(self) -> Dict[str, List[str]]:
-        default_strategies = get_prebuilt_evolutionary_strategies()
-        return {**default_strategies, **self.custom_evolutionary_strategies}
+    def _initialize_evolution_strategies(self) -> List[str]:
+        """
+        Initialize evolutionary strategies by either using the custom strategies provided
+        or falling back to the default strategies.
+
+        Returns:
+            List[str]: The list of evolutionary strategies to use.
+        """
+        if self.custom_evolutionary_strategies:
+            self.logger.info("Using custom evolutionary strategies.")
+            return self.custom_evolutionary_strategies
+        else:
+            self.logger.info("Using default evolutionary strategies.")
+            return DEFAULT_EVOLUTION_STRATEGIES
 
     def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
-        if not field.evolution_strategies:
+        """
+        Select a random evolutionary strategy for a given field. If no custom strategies
+        are provided for the field, use the default strategies.
+
+        Args:
+            field (DataFieldDefinition): The field for which to select a strategy.
+
+        Returns:
+            str: The selected evolutionary strategy.
+        """
+        strategies = field.get_evolution_strategies()
+        if not strategies:
             self.logger.warning(
                 f"No evolution strategies defined for field {field.name}. Skipping evolution."
             )
             return ""
-        category = random.choice(list(field.evolution_strategies))
-        return random.choice(self.evolutionary_strategies[category])
+        return random.choice(strategies)
 
     def _generate_field_value(
         self,
@@ -57,12 +88,128 @@ class EvolDataGenerator:
         field: DataFieldDefinition,
         current_record: Dict[str, Any],
     ) -> Any:
-        prompt = self._create_field_prompt(context, field, current_record)
+        prompt = FIELD_GENERATION_PROMPT.format(
+            generation_instructions=self.model_definition.generation_instructions,
+            context=json.dumps(context, indent=2),
+            current_record=json.dumps(current_record, indent=2),
+            field_name=field.name,
+            field_type=field.type,
+            field_description=field.description,
+        )
         self.logger.debug(f"Prompt for {field.name}:\n{prompt}")
-        response = self.llm.generate(prompt, temperature=0.7, max_tokens=MAX_TOKENS)
-        value = self._parse_field_value(response.strip(), field)
-        self.logger.debug(f"Generated value for {field.name}: {value}")
-        return value
+
+        value = self.text_inference.generate(
+            prompt,
+            use_reflection=self.use_reflection,
+            return_full_reflection=field.store_full_reflection,
+            system_message=(
+                self.model_definition.generation_instructions
+                if not self.use_reflection
+                else None
+            ),
+            temperature=0.8 if self.use_reflection else 0.7,
+            max_tokens=2048,
+            field_name=field.name,
+        )
+
+        parsed_value = self._parse_field_value(value.strip(), field)
+        self.logger.debug(f"Generated value for {field.name}: {parsed_value}")
+        return parsed_value
+
+    def _mutate_field_value(
+        self,
+        value: Any,
+        evolution_strategy: str,
+        field: DataFieldDefinition,
+        context: Dict[str, Any],
+        current_record: Dict[str, Any],
+    ) -> Any:
+        prompt = MUTATION_PROMPT.format(
+            generation_instructions=self.model_definition.generation_instructions,
+            evolution_strategy=evolution_strategy,
+            value=value,
+            field_name=field.name,
+            field_type=field.type,
+            field_description=field.description,
+            context=json.dumps(context, indent=2),
+            current_record=json.dumps(current_record, indent=2),
+        )
+
+        return self.text_inference.generate(
+            prompt,
+            use_reflection=self.use_reflection,
+            return_full_reflection=field.store_full_reflection,
+            temperature=0.8,
+            field_name=field.name,
+        )
+
+    def _llm_judge_check(self, generated_record: Dict[str, Any]) -> Tuple[bool, str]:
+        self.logger.info("Starting LLM judge check...")
+
+        prompt = LLM_JUDGE_PROMPT.format(
+            generated_record=json.dumps(generated_record, indent=2),
+            model_definition=self.model_definition.model_dump_json(indent=2),
+        )
+
+        self.logger.debug(f"LLM judge prompt:\n{prompt}")
+
+        response = self.text_inference.generate(
+            prompt,
+            use_reflection=self.use_reflection,
+            return_full_reflection=False,
+            temperature=0.1,
+            field_name="LLM_JUDGE",
+        )
+
+        if "FAIL" in response:
+            self.logger.info("LLM judge check: FAIL")
+            self.logger.debug(f"LLM judge failure reason:\n{response.strip()}")
+            return False, response.strip()
+        else:
+            self.logger.info("LLM judge check: PASS")
+            return True, response.strip()
+
+    def _validate_and_correct_field_value(
+        self, value: Any, field: DataFieldDefinition
+    ) -> Tuple[Any, bool]:
+        validator = self.validators.get(field.name)
+        if validator:
+            error = validator(value)
+            if error:
+                self.logger.warning(f"Validation error for {field.name}: {error}")
+                corrected_value = self._correct_content(value, field.type, error, field)
+                if corrected_value != value:
+                    if not validator(corrected_value):
+                        self.logger.info(f"Repaired value for {field.name}")
+                        return corrected_value, True
+                    else:
+                        self.logger.info(f"Failed to repair value for {field.name}")
+                        return corrected_value, False
+                else:
+                    self.logger.warning(f"Unable to repair value for {field.name}")
+                    return value, False
+        return value, True
+
+    def _correct_content(
+        self,
+        content: str,
+        content_type: str,
+        error_message: str,
+        field: DataFieldDefinition,
+    ) -> str:
+
+        return self.text_inference.generate(
+            CONTENT_CORRECTION_PROMPT.format(
+                model_definition=self.model_definition.model_dump_json(indent=2),
+                content_type=content_type.upper(),
+                error_message=error_message,
+                content=content,
+            ),
+            use_reflection=self.config.use_reflection,
+            return_full_reflection=field.store_full_reflection,
+            temperature=0.2,
+            field_name="Attempting Correction",
+        )
 
     def _generate_and_evolve_field(
         self,
@@ -73,11 +220,7 @@ class EvolDataGenerator:
         field_value = self._generate_field_value(context, field, current_record)
         self.logger.debug(f"Initial value for {field.name}: {field_value}")
 
-        evolution_rate = (
-            field.evolution_rate
-            if field.evolution_rate is not None
-            else self.config.evolution_rate
-        )
+        evolution_rate = field.evolution_rate
 
         for gen in range(self.config.num_generations):
             if random.random() < evolution_rate:
@@ -102,47 +245,6 @@ class EvolDataGenerator:
                 )
 
         return field_value
-
-    def _mutate_field_value(
-        self,
-        value: Any,
-        evolution_strategy: str,
-        field: DataFieldDefinition,
-        context: Dict[str, Any],
-        current_record: Dict[str, Any],
-    ) -> Any:
-        # Prepare the context from already generated fields
-        context_json = json.dumps(context)
-        current_record_json = json.dumps(current_record, indent=2)
-
-        # Build the evolution prompt
-        evolution_prompt = textwrap.dedent(
-            f"""
-        Apply the following evolution strategy to the given value:
-        Strategy: {evolution_strategy}
-        Current value: {value}
-        Field type: {field.type}
-        Field description: {field.description}
-        Context: {context_json}
-        Current Record (already generated fields): {current_record_json}
-
-        Ensure that the evolved value remains consistent with the fields that have already been generated in the current record.
-        Return only the evolved value.
-        """
-        )
-
-        self.logger.debug(f"evolution prompt for {field.name}:\n{evolution_prompt}")
-
-        # Generate the evolved value
-        evolved_response = self.llm.generate(
-            evolution_prompt, temperature=0.8, max_tokens=MAX_TOKENS
-        )
-
-        # Parse the evolved value
-        evolved_value = self._parse_field_value(evolved_response.strip(), field)
-
-        self.logger.debug(f"evolved value for {field.name}: {evolved_value}")
-        return evolved_value
 
     def _setup_logging(self):
         logging.basicConfig(
@@ -203,7 +305,7 @@ class EvolDataGenerator:
         self, contextual_tags: Optional[pd.DataFrame]
     ) -> List[Dict[str, Any]]:
         if contextual_tags is None:
-            return [{}]  # Return a list with one empty context if no tags provided
+            return [{}]  
         return contextual_tags.to_dict("records")
 
     def _create_field_prompt(
@@ -239,67 +341,6 @@ class EvolDataGenerator:
         # Add more type parsing as needed
         return value
 
-    def _validate_and_correct_field_value(
-        self, value: Any, field: DataFieldDefinition
-    ) -> Tuple[Any, bool]:
-        validator = self.validators.get(field.name)
-        if validator:
-            error = validator(value)
-            if error:
-                self.logger.warning(f"Validation error for {field.name}: {error}")
-                corrected_value = self._correct_content(value, field.type, error)
-                if corrected_value != value:
-                    self.logger.info(f"Repaired value for {field.name}")
-                    return corrected_value, True
-                else:
-                    self.logger.warning(f"Failed to repair value for {field.name}")
-                    return value, False
-        return value, True
-
-    def _correct_content(
-        self, content: str, content_type: str, error_message: str
-    ) -> str:
-        prompt = textwrap.dedent(
-            f"""The following {content_type} content is invalid:
-        Error: {error_message}
-        Please correct it so that it conforms to valid {content_type.upper()} syntax.
-        {content}
-        Return only the corrected version of the provided content, with no additional text, explanations, or formatting."""
-        )
-        response = self.llm.generate(prompt, temperature=0.2, max_tokens=MAX_TOKENS)
-        return response.strip()
-
-    def _llm_judge_check(self, generated_record: Dict[str, Any]) -> Tuple[bool, str]:
-        prompt = textwrap.dedent(
-            f"""
-        As an expert judge, your task is to evaluate the quality and relevance of the following generated record:
-
-        {json.dumps(generated_record, indent=2)}
-
-        Based on the original data model definition:
-
-        {self.model_definition.model_dump_json(indent=2)}
-
-        Evaluate the generated record on the following criteria:
-        1. Adherence to instructions in the system message
-        2. Relevance to the specified fields and their descriptions
-        3. Consistency with the provided context
-        4. Overall quality and coherence
-
-        If the record meets all criteria, respond with "PASS" followed by a brief explanation.
-        If the record fails to meet any criteria, respond with "FAIL" followed by a explanation of why it failed.
-
-        Your response:
-        """
-        )
-
-        response = self.llm.generate(prompt, temperature=0.2, max_tokens=MAX_TOKENS)
-
-        if response.strip().startswith("PASS"):
-            return True, response.strip()
-        else:
-            return False, response.strip()
-
     def generate_data(
         self,
         contextual_tags: Optional[pd.DataFrame] = None,
@@ -327,7 +368,7 @@ class EvolDataGenerator:
                 )
                 if not is_valid:
                     valid_record = False
-                    self.fail_count += 1 
+                    self.fail_count += 1
                     break
                 record[field.name] = field_value
 
