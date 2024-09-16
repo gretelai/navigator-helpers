@@ -1,4 +1,4 @@
-from navigator_helpers.steps.evol_aaa.evol_aaa import (
+from navigator_helpers.tasks.evol_aaa.evol_aaa import (
     AAAConfig,
     AAATextProcessor,
     EvolutionConfig,

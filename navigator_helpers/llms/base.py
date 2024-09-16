@@ -48,15 +48,18 @@ class LLMRegistry:
     def __init__(self, model_list: list[dict[str, Any]]):
         self._model_list = model_list
 
-    def find_by_tags(self, tags: Union[list[str], set[str]]) -> list[LLMConfig]:
+    def find_by_tags(
+        self, required_tags: Union[list[str], set[str]]
+    ) -> list[LLMConfig]:
         """
-        Get all LLMs that are tagged with any of the provided tags.
+        Get all LLMs that are tagged with all the `required_tags`.
+        LLMConfig will only be returned if it's tagged with ALL the tags.
         """
-        tags = set(tags)
+        required_tags = set(required_tags)
         return [
             LLMConfig(model)
             for model in self._model_list
-            if set(model.get("tags", [])).intersection(tags)
+            if set(model.get("tags", [])).intersection(required_tags) == required_tags
         ]
 
     def filter(self, filters: dict[str, Any]):
@@ -80,10 +83,16 @@ def init_llms(
 
     elif isinstance(config, str):
         # TODO: check if it's S3 link, so we can fetch from there
-        loaded_config = yaml.safe_load(Path(config).read_text())
+        loaded_config = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
 
     # `resolve_keys` modifies the config in place
     resolve_keys(loaded_config, fail_on_error=fail_on_error)
+
+    # litellm will fail loading a config without "api_key", but we don't need it
+    for model in loaded_config:
+        litellm_params = model["litellm_params"]
+        if litellm_params.get("api_key") is None:
+            litellm_params["api_key"] = "not-used-but-required"
 
     return LLMRegistry(loaded_config)
 

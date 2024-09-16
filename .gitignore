@@ -174,3 +174,6 @@ cython_debug/
 scratch/
 scratch.py
 scratch.ipynb
+
+# default output directory for nl2code pipeline 
+nl2code-artifacts/
