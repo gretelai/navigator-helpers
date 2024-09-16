@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
+
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 
 
@@ -23,7 +25,9 @@ class DataFieldDefinition(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: List[str] = Field(default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES)
+    evolution_strategies: List[str] = Field(
+        default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES
+    )
     evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
     additional_params: Dict[str, Any] = {}
