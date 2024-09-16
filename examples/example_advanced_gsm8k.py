@@ -25,27 +25,6 @@ NUM_TAGS = 100000
 BATCH_SIZE = 20
 
 
-def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
-    """
-    Returns a dictionary of evolutionary strategies to apply to the GSM8K-like dataset.
-    """
-    return {
-        "improve_questions": [
-            "Rewrite the problem to include an additional step or calculation. For example, if it's a two-step problem, make it a three-step problem.",
-            "Insert a new condition or constraint into the problem statement that affects the solution process.",
-            "Change the context of the problem to incorporate a different mathematical concept while keeping the core question similar.",
-            "Adjust the numerical values in the problem to make the calculations more complex or to involve a different mathematical principle.",
-        ],
-        "improve_answers": [
-            "Rewrite the solution to include a step-by-step breakdown, with each step on a new line and prefaced by a step number.",
-            "Insert <<calculation=result>> annotations for every mathematical operation in the solution. If they already exist, add more detail to the calculations.",
-            "Add an explanation sentence after each calculation step to clarify the reasoning behind the operation.",
-            "Include a 'Therefore...' statement at the end that summarizes how the final answer was derived from the preceding steps.",
-            "Reformat the final answer to ensure it's preceded by '#### ' on a new line at the end of the solution.",
-        ],
-    }
-
-
 def get_contextual_dataframes() -> List[pd.DataFrame]:
     """
     Returns a list of dataframes used for contextual tags.
@@ -186,15 +165,23 @@ def create_model_definition() -> DataModelDefinition:
                 type="str",
                 description="A math problem ranging from basic to advanced, incorporating various topics and real-world contexts. This is a problem for a student, do not include the answer. Must end with a question mark.",
                 validator="A natural language math problem that ends with a question mark",
-                evolution_strategies=["improve_questions"],
-                evolution_rate=0.0,
+                evolution_strategies=[
+                    "Increase the complexity by adding more steps to the problem.",
+                    "Introduce diverse contexts and new mathematical concepts.",
+                    "Enhance the wording for better clarity and engagement.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="answer",
                 type="str",
-                description="Detailed step-by-step solution with explanations. EVERY arithmetic or algebraic operation must be annotated with <<calculation=result>>. Do not repeat the problem statement in the answer. Must end with '#### ' followed by the final numeric answer.",
-                evolution_strategies=["improve_answers"],
-                evolution_rate=0.0,
+                description="Detailed step-by-step solution with explanations. EVERY arithmetic or algebraic operation must be annotated with <<calculation=result>>. Must end with '#### ' followed by the final numeric answer.",
+                evolution_strategies=[
+                    "Refine the solution to improve step-by-step clarity.",
+                    "Add detailed annotations for all key calculations.",
+                    "Simplify the explanation while maintaining accuracy and thoroughness.",
+                ],
+                evolution_rate=0.1,
                 store_full_reflection=True,
             ),
         ],
@@ -220,7 +207,6 @@ def main():
     generator = EvolDataGenerator(
         config,
         create_model_definition(),
-        custom_evolutionary_strategies=get_gsm8k_evolutionary_strategies(),
     )
 
     batch_and_write_data(
@@ -230,7 +216,7 @@ def main():
         file_prefix="advanced_gsm8k",
     )
 
-    print("Advanced GSM8k scenario generation complete.")
+    print("Advanced GSM8K scenario generation complete.")
 
 
 if __name__ == "__main__":

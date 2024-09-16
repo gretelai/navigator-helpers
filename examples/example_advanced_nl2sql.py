@@ -213,34 +213,6 @@ def get_contextual_dataframes() -> List[pd.DataFrame]:
     ]
 
 
-def get_sql_evolutionary_strategies() -> Dict[str, List[str]]:
-    """Returns a dictionary of evolutionary strategies for SQL generation."""
-    return {
-        "improve_context": [
-            "Enhance the schema to include domain-specific tables and data types consistent with the given industry.",
-            "Add relevant indexes, constraints, and views that reflect real-world database designs in the specified domain.",
-            "Ensure all CREATE TABLE statements are properly closed with semicolons and brackets.",
-        ],
-        "improve_prompt": [
-            "Refine the prompt to sound more natural, as if asked by a domain expert seeking insights or solutions.",
-            "Ensure the prompt reflects real-world business needs or analytical questions relevant to the specific industry.",
-            "Incorporate domain-specific terminology and concepts that an expert would use in their day-to-day work.",
-        ],
-        "improve_sql": [
-            "Optimize the SQL solution to efficiently address the specific prompt given the provided schema.",
-            "Incorporate advanced SQL concepts and operations relevant to the domain and data structures.",
-            "Ensure the solution handles large datasets and complex data types efficiently.",
-            "Verify that all brackets and parentheses are properly closed and all statements are properly terminated.",
-        ],
-        "improve_explanation": [
-            "Provide a clear, step-by-step breakdown of how the SQL solution addresses the given prompt.",
-            "Explain the rationale behind specific SQL techniques used, especially in relation to the domain's data structures.",
-            "Discuss any performance considerations or potential optimizations relevant to the solution.",
-            "Ensure the explanation is tailored to a domain expert audience, using appropriate industry terminology.",
-        ],
-    }
-
-
 def create_model_definition() -> DataModelDefinition:
     """Creates and returns the DataModelDefinition for SQL scenarios."""
     return DataModelDefinition(
@@ -258,31 +230,43 @@ def create_model_definition() -> DataModelDefinition:
                 type="str",
                 description="A single string comprising multiple valid PostgreSQL `CREATE TABLE` statements and a complex schema similar to a production application including multiple tables, separated by semicolons. The schema should be based on the provided Context, particularly the domain and domain_description.",
                 validator="sql:postgres",
-                evolution_strategies=["complexity", "improve"],
-                evolution_rate=0.0,
+                evolution_strategies=[
+                    "Enhance the schema to include domain-specific tables and data types.",
+                    "Add relevant indexes, constraints, and views reflecting real-world designs.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="prompt",
                 type="str",
                 description="A detailed, nuanced natural language prompt that a user might ask to a database for a particular task, based on the provided `sql_context` field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.",
-                evolution_strategies=["diversity", "complexity", "improve"],
-                evolution_rate=0.0,
+                validator="A natural language question or command written in English",
+                evolution_strategies=[
+                    "Refine the prompt to sound more natural.",
+                    "Ensure the prompt reflects real-world business needs.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="sql",
                 type="str",
                 description="A fully executable SQL query that directly answers the `prompt` using the schema in `sql_context`, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.",
                 validator="sql:postgres",
-                evolution_strategies=["complexity", "improve"],
-                evolution_rate=0.0,
+                evolution_strategies=[
+                    "Optimize the SQL solution for performance.",
+                    "Ensure the solution handles large datasets efficiently.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="sql_explanation",
                 type="str",
                 description="A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `prompt` and the purpose of each part. Include references to the domain-specific context.",
-                validator="A natural language explanation written in English",
-                evolution_strategies=["simplify", "improve"],
-                evolution_rate=0.0,
+                evolution_strategies=[
+                    "Provide a clear, step-by-step explanation.",
+                    "Explain the rationale behind specific SQL techniques.",
+                ],
+                evolution_rate=0.1,
             ),
         ],
     )
@@ -313,7 +297,6 @@ def main():
     generator = EvolDataGenerator(
         config,
         create_model_definition(),
-        custom_evolutionary_strategies=get_sql_evolutionary_strategies(),
     )
 
     # Generate and write data in batches

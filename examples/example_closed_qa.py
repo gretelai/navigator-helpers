@@ -50,8 +50,12 @@ def create_model_definition() -> DataModelDefinition:
                 4. Be focused and allow for a concise answer if the information permits, or a more detailed response when necessary.
                 5. Encourage critical thinking or analysis of the information in the context.""",
                 validator="Question",
-                evolution_strategies=["complexity", "improve", "diversity", "simplify"],
-                evolution_rate=0.2,
+                evolution_strategies=[
+                    "Increase clarity by refining question phrasing.",
+                    "Enhance relevance by focusing on key context points.",
+                    "Vary complexity to challenge different levels of understanding.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="response",
@@ -65,8 +69,12 @@ def create_model_definition() -> DataModelDefinition:
                 6. Maintain consistency with the question and the original context.
                 7. Avoid introducing information not present in the original context.""",
                 validator="Answer",
-                evolution_strategies=["complexity", "improve", "simplify"],
-                evolution_rate=0.2,
+                evolution_strategies=[
+                    "Refine the response to ensure clarity and accuracy.",
+                    "Enhance explanation depth where necessary to improve understanding.",
+                    "Simplify where appropriate without losing important details.",
+                ],
+                evolution_rate=0.1,
             ),
         ],
     )

@@ -166,7 +166,6 @@ def get_gsm8k_evolutionary_strategies() -> Dict[str, List[str]]:
         ],
     }
 
-
 def create_model_definition() -> DataModelDefinition:
     """
     Creates and returns the DataModelDefinition for GSM8K-like problems.
@@ -179,16 +178,23 @@ def create_model_definition() -> DataModelDefinition:
                 type="str",
                 description="A math problem ranging from basic to advanced, incorporating various topics and real-world contexts. Must end with a question mark.",
                 validator="A natural language math question that ends with a question mark",
-                evolution_strategies=["improve_questions"],
-                evolution_rate=0.0,
-                store_full_reflection=False,
+                evolution_strategies=[
+                    "Improve clarity by refining problem phrasing.",
+                    "Enhance diversity by varying names, contexts, and scenarios.",
+                    "Adjust complexity to match different skill levels, from simple to multi-step problems.",
+                ],
+                evolution_rate=0.1,
             ),
             DataFieldDefinition(
                 name="answer",
                 type="str",
                 description="Detailed step-by-step solution with explanations, annotated arithmetic operations. Must end with '#### ' followed by the final numeric answer.",
-                evolution_strategies=["improve_answers"],
-                evolution_rate=0.0,
+                evolution_strategies=[
+                    "Refine step-by-step reasoning for clarity and readability.",
+                    "Improve annotation detail for calculations, ensuring consistency with the problem statement.",
+                    "Simplify complex steps while maintaining correctness and logical flow.",
+                ],
+                evolution_rate=0.1,
                 store_full_reflection=True,
             ),
         ],
@@ -217,7 +223,6 @@ def main():
     generator = EvolDataGenerator(
         config,
         create_model_definition(),
-        custom_evolutionary_strategies=get_gsm8k_evolutionary_strategies(),
     )
 
     synthetic_data = generator.generate_data(
