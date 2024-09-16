@@ -52,7 +52,7 @@ Ensure the generated value is consistent with the context and current record.
 MUTATION_PROMPT = """
 {generation_instructions}
 
-Apply the following evolution strategy to the given value:
+Apply the following evolution strategy to the given value for the `{field_name}` field:
 Strategy: {evolution_strategy}
 Current value: {value}
 Field type: {field_type}
@@ -61,7 +61,7 @@ Context: {context}
 Current Record (already generated fields): {current_record}
 
 Ensure that the evolved value remains consistent with the fields that have already been generated in the current record.
-Return only the evolved value.
+Return only the evolved value for the `{field_name}` field.
 """
 
 LLM_JUDGE_PROMPT = """
