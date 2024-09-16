@@ -11,7 +11,7 @@ from gretel_client import Gretel
 
 from .content_validator import ContentValidator
 from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
-from .evolutionary_strategies import get_prebuilt_evolutionary_strategies
+from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 from .prompts import (
     CONTENT_CORRECTION_PROMPT,
     FIELD_GENERATION_PROMPT,
@@ -26,15 +26,19 @@ class EvolDataGenerator:
         self,
         config: GeneratorConfig,
         model_definition: DataModelDefinition,
-        custom_evolutionary_strategies: Optional[Dict[str, List[str]]] = None,
+        custom_evolutionary_strategies: Optional[List[str]] = None,
     ):
         self.config = config
         self.model_definition = model_definition
-        self.custom_evolutionary_strategies = custom_evolutionary_strategies or {}
         self._setup_logging()
         self.gretel = Gretel(api_key=self.config.api_key)
         self.llm = self.gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=self.config.llm_model
+        )
+        self.custom_evolutionary_strategies = (
+            list(custom_evolutionary_strategies)
+            if custom_evolutionary_strategies
+            else []
         )
         self.text_inference = TextInference(self.llm, self.logger)
         self.use_reflection = config.use_reflection
@@ -44,18 +48,39 @@ class EvolDataGenerator:
         self.success_count = 0
         self.fail_count = 0
 
-    def _initialize_evolution_strategies(self) -> Dict[str, List[str]]:
-        default_strategies = get_prebuilt_evolutionary_strategies()
-        return {**default_strategies, **self.custom_evolutionary_strategies}
+    def _initialize_evolution_strategies(self) -> List[str]:
+        """
+        Initialize evolutionary strategies by either using the custom strategies provided
+        or falling back to the default strategies.
+
+        Returns:
+            List[str]: The list of evolutionary strategies to use.
+        """
+        if self.custom_evolutionary_strategies:
+            self.logger.info("Using custom evolutionary strategies.")
+            return self.custom_evolutionary_strategies
+        else:
+            self.logger.info("Using default evolutionary strategies.")
+            return DEFAULT_EVOLUTION_STRATEGIES
 
     def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
-        if not field.evolution_strategies:
+        """
+        Select a random evolutionary strategy for a given field. If no custom strategies
+        are provided for the field, use the default strategies.
+
+        Args:
+            field (DataFieldDefinition): The field for which to select a strategy.
+
+        Returns:
+            str: The selected evolutionary strategy.
+        """
+        strategies = field.get_evolution_strategies()
+        if not strategies:
             self.logger.warning(
                 f"No evolution strategies defined for field {field.name}. Skipping evolution."
             )
             return ""
-        category = random.choice(list(field.evolution_strategies))
-        return random.choice(self.evolutionary_strategies[category])
+        return random.choice(strategies)
 
     def _generate_field_value(
         self,
@@ -103,6 +128,7 @@ class EvolDataGenerator:
             generation_instructions=self.model_definition.generation_instructions,
             evolution_strategy=evolution_strategy,
             value=value,
+            field_name=field.name,
             field_type=field.type,
             field_description=field.description,
             context=json.dumps(context, indent=2),
@@ -279,7 +305,7 @@ class EvolDataGenerator:
         self, contextual_tags: Optional[pd.DataFrame]
     ) -> List[Dict[str, Any]]:
         if contextual_tags is None:
-            return [{}]  # Return a list with one empty context if no tags provided
+            return [{}]  
         return contextual_tags.to_dict("records")
 
     def _create_field_prompt(
