@@ -58,6 +58,10 @@ class LLMWrapper:
         self._model_name = model_name
         self._router = router
 
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
     def completion(self, messages: list[dict[str, str]], **kwargs) -> ModelResponse:
         logger.debug(f"Calling {self._model_name} with messages: {messages}")
         return self._router.completion(self._model_name, messages, **kwargs)

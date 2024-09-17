@@ -1,8 +1,8 @@
 from enum import Enum
 from typing import Optional
 
-from gretel_client import Gretel
-
+from navigator_helpers.llms import LLMWrapper, str_to_message
+from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import (
     get_logger,
     silence_iapi_initialization_logs,
@@ -16,14 +16,8 @@ class LLMSuiteType(str, Enum):
     OPEN_LICENSE = "open_license"
 
 
-DEV_ENDPOINT = "https://api-dev.gretel.cloud"
-
-
 LLM_SUITE_CONFIG = {
     LLMSuiteType.OPEN_LICENSE: {
-        "nl": "gretelai/gpt-mixtral-8x-22b",
-        "code": "gretelai/gpt-codestral-mamba",
-        "judge": "gretelai/gpt-groq-llama-3-1-8b",
         "generate_kwargs": {
             "nl": {},
             "code": {"max_tokens": 4096},
@@ -38,14 +32,10 @@ class GretelLLMSuite:
     def __init__(
         self,
         suite_type: LLMSuiteType,
+        llm_registry: LLMRegistry,
         suite_config: Optional[dict] = None,
-        **session_kwargs,
     ):
-        endpoint = session_kwargs.pop("endpoint", DEV_ENDPOINT)
-        if endpoint != DEV_ENDPOINT:
-            raise ValueError("Only the dev endpoint is currently supported")
-
-        self._gretel = Gretel(endpoint=endpoint, **session_kwargs)
+        self._llm_registry = llm_registry
 
         suite_config = suite_config or LLM_SUITE_CONFIG
         if suite_type not in suite_config:
@@ -58,44 +48,43 @@ class GretelLLMSuite:
         with silence_iapi_initialization_logs():
             config = suite_config[suite_type]
 
-            logger.info(f"📖 Natural language LLM: {config['nl']}")
-            self._nl = self._gretel.factories.initialize_navigator_api(
-                "natural_language", backend_model=config["nl"]
+            self._nl = LLMWrapper.from_llm_configs(
+                llm_registry.find_by_tags({suite_type.value, "nl"})
             )
+            logger.info(f"📖 Natural language LLM: {self._nl.model_name}")
             self._nl_gen_kwargs = config["generate_kwargs"]["nl"]
 
-            logger.info(f"💻 Code LLM: {config['code']}")
-            self._code = self._gretel.factories.initialize_navigator_api(
-                "natural_language", backend_model=config["code"]
+            self._code = LLMWrapper.from_llm_configs(
+                llm_registry.find_by_tags({suite_type.value, "code"})
             )
+            logger.info(f"💻 Code LLM: {self._code.model_name}")
             self._code_gen_kwargs = config["generate_kwargs"]["code"]
 
-            logger.info(f"⚖️ Judge LLM: {config['judge']}")
-            self._judge = self._gretel.factories.initialize_navigator_api(
-                "natural_language", backend_model=config["judge"]
+            self._judge = LLMWrapper.from_llm_configs(
+                llm_registry.find_by_tags({suite_type.value, "judge"})
             )
+            logger.info(f"⚖️ Judge LLM: {self._judge.model_name}")
             self._judge_gen_kwargs = config["generate_kwargs"]["judge"]
 
     def nl_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._nl_gen_kwargs)
-        return self._nl.generate(prompt, **kwargs)
+        response = self._nl.completion([str_to_message(prompt)], **kwargs)
+        return response.choices[0].message.content
 
     def code_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._code_gen_kwargs)
-        return self._code.generate(prompt, **kwargs)
+        response = self._code.completion([str_to_message(prompt)], **kwargs)
+        return response.choices[0].message.content
 
     def judge_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._judge_gen_kwargs)
-        return self._judge.generate(prompt, **kwargs)
+        response = self._judge.completion([str_to_message(prompt)], **kwargs)
+        return response.choices[0].message.content
 
     def list_available_models(self) -> list[str]:
-        return self._gretel.factories.get_navigator_model_list("natural_language")
+        # TODO: implement by iterating self._llm_registry
+        return []
 
     def set_backend_model(self, llm_type: str, model_name: str):
-        setattr(
-            self,
-            f"_{llm_type}",
-            self._gretel.factories.initialize_navigator_api(
-                "natural_language", backend_model=model_name
-            ),
-        )
+        # TODO: implement by iterating self._llm_registry
+        pass

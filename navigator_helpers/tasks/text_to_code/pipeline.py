@@ -14,6 +14,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from navigator_helpers import IN_COLAB
+from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.text_to_code.config import (
     ConfigLike,
@@ -61,11 +62,14 @@ class PipelineResults:
 
 class NL2CodePipeline:
 
-    def __init__(self, config: ConfigLike, **session_kwargs):
+    def __init__(self, llm_registry: LLMRegistry, config: ConfigLike, **session_kwargs):
         self.contextual_tags = None
         self._setup(config)
         self.tasks = NL2CodeTaskSuite(
-            self.config.code_lang, self.config.llm_suite_type, **session_kwargs
+            llm_registry,
+            self.config.code_lang,
+            self.config.llm_suite_type,
+            **session_kwargs,
         )
 
     def _setup(self, config: ConfigLike):
