@@ -1,0 +1,9 @@
+- model_name: local
+  litellm_params:
+    model: openai/local
+    base_url: http://localhost:8080/v1/
+  tags:
+  - open_license
+  - nl
+  - code
+  - judge

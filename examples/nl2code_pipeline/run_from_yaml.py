@@ -1,12 +1,14 @@
 from navigator_helpers import NL2CodePipeline
-from navigator_helpers.llms.base import init_llms, LLMRegistry
+from navigator_helpers.llms.base import init_llms
 
 
 def run_pipeline(llm_config_path: str, config_path: str, num_samples: int = 10):
     llm_registry = init_llms(llm_config_path)
 
     pipe = NL2CodePipeline(llm_registry, config_path)
-    pipe.run(num_samples=num_samples)
+    results = pipe.run(num_samples=num_samples)
+
+    results.display_sample()
 
 
 if __name__ == "__main__":
