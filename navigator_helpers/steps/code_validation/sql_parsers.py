@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, text
 from sqlvalidator.sql_validator import SQLQuery
 from typing import Tuple
 
+from utils import split_statements
+
 
 class SimpleSqlValidator:
     # Copied from https://github.com/Gretellabs/ml-research/blob/23044df605b95d45f970c3024baf0ce2bba65429/customer_pocs/databricks_text2sql_poc/databricks_compare_quality.py#L51-L73
@@ -54,19 +56,13 @@ class SimpleSqlValidator:
 
 class SqliteValidator:
     
-    def _split_statements(query):
-        statements = [s.strip() for s in query.split(';')]
-        statements = [s for s in statements if s != '']
-        statements = [s + ';' for s in statements if s[-1] != ';']
-        return statements
-
     def is_valid_sql(query: str, schema: str) -> Tuple[bool, str]:
 
         # Create the engine for an in-memory SQLite database
         engine = create_engine('sqlite:///:memory:', echo=False)
 
         # Split the context into individual statements
-        context_statements = SqliteValidator._split_statements(schema)
+        context_statements = split_statements(schema)
 
         with engine.connect() as connection:
             # Execute the CREATE TABLE statements
@@ -172,7 +168,7 @@ class PostgresqlValidator:
             raise e
 
     def is_valid_sql(query: str, schema: str, domain: str, db_creds: dict) -> Tuple[bool, str]:
-        db_name = domain.replace(' ','_').lower()
+        db_name = domain.replace(' ','_').replace('-', '_').lower()
         try:
             PostgresqlValidator._query_postgres(
                 sql_query=query,
@@ -198,7 +194,7 @@ class MysqlValidator:
             ):
         mysql_command = f"mysql -u {db_creds['user']} -p'{db_creds['password']}' -e \"CREATE DATABASE IF NOT EXISTS {db_name};\""
         exit_code, output = mysql_container.exec_run(mysql_command)
-        print(f"exit_code: {exit_code}, output: {output}")
+        # print(f"exit_code: {exit_code}, output: {output}")
         assert exit_code == 0, "Failed to create database"
 
     def _remove_db(
@@ -208,7 +204,7 @@ class MysqlValidator:
             ):
         mysql_command = f"mysql -u {db_creds['user']} -p'{db_creds['password']}' -e \"DROP DATABASE IF EXISTS {db_name};\""
         exit_code, output = mysql_container.exec_run(mysql_command)
-        print(f"exit_code: {exit_code}, output: {output}")
+        # print(f"exit_code: {exit_code}, output: {output}")
         assert exit_code == 0, "Failed to drop database"
 
     def _query_mysql(
@@ -228,8 +224,13 @@ class MysqlValidator:
             # create tables in the temporary database and execute sql query
             db_url = f"mysql+mysqlconnector://{db_creds['user']}:{db_creds['password']}@{db_creds['host']}:{db_creds['port']}/{db_name}"
             engine = create_engine(db_url)
+
+            # Split the context into individual statements
+            context_statements = split_statements(schema)
+
             with engine.connect() as conn:
-                conn.execute(text(schema))
+                for statement in context_statements:
+                    conn.execute(text(statement))
                 result = conn.execute(text(sql_query))
 
             engine.dispose()  # close connection
@@ -244,9 +245,9 @@ class MysqlValidator:
             raise e
     
     def is_valid_sql(query: str, schema: str, domain: str, db_creds: dict, mysql_container: Container) -> Tuple[bool, str]:
-        db_name = domain.replace(' ','_').lower()
+        db_name = domain.replace(' ','_').replace('-', '_').lower()
         try:
-            # A MySQL database need to have been created before creating an engine
+            # A MySQL database need to be created before creating an engine
             MysqlValidator._create_db(db_name, db_creds, mysql_container)
             MysqlValidator._query_mysql(
                 sql_query=query,
