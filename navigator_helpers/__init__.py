@@ -25,7 +25,6 @@ __all__ = [
     "DataModel",
     "ContextualTags",
     "ContextualTag",
-    "GeneratorConfig",
     "EvolDataGenerator",
     "ContentValidator",
     "TextInference",
