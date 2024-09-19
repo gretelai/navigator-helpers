@@ -60,7 +60,7 @@ contextual_tags:
         - Complex
         - Very Complex
         - Expert
-      weights: [0.4, 0.3, 0.2, 0.1]
+      weights: [0.5, 0.3, 0.15, 0.05]  # Increased Moderate, decreased higher complexities
 
     - name: concept
       values:
@@ -84,12 +84,13 @@ contextual_tags:
         - Geospatial Queries
         - Temporal Data Handling
         - Dynamic SQL Generation
-      weights: [0.09, 0.09, 0.075, 0.075, 0.05, 0.06, 0.04, 0.05, 0.075, 0.075, 0.075, 0.06, 0.035, 0.05, 0.075, 0.05, 0.035, 0.035, 0.05, 0.04]
+      weights: [0.15, 0.15, 0.1, 0.1, 0.05, 0.1, 0.03, 0.04, 0.08, 0.07, 0.07, 0.06, 0.04, 0.05, 0.07, 0.05, 0.04, 0.04, 0.05, 0.02]
+      # Prioritized common concepts like Joins, Subqueries, Aggregations
 
     - name: domain
       values:
-        - Healthcare
         - Finance
+        - Healthcare
         - E-commerce
         - Retail
         - Manufacturing
@@ -108,7 +109,8 @@ contextual_tags:
         - Gaming
         - Social Media
         - Cybersecurity
-      weights: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+      weights: [0.12, 0.12, 0.1, 0.08, 0.07, 0.07, 0.07, 0.06, 0.05, 0.05, 0.05, 0.05, 0.04, 0.04, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02]
+      # Higher weights for more prevalent domains like Finance, Healthcare, E-commerce
 
     - name: data_structure
       values:
@@ -122,7 +124,8 @@ contextual_tags:
         - Hierarchical Data
         - Document Store
         - Column-Oriented
-      weights: [0.54, 0.11, 0.054, 0.027, 0.081, 0.027, 0.054, 0.054, 0.027, 0.027]
+      weights: [0.6, 0.1, 0.05, 0.05, 0.07, 0.03, 0.05, 0.04, 0.025, 0.025]
+      # Increased Relational Tables, adjusted others accordingly
 
     - name: data_type_combination
       values:
@@ -140,7 +143,8 @@ contextual_tags:
         - Integer, Varchar, JSONB, Boolean
         - Integer, Varchar, Date, ENUM
         - Integer, Varchar, BLOB, Timestamp
-      weights: [0.156, 0.156, 0.117, 0.094, 0.063, 0.078, 0.039, 0.023, 0.055, 0.016, 0.039, 0.047, 0.023, 0.016]
+      weights: [0.2, 0.15, 0.1, 0.1, 0.08, 0.07, 0.05, 0.04, 0.04, 0.04, 0.04, 0.04, 0.02, 0.02]
+      # Increased weights for more common combinations like Integer, Varchar, Date, Timestamp
 
     - name: analysis_type
       values:
@@ -169,6 +173,5 @@ contextual_tags:
         - Deep Learning-based Analysis
         - Market Segmentation
         - Operational Efficiency
-      weights: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
-
-
+      weights: [0.07, 0.05, 0.05, 0.05, 0.05, 0.07, 0.05, 0.06, 0.05, 0.04, 0.04, 0.05, 0.05, 0.04, 0.05, 0.05, 0.04, 0.04, 0.05, 0.04, 0.03, 0.02, 0.02, 0.02, 0.02]
+      # Higher weights for common analysis types like Trend Analysis, Customer Segmentation

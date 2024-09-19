@@ -91,7 +91,7 @@ contextual_tags:
         - exponential growth/decay
         - probability
         - optimization
-      weights: [0.15, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1]
+      weights: [0.05, 0.05, 0.1, 0.1, 0.15, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.15]
 
     - name: context
       values:
@@ -105,7 +105,7 @@ contextual_tags:
         - hobbies and crafts
         - holidays and celebrations
         - animals and nature
-      weights: [0.15, 0.15, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1]
+      weights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.15, 0.15]
 
     - name: difficulty
       values:
@@ -113,14 +113,14 @@ contextual_tags:
         - medium
         - hard
         - very hard
-      weights: [0.2, 0.4, 0.3, 0.1]
+      weights: [0.05, 0.15, 0.4, 0.4]
 
     - name: age_group
       values:
         - grade 6-7
         - grades 8-9
         - grades 10-12
-      weights: [0.3, 0.4, 0.3]
+      weights: [0.2, 0.3, 0.5]
 
     - name: culture
       values:
@@ -130,4 +130,4 @@ contextual_tags:
         - European
         - Asian
         - African
-      weights: [0.2, 0.15, 0.15, 0.2, 0.15, 0.15]
+      weights: [0.5, 0.2, 0.2, 0.1, 0.1, 0.1]
