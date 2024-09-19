@@ -264,3 +264,79 @@ class MysqlValidator:
             except:
                 print('Unable to remove db')
                 pass
+
+
+class SqlserverValidator:
+    def _create_db(
+            db_name: str, 
+            db_creds: dict,
+            sqlserver_container: Container
+            ):
+        sqlserver_command = f"/opt/mssql-tools/bin/sqlcmd -S {db_creds['host']},{db_creds['port']} -U {db_creds['user']} -P '{db_creds['password']}' -Q \"CREATE DATABASE {db_name};\""
+        exit_code, output = sqlserver_container.exec_run(sqlserver_command)
+        # print(f"exit_code: {exit_code}, output: {output}")
+        assert exit_code == 0, "Failed to create database"
+    
+    def _remove_db(
+            db_name: str, 
+            db_creds: dict,
+            sqlserver_container: Container
+            ):
+        sqlserver_command = f"/opt/mssql-tools/bin/sqlcmd -S {db_creds['host']},{db_creds['port']} -U {db_creds['user']} -P '{db_creds['password']}' -Q \"DROP DATABASE {db_name};\""
+        exit_code, output = sqlserver_container.exec_run(sqlserver_command)
+        # print(f"exit_code: {exit_code}, output: {output}")
+        assert exit_code == 0, "Failed to drop database"
+    
+    def _query_sqlserver(
+            sql_query: str,
+            schema: str,
+            db_name: str,
+            db_creds: dict
+        ) -> pd.DataFrame:
+        """
+        Creates a temporary db from the table metadata string, runs query on the temporary db.
+        After the query is run, the temporary db is dropped.
+        """
+        engine = None
+        conn = None
+
+        try:
+            # create tables in the temporary database and execute sql query
+            db_url = f"mssql+pyodbc://{db_creds['user']}:{db_creds['password']}@{db_creds['host']}:{db_creds['port']}/{db_name}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+            engine = create_engine(db_url)
+
+            with engine.connect() as conn:
+                conn.execute(text(schema))
+                result = conn.execute(text(sql_query))
+
+            engine.dispose()  # close connection
+
+            return result
+        
+        except Exception as e:
+            if engine:
+                engine.dispose()
+            if conn:
+                conn.close()
+            raise e
+    
+    def is_valid_sql(query: str, schema: str, domain: str, db_creds: dict, sqlserver_container: Container) -> Tuple[bool, str]:
+        db_name = domain.replace(' ','_').replace('-', '_').lower()
+        try:
+            # A SQL Server database need to be created before creating an engine
+            SqlserverValidator._create_db(db_name, db_creds, sqlserver_container)
+            SqlserverValidator._query_sqlserver(
+                sql_query=query,
+                schema=schema,
+                db_name=db_name,
+                db_creds=db_creds)
+            return True, None
+        except Exception as e:
+            print(f"SQL Server Error: {e}")
+            return False, str(e)
+        finally:
+            try:
+                SqlserverValidator._remove_db(db_name, db_creds, sqlserver_container)
+            except:
+                print('Unable to remove db')
+                pass
