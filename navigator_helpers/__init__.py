@@ -18,7 +18,6 @@ from .tasks.text_to_code.llm_suite import GretelLLMSuite
 from .tasks.text_to_code.pipeline import NL2CodePipeline
 from .tasks.text_to_code.task_suite import NL2CodeTaskSuite
 from .text_inference import TextInference
-from .utils import batch_and_write_data
 
 __all__ = [
     "DataFieldDefinition",
@@ -29,5 +28,4 @@ __all__ = [
     "ContentValidator",
     "TextInference",
     "DEFAULT_EVOLUTION_STRATEGIES",
-    "batch_and_write_data",
 ]
