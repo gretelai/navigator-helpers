@@ -10,3 +10,4 @@ pyautogen[mistral,groq]==0.2.35
 litellm>=1.43.9
 json_repair==0.27.2
 rich==13.7.0
+pydantic >= 2.0.0

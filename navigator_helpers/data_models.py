@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 
 from datasets import load_dataset
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 
@@ -162,6 +162,8 @@ class DataModel(BaseModel):
         num_examples (int): The total number of examples to generate.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
+
     fields: List[DataFieldDefinition]
     generation_instructions: str
     contextual_tags: Optional[ContextualTags] = None
@@ -174,15 +176,14 @@ class DataModel(BaseModel):
     output_prefix: str
     num_examples: int
 
-    @validator("data_source", "contextual_tags")
-    def validate_data_source(cls, v, values, **kwargs):
+    @field_validator("data_source", "contextual_tags")
+    def validate_data_source(cls, v, info):
         """
         Validates that only one of data_source or contextual_tags is provided.
 
         Args:
             v: The value being validated.
-            values: A dictionary of the model's fields.
-            kwargs: Additional keyword arguments.
+            info: ValidationInfo object containing information about the current validation.
 
         Returns:
             The validated value.
@@ -190,14 +191,13 @@ class DataModel(BaseModel):
         Raises:
             ValueError: If both data_source and contextual_tags are provided.
         """
-        if "data_source" in values and "contextual_tags" in values:
-            if (
-                values["data_source"] is not None
-                and values["contextual_tags"] is not None
-            ):
-                raise ValueError(
-                    "Only one of data_source or contextual_tags should be provided"
-                )
+        data_source = info.data.get("data_source")
+        contextual_tags = info.data.get("contextual_tags")
+
+        if data_source is not None and contextual_tags is not None:
+            raise ValueError(
+                "Only one of data_source or contextual_tags should be provided"
+            )
         return v
 
     def load_data(
