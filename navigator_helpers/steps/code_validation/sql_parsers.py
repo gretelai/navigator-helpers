@@ -51,7 +51,7 @@ class SimpleSqlValidator:
                     return False, error_messages
                 return True, None
             except Exception as e:
-                return False, f"Exception during SQL parsing: {str(e)[:50]}..."
+                return False, f"Exception during SQL parsing: {str(e)}"
 
 
 class SqliteValidator:
@@ -177,13 +177,13 @@ class PostgresqlValidator:
                 db_creds=db_creds)
             return True, None
         except Exception as e:
-            print(f"PostgreSQL Error: {e}")
+            # print(f"PostgreSQL Error: {e}")
             return False, str(e)
         finally:
             try:
                 PostgresqlValidator._remove_db(db_name, db_creds)
             except:
-                print('Unable to remove db')
+                # print('Unable to remove db')
                 pass
 
 class MysqlValidator:
@@ -256,13 +256,13 @@ class MysqlValidator:
                 db_creds=db_creds)
             return True, None
         except Exception as e:
-            print(f"MySQL Error: {e}")
+            # print(f"MySQL Error: {e}")
             return False, str(e)
         finally:
             try:
                 MysqlValidator._remove_db(db_name, db_creds, mysql_container)
             except:
-                print('Unable to remove db')
+                # print('Unable to remove db')
                 pass
 
 
@@ -332,11 +332,11 @@ class SqlserverValidator:
                 db_creds=db_creds)
             return True, None
         except Exception as e:
-            print(f"SQL Server Error: {e}")
+            # print(f"SQL Server Error: {e}")
             return False, str(e)
         finally:
             try:
                 SqlserverValidator._remove_db(db_name, db_creds, sqlserver_container)
             except:
-                print('Unable to remove db')
+                # print('Unable to remove db')
                 pass
