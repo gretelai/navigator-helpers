@@ -305,27 +305,36 @@ class EvolDataGenerator:
         self.logger.info(f"Generated {len(contexts)} contexts from contextual tags.")
         return contexts
 
-    def generate_data(self) -> List[Dict[str, Any]]:
-        """
-        Generate synthetic data based on the model definition and continuously write the
-        generated data to an output file with a file prefix and timestamp.
+    def _process_data_source(self, num_examples: int) -> List[Dict[str, Any]]:
+        if self.model_definition.data_source:
+            self.logger.info(
+                f"Loading data from {self.model_definition.data_source.uri}"
+            )
+            data = self.model_definition.load_data()
+            return self.model_definition.sample_data(num_examples)
+        elif self.model_definition.contextual_tags:
+            self.logger.info("Processing contextual tags...")
+            return self.model_definition.contextual_tags.mix_tags(num_examples)
+        else:
+            self.logger.info(
+                "No data source or contextual tags provided. Using empty context."
+            )
+            return [{}] * num_examples
 
-        Returns:
-            List[Dict[str, Any]]: List of generated records.
-        """
+    def generate_data(self) -> List[Dict[str, Any]]:
         results = []
         num_examples = self.model_definition.num_examples
         output_prefix = self.model_definition.output_prefix
-        contexts = self._process_contextual_tags(num_examples)
+        contexts = self._process_data_source(num_examples)
 
         # Create a timestamped output file name using the prefix
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        output_file = f"{output_prefix}_{timestamp}.jsonl"
+        self.output_filename = f"{output_prefix}_{timestamp}.jsonl"
 
-        self.logger.info(f"Output file: {output_file}")
+        self.logger.info(f"Output file: {self.output_filename}")
 
         # Open the output file in append mode (creates if not exists)
-        with open(output_file, "a") as f:
+        with open(self.output_filename, "a") as f:
             for i, context in enumerate(contexts):
                 self.logger.info(f"Generating record {i+1}/{num_examples}")
                 self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
