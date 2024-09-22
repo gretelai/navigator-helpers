@@ -81,19 +81,46 @@ class DataField(BaseModel):
     store_full_reflection: bool = Field(default=False)
 
 
+class WeightedValue(BaseModel):
+    """
+    Represents a value with an associated weight.
+
+    Attributes:
+        value (str): The actual value.
+        weight (float): The weight associated with this value.
+    """
+
+    value: str
+    weight: float
+
+
 class ContextualTag(BaseModel):
     """
     Represents a single contextual tag used for data generation.
 
     Attributes:
         name (str): The name of the contextual tag.
-        values (List[str]): A list of possible values for this tag.
-        weights (Optional[List[float]]): Optional weights for the values, used for weighted random selection.
+        values (List[Union[str, WeightedValue]]): A list of possible values for this tag, either as strings or WeightedValue objects.
     """
 
     name: str
-    values: List[str]
-    weights: Optional[List[float]] = None
+    values: List[Union[str, WeightedValue]] = Field(..., description="List of values or weighted value objects")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.normalize_weights()
+
+    def normalize_weights(self):
+        """
+        Normalizes the weights of the values so that they sum to 1.
+        Converts all values to WeightedValue objects.
+        """
+        total_weight = sum(v.weight if isinstance(v, WeightedValue) else 1 for v in self.values)
+        self.values = [
+            WeightedValue(value=v.value, weight=v.weight / total_weight) if isinstance(v, WeightedValue)
+            else WeightedValue(value=v, weight=1 / total_weight)
+            for v in self.values
+        ]
 
 
 class ContextualTags(BaseModel):
@@ -127,11 +154,8 @@ class ContextualTags(BaseModel):
         for _ in range(num_rows):
             record = {}
             for tag in self.tags:
-                if tag.weights:
-                    value = random.choices(tag.values, weights=tag.weights, k=1)[0]
-                else:
-                    value = random.choice(tag.values)
-                record[tag.name] = value
+                chosen_value = random.choices(tag.values, weights=[v.weight for v in tag.values], k=1)[0]
+                record[tag.name] = chosen_value.value
             results.append(record)
 
         # Pretty print one example of the generated tags
@@ -274,7 +298,8 @@ class DataModel(BaseModel):
         """
         data = yaml.safe_load(yaml_str)
         if "contextual_tags" in data:
-            data["contextual_tags"] = ContextualTags(**data["contextual_tags"])
+            tags_data = data["contextual_tags"]["tags"]
+            data["contextual_tags"] = ContextualTags(tags=[ContextualTag(**tag) for tag in tags_data])
         if "data_source" in data:
             data["data_source"] = DataSource(**data["data_source"])
         return cls(**data)
@@ -286,4 +311,16 @@ class DataModel(BaseModel):
         Returns:
             str: YAML representation of the DataModel object.
         """
-        return yaml.dump(self.dict(), default_flow_style=False)
+        data = self.dict()
+        if self.contextual_tags:
+            tags_data = []
+            for tag in self.contextual_tags.tags:
+                tag_dict = {"name": tag.name, "values": []}
+                for value in tag.values:
+                    if isinstance(value, WeightedValue):
+                        tag_dict["values"].append({"value": value.value, "weight": value.weight})
+                    else:
+                        tag_dict["values"].append(value)
+                tags_data.append(tag_dict)
+            data["contextual_tags"] = {"tags": tags_data}
+        return yaml.dump(data, default_flow_style=False)

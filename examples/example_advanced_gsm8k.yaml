@@ -74,6 +74,7 @@ fields:
     evolution_rate: 0.1
     store_full_reflection: true
 
+# Contextual Tags
 contextual_tags:
   tags:
     - name: topic
@@ -91,7 +92,6 @@ contextual_tags:
         - exponential growth/decay
         - probability
         - optimization
-      weights: [0.05, 0.05, 0.1, 0.1, 0.15, 0.05, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.15]
 
     - name: context
       values:
@@ -105,29 +105,32 @@ contextual_tags:
         - hobbies and crafts
         - holidays and celebrations
         - animals and nature
-      weights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.15, 0.15]
 
     - name: difficulty
       values:
-        - easy
-        - medium
+        - value: easy
+          weight: 0.1
+        - value: medium
+          weight: 0.3
         - hard
         - very hard
-      weights: [0.05, 0.15, 0.4, 0.4]
 
     - name: age_group
       values:
-        - grade 6-7
-        - grades 8-9
+        - value: grade 6-7
+          weight: 0.2
+        - value: grades 8-9
+          weight: 0.3
         - grades 10-12
-      weights: [0.2, 0.3, 0.5]
 
     - name: culture
       values:
         - American
         - Mexican
         - Canadian
-        - European
-        - Asian
-        - African
-      weights: [0.5, 0.2, 0.2, 0.1, 0.1, 0.1]
+        - value: European
+          weight: 0.5
+        - value: Asian
+          weight: 0.5
+        - value: African
+          weight: 0.5

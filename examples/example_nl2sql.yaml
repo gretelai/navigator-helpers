@@ -24,7 +24,6 @@ fields:
       - Enhance the schema to include domain-specific tables and data types.
       - Add relevant indexes, constraints, and views reflecting real-world designs.
     evolution_rate: 0.1
-
   - name: prompt
     type: str
     description: A detailed, nuanced natural language prompt that a user might ask to a database for a particular task, based on the provided sql_context field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.
@@ -33,7 +32,6 @@ fields:
       - Refine the prompt to sound more natural.
       - Ensure the prompt reflects real-world business needs.
     evolution_rate: 0.1
-
   - name: sql
     type: str
     description: A fully executable SQL query that directly answers the prompt using the schema in sql_context, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.
@@ -42,7 +40,6 @@ fields:
       - Optimize the SQL solution for performance.
       - Ensure the solution handles large datasets efficiently.
     evolution_rate: 0.1
-
   - name: sql_explanation
     type: str
     description: A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the prompt and the purpose of each part. Include references to the domain-specific context.
@@ -56,11 +53,11 @@ contextual_tags:
   tags:
     - name: sql_complexity
       values:
-        - Moderate
+        - value: Moderate
+          weight: 0.3
         - Complex
         - Very Complex
         - Expert
-      weights: [0.4, 0.3, 0.2, 0.1]
 
     - name: sql_concepts
       values:
@@ -70,7 +67,6 @@ contextual_tags:
         - Common Table Expressions (CTEs)
         - Set Operations
         - Advanced Aggregations
-      weights: [0.2, 0.2, 0.15, 0.15, 0.15, 0.15]
 
     - name: domain
       values:
@@ -79,4 +75,3 @@ contextual_tags:
         - E-commerce
         - Education
         - Manufacturing
-      weights: [0.25, 0.25, 0.2, 0.15, 0.15]

@@ -56,11 +56,11 @@ contextual_tags:
   tags:
     - name: complexity
       values:
-        - Moderate
+        - value: Moderate
+          weight: 0.3
         - Complex
         - Very Complex
         - Expert
-      weights: [0.5, 0.3, 0.15, 0.05]  # Increased Moderate, decreased higher complexities
 
     - name: concept
       values:
@@ -68,14 +68,18 @@ contextual_tags:
         - Subqueries
         - Window Functions
         - Common Table Expressions (CTEs)
-        - Set Operations
+        - value: Set Operations
+          weight: 0.5
         - Advanced Aggregations
         - Recursive Queries
         - Pivoting and Unpivoting
-        - Date and Time Operations
-        - String Manipulations
+        - value: Date and Time Operations
+          weight: 0.5
+        - value: String Manipulations
+          weight: 0.5
         - Conditional Logic
-        - Data Type Conversions
+        - value: Data Type Conversions
+          weight: 0.5
         - Hierarchical Data Queries
         - Complex Grouping
         - Advanced Filtering
@@ -84,8 +88,6 @@ contextual_tags:
         - Geospatial Queries
         - Temporal Data Handling
         - Dynamic SQL Generation
-      weights: [0.15, 0.15, 0.1, 0.1, 0.05, 0.1, 0.03, 0.04, 0.08, 0.07, 0.07, 0.06, 0.04, 0.05, 0.07, 0.05, 0.04, 0.04, 0.05, 0.02]
-      # Prioritized common concepts like Joins, Subqueries, Aggregations
 
     - name: domain
       values:
@@ -109,23 +111,22 @@ contextual_tags:
         - Gaming
         - Social Media
         - Cybersecurity
-      weights: [0.12, 0.12, 0.1, 0.08, 0.07, 0.07, 0.07, 0.06, 0.05, 0.05, 0.05, 0.05, 0.04, 0.04, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02]
-      # Higher weights for more prevalent domains like Finance, Healthcare, E-commerce
 
     - name: data_structure
       values:
         - Relational Tables
         - JSON Documents
-        - XML Documents
+        - value: XML Documents
+          weight: 0.5
         - Key-Value Pairs
         - Time Series
         - Graph Data
         - Geospatial Data
         - Hierarchical Data
-        - Document Store
-        - Column-Oriented
-      weights: [0.6, 0.1, 0.05, 0.05, 0.07, 0.03, 0.05, 0.04, 0.025, 0.025]
-      # Increased Relational Tables, adjusted others accordingly
+        - value: Document Store
+          weight: 0.5
+        - value: Column-Oriented
+          weight: 0.5
 
     - name: data_type_combination
       values:
@@ -143,8 +144,6 @@ contextual_tags:
         - Integer, Varchar, JSONB, Boolean
         - Integer, Varchar, Date, ENUM
         - Integer, Varchar, BLOB, Timestamp
-      weights: [0.2, 0.15, 0.1, 0.1, 0.08, 0.07, 0.05, 0.04, 0.04, 0.04, 0.04, 0.04, 0.02, 0.02]
-      # Increased weights for more common combinations like Integer, Varchar, Date, Timestamp
 
     - name: analysis_type
       values:
@@ -169,9 +168,11 @@ contextual_tags:
         - Recommendation Systems
         - User Behavior Analysis
         - Supply Chain Optimization
-        - Credit Scoring
-        - Deep Learning-based Analysis
-        - Market Segmentation
-        - Operational Efficiency
-      weights: [0.07, 0.05, 0.05, 0.05, 0.05, 0.07, 0.05, 0.06, 0.05, 0.04, 0.04, 0.05, 0.05, 0.04, 0.05, 0.05, 0.04, 0.04, 0.05, 0.04, 0.03, 0.02, 0.02, 0.02, 0.02]
-      # Higher weights for common analysis types like Trend Analysis, Customer Segmentation
+        - value: Credit Scoring
+          weight: 0.5
+        - value: Deep Learning-based Analysis
+          weight: 0.5
+        - value: Market Segmentation
+          weight: 0.5
+        - value: Operational Efficiency
+          weight: 0.5
