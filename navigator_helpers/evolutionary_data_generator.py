@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from gretel_client import Gretel
 
 from .content_validator import ContentValidator
-from .data_models import DataFieldDefinition, DataModel
+from .data_models import DataField, DataModel
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 from .prompts import (
     CONTENT_CORRECTION_PROMPT,
@@ -56,7 +56,7 @@ class EvolDataGenerator:
             self.logger.info("Using default evolutionary strategies.")
             return DEFAULT_EVOLUTION_STRATEGIES
 
-    def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
+    def _select_evolutionary_strategy(self, field: DataField) -> str:
         """
         Select a random evolutionary strategy for a given field. The field's evolutionary strategies
         will default to the global DEFAULT_EVOLUTION_STRATEGIES if no custom strategies are provided.
@@ -78,7 +78,7 @@ class EvolDataGenerator:
     def _generate_field_value(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> Any:
         prompt = FIELD_GENERATION_PROMPT.format(
@@ -113,7 +113,7 @@ class EvolDataGenerator:
         self,
         value: Any,
         evolution_strategy: str,
-        field: DataFieldDefinition,
+        field: DataField,
         context: Dict[str, Any],
         current_record: Dict[str, Any],
     ) -> Any:
@@ -163,7 +163,7 @@ class EvolDataGenerator:
             return True, response.strip()
 
     def _validate_and_correct_field_value(
-        self, value: Any, field: DataFieldDefinition
+        self, value: Any, field: DataField
     ) -> Tuple[Any, bool]:
         validator = self.validators.get(field.name)
         if validator:
@@ -188,7 +188,7 @@ class EvolDataGenerator:
         content: str,
         content_type: str,
         error_message: str,
-        field: DataFieldDefinition,
+        field: DataField,
     ) -> str:
 
         return self.text_inference.generate(
@@ -207,7 +207,7 @@ class EvolDataGenerator:
     def _generate_and_evolve_field(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> Any:
         field_value = self._generate_field_value(context, field, current_record)
@@ -392,7 +392,7 @@ class EvolDataGenerator:
     def _create_field_prompt(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> str:
         return textwrap.dedent(
@@ -414,7 +414,7 @@ class EvolDataGenerator:
             """
         )
 
-    def _parse_field_value(self, value: str, field: DataFieldDefinition) -> Any:
+    def _parse_field_value(self, value: str, field: DataField) -> Any:
         if field.type == "int":
             return int(value)
         elif field.type == "float":

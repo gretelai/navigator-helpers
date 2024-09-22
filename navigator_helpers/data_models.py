@@ -56,7 +56,7 @@ class DataSource(BaseModel):
     fields: Optional[List[str]] = None
 
 
-class DataFieldDefinition(BaseModel):
+class DataField(BaseModel):
     """
     Defines a single field in the data model with attributes for validation and evolutionary strategies.
 
@@ -164,7 +164,7 @@ class DataModel(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    fields: List[DataFieldDefinition]
+    fields: List[DataField]
     generation_instructions: str
     contextual_tags: Optional[ContextualTags] = None
     data_source: Optional[DataSource] = None
