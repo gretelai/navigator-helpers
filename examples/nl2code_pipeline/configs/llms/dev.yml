@@ -7,6 +7,7 @@
   tags:
   - open_license
   - nl
+  - judge
 
 - model_name: gretelai/gpt-codestral-mamba
   litellm_params:
@@ -27,3 +28,13 @@
   tags:
   - open_license
   - judge
+
+- model_name: gretelai-mistral-nemo-2407
+  litellm_params:
+    model: gretelai/gpt-mistral-nemo-2407
+    api_key: os.environ/GRETEL_PROD_API_KEY
+    api_base: https://api.gretel.ai
+  tags:
+  - open_license
+  - nl
+  - code
