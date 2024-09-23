@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import re
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -10,7 +11,7 @@ import pandas as pd
 import yaml
 
 from datasets import load_dataset
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 
@@ -74,10 +75,8 @@ class DataField(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: List[str] = Field(
-        default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES
-    )
-    evolution_rate: float = Field(default=0.0)
+    evolution_strategies: Optional[List[str]] = None
+    evolution_rate: float = Field(default=None)
     store_full_reflection: bool = Field(default=False)
 
 
@@ -104,23 +103,9 @@ class ContextualTag(BaseModel):
     """
 
     name: str
-    values: List[Union[str, WeightedValue]] = Field(..., description="List of values or weighted value objects")
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.normalize_weights()
-
-    def normalize_weights(self):
-        """
-        Normalizes the weights of the values so that they sum to 1.
-        Converts all values to WeightedValue objects.
-        """
-        total_weight = sum(v.weight if isinstance(v, WeightedValue) else 1 for v in self.values)
-        self.values = [
-            WeightedValue(value=v.value, weight=v.weight / total_weight) if isinstance(v, WeightedValue)
-            else WeightedValue(value=v, weight=1 / total_weight)
-            for v in self.values
-        ]
+    values: List[Union[str, WeightedValue]] = Field(
+        ..., description="List of values or weighted value objects"
+    )
 
 
 class ContextualTags(BaseModel):
@@ -140,7 +125,7 @@ class ContextualTags(BaseModel):
         Args:
             num_rows (int): Number of rows to generate.
 
-        Returns:
+            Returns:
             List[Dict[str, Any]]: List of dictionaries with mixed contextual tags.
         """
         results = []
@@ -154,15 +139,51 @@ class ContextualTags(BaseModel):
         for _ in range(num_rows):
             record = {}
             for tag in self.tags:
-                chosen_value = random.choices(tag.values, weights=[v.weight for v in tag.values], k=1)[0]
+                values = [
+                    (
+                        value
+                        if isinstance(value, WeightedValue)
+                        else WeightedValue(value=value, weight=1)
+                    )
+                    for value in tag.values
+                ]
+                weights = [value.weight for value in values]
+                chosen_value = random.choices(values, weights=weights, k=1)[0]
                 record[tag.name] = chosen_value.value
+
             results.append(record)
 
-        # Pretty print one example of the generated tags
         if results:
             pretty_print_sample(results[0], "generated contextual tags")
 
         return results
+
+    def to_yaml(self) -> str:
+        """
+        Converts the ContextualTags object to a YAML string, handling both weighted and non-weighted values.
+
+        Returns:
+            str: YAML representation of the ContextualTags object.
+        """
+        data = {
+            "contextual_tags": [
+                {
+                    "name": tag.name,
+                    "values": [
+                        # Check if the value is a WeightedValue or plain string
+                        (
+                            {"value": value.value, "weight": value.weight}
+                            if isinstance(value, WeightedValue)
+                            else value
+                        )
+                        for value in tag.values
+                    ],
+                }
+                for tag in self.tags
+            ]
+        }
+
+        return yaml.dump(data, default_flow_style=False)
 
 
 class DataModel(BaseModel):
@@ -299,28 +320,61 @@ class DataModel(BaseModel):
         data = yaml.safe_load(yaml_str)
         if "contextual_tags" in data:
             tags_data = data["contextual_tags"]["tags"]
-            data["contextual_tags"] = ContextualTags(tags=[ContextualTag(**tag) for tag in tags_data])
+            data["contextual_tags"] = ContextualTags(
+                tags=[ContextualTag(**tag) for tag in tags_data]
+            )
         if "data_source" in data:
             data["data_source"] = DataSource(**data["data_source"])
         return cls(**data)
 
     def to_yaml(self) -> str:
         """
-        Converts the DataModel object to a YAML string.
-
-        Returns:
-            str: YAML representation of the DataModel object.
+        Converts the DataModel object to a YAML string, ensuring fields are ordered as:
+        - generation_instructions
+        - fields
+        - contextual_tags (if present)
+        Followed by any additional fields.
         """
-        data = self.dict()
+        yaml_output = []
+
+        # Generation instructions
+        yaml_output.append("generation_instructions: |")
+        instructions_text = self.generation_instructions.replace("\n", "\n  ")
+        yaml_output.append(f"  {instructions_text}")
+
+        # Fields
+        yaml_output.append("fields:")
+        for field in self.fields:
+            yaml_output.append(f"  - name: {field.name}")
+            yaml_output.append(f"    type: {field.type}")
+            yaml_output.append(f"    description: |")
+            description_text = field.description.replace("\n", "\n      ")
+            yaml_output.append(f"      {description_text}")
+            if field.evolution_rate and field.evolution_rate > 0:
+                yaml_output.append(f"    evolution_rate: {field.evolution_rate}")
+                if field.evolution_strategies:
+                    yaml_output.append("    evolution_strategies:")
+                    for strategy in field.evolution_strategies:
+                        yaml_output.append(f"      - {strategy}")
+
+        # Contextual tags
         if self.contextual_tags:
-            tags_data = []
+            yaml_output.append("contextual_tags:")
+            yaml_output.append("  tags:")
             for tag in self.contextual_tags.tags:
-                tag_dict = {"name": tag.name, "values": []}
+                yaml_output.append(f"    - name: {tag.name}")
+                yaml_output.append("      values:")
                 for value in tag.values:
                     if isinstance(value, WeightedValue):
-                        tag_dict["values"].append({"value": value.value, "weight": value.weight})
+                        yaml_output.append(f"        - value: {value.value}")
+                        yaml_output.append(f"          weight: {value.weight}")
                     else:
-                        tag_dict["values"].append(value)
-                tags_data.append(tag_dict)
-            data["contextual_tags"] = {"tags": tags_data}
-        return yaml.dump(data, default_flow_style=False)
+                        yaml_output.append(f"        - {value}")
+
+        # Other fields
+        other_fields = self.model_dump(
+            exclude={"fields", "generation_instructions", "contextual_tags"}
+        )
+        yaml_output.append(yaml.dump(other_fields, default_flow_style=False))
+
+        return "\n".join(yaml_output)

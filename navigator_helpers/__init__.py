@@ -9,6 +9,7 @@ try:
 except ImportError:
     IN_COLAB = False
 
+from .config.generator import ConfigGenerator
 from .content_validator import ContentValidator
 from .data_models import ContextualTag, ContextualTags, DataField, DataModel
 from .evolutionary_data_generator import EvolDataGenerator
@@ -23,6 +24,7 @@ __all__ = [
     "DataField",
     "DataModel",
     "ContextualTags",
+    "ConfigGenerator",
     "ContextualTag",
     "EvolDataGenerator",
     "ContentValidator",
