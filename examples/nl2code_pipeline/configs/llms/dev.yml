@@ -3,10 +3,10 @@
     model: openai/gretelai/gpt-mixtral-8x-22b
     base_url: https://llmproxy.dev.gretel.cloud/v1/
     temperature: 0.9
-    extra_headers:
-      Authorization: os.environ/GRETEL_DEV_API_KEY
     max_tokens: 32768
     top_p: 1.0
+    extra_headers:
+      Authorization: os.environ/GRETEL_DEV_API_KEY
   tags:
   - open_license
   - nl
