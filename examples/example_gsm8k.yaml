@@ -1,0 +1,81 @@
+# Generator configuration
+api_key: prompt
+llm_model: gretelai/gpt-auto
+log_level: INFO
+use_reflection: true
+output_prefix: basic_gsm8k
+evol_generations: 1
+num_examples: 100000
+
+# Data model definition
+fields:
+  - name: question
+    type: str
+    description: A math problem ranging from basic to advanced, incorporating various topics and real-world contexts. This is a problem for a student, do not include the answer. Must end with a question mark.
+    validator: A natural language math problem that ends with a question mark
+    evolution_strategies:
+      - Increase the complexity by adding more steps to the problem.
+      - Introduce diverse contexts and new mathematical concepts.
+      - Enhance the wording for better clarity and engagement.
+    evolution_rate: 0.1
+
+  - name: answer
+    type: str
+    description: Detailed step-by-step solution with explanations. EVERY arithmetic or algebraic operation must be annotated with <<calculation=result>>. Must end with '#### ' followed by the final numeric answer.
+    validator: null
+    evolution_strategies:
+      - Refine the solution to improve step-by-step clarity.
+      - Add detailed annotations for all key calculations.
+      - Simplify the explanation while maintaining accuracy and thoroughness.
+    evolution_rate: 0.1
+
+generation_instructions: |
+  You are an expert in generating balanced, context-rich questions and comprehensive answers based on given contexts. Your task is to:
+  1. Create questions that are specific, clear, and directly related to key points in the given context.
+  2. Ensure questions include sufficient background information for understanding without prior knowledge.
+  3. Craft questions that can be answered using only the information provided in the context.
+  4. Generate answers that are informative, concise when possible, and detailed when necessary.
+  5. Provide comprehensive responses that fully address the question, including relevant context and explanations.
+  6. Maintain consistency between the question, answer, and the original context.
+  7. Avoid revealing the answer in the question.
+  8. Adapt the level of detail in the answer based on the complexity of the topic.
+  Remember, the goal is to create question-answer pairs that are informative, understandable, and faithful to the provided context.
+
+# Contextual tags
+contextual_tags:
+  tags:
+    - name: topic
+      values:
+        - arithmetic
+        - fractions
+        - percentages
+        - geometry
+        - basic algebra
+        - data interpretation
+        - word problems
+        - ratios and proportions
+
+    - name: context
+      values:
+        - shopping
+        - sports
+        - cooking
+        - travel
+        - school
+        - family
+        - outdoor activities
+        - hobbies and crafts
+        - holidays and celebrations
+        - animals and nature
+
+    - name: difficulty
+      values:
+        - easy
+        - medium
+        - hard
+
+    - name: age_group
+      values:
+        - grades 2-3
+        - grades 4-5
+        - grade 6

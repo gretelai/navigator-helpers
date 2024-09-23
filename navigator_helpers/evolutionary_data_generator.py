@@ -3,14 +3,13 @@ import logging
 import random
 import textwrap
 
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
-
-import pandas as pd
 
 from gretel_client import Gretel
 
 from .content_validator import ContentValidator
-from .data_models import DataFieldDefinition, DataModelDefinition, GeneratorConfig
+from .data_models import DataField, DataModel
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 from .prompts import (
     CONTENT_CORRECTION_PROMPT,
@@ -24,24 +23,18 @@ from .text_inference import TextInference
 class EvolDataGenerator:
     def __init__(
         self,
-        config: GeneratorConfig,
-        model_definition: DataModelDefinition,
+        model_definition: DataModel,
         custom_evolutionary_strategies: Optional[List[str]] = None,
     ):
-        self.config = config
         self.model_definition = model_definition
         self._setup_logging()
-        self.gretel = Gretel(api_key=self.config.api_key)
+        self.gretel = Gretel(api_key=self.model_definition.api_key)
         self.llm = self.gretel.factories.initialize_navigator_api(
-            "natural_language", backend_model=self.config.llm_model
+            "natural_language", backend_model=self.model_definition.llm_model
         )
-        self.custom_evolutionary_strategies = (
-            list(custom_evolutionary_strategies)
-            if custom_evolutionary_strategies
-            else []
-        )
+        self.custom_evolutionary_strategies = custom_evolutionary_strategies or []
         self.text_inference = TextInference(self.llm, self.logger)
-        self.use_reflection = config.use_reflection
+        self.use_reflection = self.model_definition.use_reflection
         self.validators = self._initialize_validators()
         self.evolutionary_strategies = self._initialize_evolution_strategies()
 
@@ -63,7 +56,7 @@ class EvolDataGenerator:
             self.logger.info("Using default evolutionary strategies.")
             return DEFAULT_EVOLUTION_STRATEGIES
 
-    def _select_evolutionary_strategy(self, field: DataFieldDefinition) -> str:
+    def _select_evolutionary_strategy(self, field: DataField) -> str:
         """
         Select a random evolutionary strategy for a given field. The field's evolutionary strategies
         will default to the global DEFAULT_EVOLUTION_STRATEGIES if no custom strategies are provided.
@@ -85,7 +78,7 @@ class EvolDataGenerator:
     def _generate_field_value(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> Any:
         prompt = FIELD_GENERATION_PROMPT.format(
@@ -120,7 +113,7 @@ class EvolDataGenerator:
         self,
         value: Any,
         evolution_strategy: str,
-        field: DataFieldDefinition,
+        field: DataField,
         context: Dict[str, Any],
         current_record: Dict[str, Any],
     ) -> Any:
@@ -170,7 +163,7 @@ class EvolDataGenerator:
             return True, response.strip()
 
     def _validate_and_correct_field_value(
-        self, value: Any, field: DataFieldDefinition
+        self, value: Any, field: DataField
     ) -> Tuple[Any, bool]:
         validator = self.validators.get(field.name)
         if validator:
@@ -195,7 +188,7 @@ class EvolDataGenerator:
         content: str,
         content_type: str,
         error_message: str,
-        field: DataFieldDefinition,
+        field: DataField,
     ) -> str:
 
         return self.text_inference.generate(
@@ -205,7 +198,7 @@ class EvolDataGenerator:
                 error_message=error_message,
                 content=content,
             ),
-            use_reflection=self.config.use_reflection,
+            use_reflection=self.model_definition.use_reflection,
             return_full_reflection=field.store_full_reflection,
             temperature=0.2,
             field_name="Attempting Correction",
@@ -214,7 +207,7 @@ class EvolDataGenerator:
     def _generate_and_evolve_field(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> Any:
         field_value = self._generate_field_value(context, field, current_record)
@@ -222,7 +215,7 @@ class EvolDataGenerator:
 
         evolution_rate = field.evolution_rate
 
-        for gen in range(self.config.num_generations):
+        for gen in range(self.model_definition.evol_generations):
             if random.random() < evolution_rate:
                 evolution_strategy = self._select_evolutionary_strategy(field)
                 if evolution_strategy:
@@ -247,8 +240,9 @@ class EvolDataGenerator:
         return field_value
 
     def _setup_logging(self):
+        """Set up logging for the EvolDataGenerator."""
         logging.basicConfig(
-            level=getattr(logging, self.config.log_level),
+            level=getattr(logging, self.model_definition.log_level),
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
         self.logger = logging.getLogger(__name__)
@@ -301,22 +295,109 @@ class EvolDataGenerator:
             return None
         return response.strip()
 
-    def _process_contextual_tags(
-        self, contextual_tags: Optional[pd.DataFrame]
-    ) -> List[Dict[str, Any]]:
-        if contextual_tags is None:
-            return [{}]
-        return contextual_tags.to_dict("records")
+    def _process_contextual_tags(self, num_examples: int) -> List[Dict[str, Any]]:
+        if self.model_definition.contextual_tags is None:
+            self.logger.info("No contextual tags provided. Using empty context.")
+            return [{}] * num_examples
+
+        self.logger.info("Processing contextual tags...")
+        contexts = self.model_definition.contextual_tags.mix_tags(num_examples)
+        self.logger.info(f"Generated {len(contexts)} contexts from contextual tags.")
+        return contexts
+
+    def _process_data_source(self, num_examples: int) -> List[Dict[str, Any]]:
+        if self.model_definition.data_source:
+            self.logger.info(
+                f"Loading data from {self.model_definition.data_source.uri}"
+            )
+            data = self.model_definition.load_data()
+            return self.model_definition.sample_data(num_examples)
+        elif self.model_definition.contextual_tags:
+            self.logger.info("Processing contextual tags...")
+            return self.model_definition.contextual_tags.mix_tags(num_examples)
+        else:
+            self.logger.info(
+                "No data source or contextual tags provided. Using empty context."
+            )
+            return [{}] * num_examples
+
+    def generate_data(self) -> List[Dict[str, Any]]:
+        results = []
+        num_examples = self.model_definition.num_examples
+        output_prefix = self.model_definition.output_prefix
+        contexts = self._process_data_source(num_examples)
+
+        # Create a timestamped output file name using the prefix
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        self.output_filename = f"{output_prefix}_{timestamp}.jsonl"
+
+        self.logger.info(f"Output file: {self.output_filename}")
+
+        # Open the output file in append mode (creates if not exists)
+        with open(self.output_filename, "a") as f:
+            for i, context in enumerate(contexts):
+                self.logger.info(f"Generating record {i+1}/{num_examples}")
+                self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
+
+                record = {}
+                valid_record = True
+
+                # Generate fields for each record
+                for field in self.model_definition.fields:
+                    self.logger.info(f"Generating field: {field.name}")
+                    field_value = self._generate_and_evolve_field(
+                        context, field, record
+                    )
+                    field_value, is_valid = self._validate_and_correct_field_value(
+                        field_value, field
+                    )
+                    if not is_valid:
+                        valid_record = False
+                        self.fail_count += 1
+                        break
+                    record[field.name] = field_value
+
+                # If the record is valid, proceed to judge check
+                if valid_record:
+                    passed_judge, judge_response = self._llm_judge_check(record)
+                    if passed_judge:
+                        # Combine the context and the generated record
+                        merged_record = {**context, **record}
+                        self._print_record(merged_record)
+                        results.append(merged_record)
+                        self.success_count += 1
+
+                        # Write the valid record to the output file
+                        json.dump(merged_record, f)
+                        f.write("\n")  # Ensure newline after each record
+
+                        self.logger.debug(
+                            f"Record passed LLM judge check: {judge_response}"
+                        )
+                    else:
+                        self.logger.warning(
+                            f"Record failed LLM judge check and was dropped: {judge_response}\n\n{record}\n\n"
+                        )
+                        self.fail_count += 1
+                else:
+                    self.logger.warning("Record failed validation and was dropped")
+
+                # Print the stats after each record generation
+                self.logger.info(
+                    f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
+                )
+
+        return results
 
     def _create_field_prompt(
         self,
         context: Dict[str, Any],
-        field: DataFieldDefinition,
+        field: DataField,
         current_record: Dict[str, Any],
     ) -> str:
         return textwrap.dedent(
             f"""
-            {self.model_definition.system_message}
+            {self.model_definition.generation_instructions}
 
             Context:
             {json.dumps(context, indent=2)}
@@ -333,73 +414,13 @@ class EvolDataGenerator:
             """
         )
 
-    def _parse_field_value(self, value: str, field: DataFieldDefinition) -> Any:
+    def _parse_field_value(self, value: str, field: DataField) -> Any:
         if field.type == "int":
             return int(value)
         elif field.type == "float":
             return float(value)
         # Add more type parsing as needed
         return value
-
-    def generate_data(
-        self,
-        contextual_tags: Optional[pd.DataFrame] = None,
-        output_file: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        results = []
-        contexts = self._process_contextual_tags(contextual_tags)
-
-        # Open the output file in write mode to overwrite it each time
-        if output_file:
-            with open(output_file, "w") as f:
-                f.write("")
-
-        for i, context in enumerate(contexts):
-            self.logger.info(f"Generating record {i+1}/{len(contexts)}")
-            self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
-
-            record = {}
-            valid_record = True
-            for field in self.model_definition.fields:
-                self.logger.info(f"Generating field: {field.name}")
-                field_value = self._generate_and_evolve_field(context, field, record)
-                field_value, is_valid = self._validate_and_correct_field_value(
-                    field_value, field
-                )
-                if not is_valid:
-                    valid_record = False
-                    self.fail_count += 1
-                    break
-                record[field.name] = field_value
-
-            if valid_record:
-                passed_judge, judge_response = self._llm_judge_check(record)
-                if passed_judge:
-                    # Combine the context and the generated record
-                    merged_record = {**context, **record}
-                    self._print_record(merged_record)
-                    results.append(merged_record)
-
-                    self.success_count += 1
-                    if output_file:
-                        self._write_to_output(merged_record, output_file)
-                    self.logger.debug(
-                        f"Record passed LLM judge check: {judge_response}"
-                    )
-                else:
-                    self.logger.warning(
-                        f"Record failed LLM judge check and was dropped: {judge_response}\n\n{record}\n\n"
-                    )
-                    self.fail_count += 1
-            else:
-                self.logger.warning("Record failed validation and was dropped")
-
-            # Print the stats after each record generation
-            self.logger.info(
-                f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
-            )
-
-        return results
 
     def _print_record(self, record: Dict[str, Any]):
         print("\nGenerated Record:")
@@ -415,7 +436,29 @@ class EvolDataGenerator:
                 print(field_value)
         print("=" * 50)
 
-    def _write_to_output(self, record: Dict[str, Any], output_file: str):
-        with open(output_file, "a") as f:
-            json.dump(record, f)
-            f.write("\n")
+    def _write_to_output(self, synthetic_data, file_prefix):
+        """
+        Write the generated synthetic data to a file with a timestamped filename.
+        The filename is created once and subsequent generations are appended to it.
+
+        Args:
+            synthetic_data: The data to write to the output file.
+            file_prefix: The prefix for the output file name, a timestamp will be appended.
+        """
+        # Create the filename once if it hasn't been created yet
+        if self.output_filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            self.output_filename = f"{file_prefix}_{timestamp}.jsonl"
+
+        logging.info(f"Appending generated data to {self.output_filename}")
+
+        # Write the synthetic data to the file in append mode
+        with open(self.output_filename, "a") as f:
+            for item in synthetic_data:
+                json.dump(item, f)
+                f.write("\n")  # Ensure newline-separated entries
+
+        logging.info(f"Data successfully appended to {self.output_filename}")
+        print(
+            f"Synthetic data generation complete. Output file: {self.output_filename}"
+        )
