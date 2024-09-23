@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import json
 import random
+
+from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -23,7 +27,7 @@ class ContextualTags(BaseModel):
         return domain, topic, complexity
 
     @classmethod
-    def from_json(cls, json_path: str):
+    def from_json(cls, json_path: str | Path):
         with open(json_path, "r") as file:
             data = json.load(file)
         return cls.model_validate(data)
