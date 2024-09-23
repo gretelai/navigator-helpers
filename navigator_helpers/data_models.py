@@ -124,9 +124,6 @@ class ContextualTags(BaseModel):
 
         Args:
             num_rows (int): Number of rows to generate.
-
-            Returns:
-            List[Dict[str, Any]]: List of dictionaries with mixed contextual tags.
         """
         results = []
 
