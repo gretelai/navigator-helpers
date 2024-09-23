@@ -35,11 +35,13 @@ class ConfigGenerator:
         self.user_task = user_task
         logger.info(f"User task set: {user_task}")
 
-    def generate_tags(self) -> ContextualTags:
+    def generate_tags(self, complexity_target: int = 10000) -> ContextualTags:
         """Generate contextual tags based on the user task."""
         if not self.user_task:
             raise ValueError("User task must be set before generating tags.")
-        self.tags = generate_contextual_tags(self.user_task, self.text_inference)
+        self.tags = generate_contextual_tags(
+            self.user_task, self.text_inference, complexity_target
+        )
         return self.tags
 
     def generate_data_model(self) -> Optional[DataModel]:
