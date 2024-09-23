@@ -97,6 +97,7 @@ class NL2ReasoningPipeline:
                 num_domains=self.config.num_domains,
                 num_topics_per_domain=self.config.num_topics_per_domain,
                 num_complexity_levels=self.config.num_complexity_levels,
+                num_objects=self.config.num_objects,
             )
         )
 
@@ -132,13 +133,15 @@ class NL2ReasoningPipeline:
 
         with logging_redirect_tqdm():
             for _ in range(num_samples):
-                domain, topic, complexity = self.contextual_tags.sample()
+                #logger.info(f"🏷️ self.contextual_tags : {self.contextual_tags}")
+                domain, topic, complexity, object_ = self.contextual_tags.sample()
                 record = self.tasks.create_record(
                     domain=domain,
                     topic=topic,
                     complexity=complexity,
                     llm_as_a_judge=self.config.llm_as_a_judge,
                     progress_bar=pbar,
+                    object_=object_
                 )
                 synthetic_dataset.append(record)
                 self._save_artifact("synthetic_dataset", synthetic_dataset)

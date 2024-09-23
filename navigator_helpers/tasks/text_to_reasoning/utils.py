@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 import json_repair
 import pandas as pd
+import re
 
 from rich.console import Console
 from rich.panel import Panel
@@ -33,7 +34,8 @@ def display_nl2reasoning_sample(
     table.add_column("Domain")
     table.add_column("Topic")
     table.add_column("Complexity")
-    rows = [record.domain, record.topic, record.complexity]
+    table.add_column("Object")
+    rows = [record.domain, record.topic, record.complexity, record.object]
 
     if "suggested_packages" in record:
         table.add_column("Suggested Packages")
@@ -59,19 +61,41 @@ def display_nl2reasoning_sample(
 
     panel = Panel(
         Text(record.natural_language, justify="left", overflow="fold"),
-        title=f"Natural Language {record.nl_type.title()}",
+        title="Model Reflection / Thought Process",
     )
     console.print(panel)
 
+    qa = record.natural_language.split("### Step 8: Solution Selection\n'''")[1:]
+    # Regex pattern to capture the final step
+    #pattern = r"*<<QUESTION:>>\s*(.*?)\s*<<ANSWERS:>>\s*(.*?)\s*<<CORRECT ANSWER:>>\s*(\w)"
+
+    # Find matches
+    #match = re.search(pattern, record.natural_language, re.DOTALL)
+
+    # if match:
+    #correct_answer = match.group(3).strip()  # The correct answer (A, B, C, D)
+
     panel = Panel(
         Syntax(
-            record.code,
+            " ".join(qa),
             lexer,
             theme=theme,
             word_wrap=True,
             background_color=background_color,
         ),
-        title="Code",
+        title="Question",
+    )
+    console.print(panel)
+
+    panel = Panel(
+        Syntax(
+            record.example,
+            lexer,
+            theme=theme,
+            word_wrap=True,
+            background_color=background_color,
+        ),
+        title="Reasoning",
     )
     console.print(panel)
 

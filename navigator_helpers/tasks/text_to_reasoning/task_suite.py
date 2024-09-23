@@ -25,8 +25,6 @@ from navigator_helpers.tasks.text_to_reasoning.llm_suite import GretelLLMSuite, 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 validator = ContentValidator()
 
-fluff_logger.setLevel(logging.ERROR)
-
 PBAR_TEMPLATE = "Running Pipeline [current task: {}]".format
 
 
@@ -66,6 +64,11 @@ class NL2ReasoningTaskSuite:
     def generate_domains(self, num_domains: int = 10) -> list[str]:
         logger.info("🏷️ Generating domains")
         response = self.llm.nl_generate(self.prompts.domains(num_domains=num_domains))
+        return utils.parse_json_str(response) or []
+    
+    def generate_objects(self, num_objects: int = 5) -> list[str]:
+        logger.info("🏷️ Generating objects")
+        response = self.llm.nl_generate(self.prompts.objects(num_objects=num_objects))
         return utils.parse_json_str(response) or []
 
     def generate_topics_from_domains(
@@ -110,16 +113,17 @@ class NL2ReasoningTaskSuite:
     #     return package_list
 
     def generate_reasoning_natural_language(
-        self, domain: str, topic: str, complexity: str
+        self, domain: str, topic: str, complexity: str, object_: str
     ) -> str:
         nl_type = random.choice(list(NL_TYPE_REASONING.keys()))
         response = self.llm.nl_generate(
-            self.prompts.python_natural_language(
+            self.prompts.reasoning_natural_language(
                 nl_type_description=NL_TYPE_REASONING[nl_type],
                 nl_type=nl_type,
                 domain=domain,
                 topic=topic,
                 complexity=complexity,
+                object_=object_
             )
         )
         return nl_type, response.strip('"')
@@ -137,7 +141,7 @@ class NL2ReasoningTaskSuite:
             topic=topic,
             complexity=complexity,
         )
-        response = self.llm.code_generate(final_prompt)
+        response = self.llm.reasoning_generate(final_prompt)
 
         if response is None or len(response) == 0:
             response = ""
@@ -155,6 +159,7 @@ class NL2ReasoningTaskSuite:
         num_domains: int = 10,
         num_topics_per_domain: int = 10,
         num_complexity_levels: int = 4,
+        num_objects: int = 5,
     ) -> ContextualTags:
         domain_list = self.generate_domains(num_domains=num_domains)
         domain_and_topics = self.generate_topics_from_domains(
@@ -163,8 +168,9 @@ class NL2ReasoningTaskSuite:
         complexity_levels = self.generate_levels_of_complexity(
             num_levels=num_complexity_levels
         )
+        objects = self.generate_objects(num_objects) 
         return ContextualTags(
-            domain_and_topics=domain_and_topics, complexity_levels=complexity_levels
+            domain_and_topics=domain_and_topics, complexity_levels=complexity_levels, objects=objects
         )
 
     def eval_reasoning_with_llm_as_judge(
@@ -190,6 +196,7 @@ class NL2ReasoningTaskSuite:
         complexity: str,
         llm_as_a_judge: bool,
         # syntax_validation: bool,
+        object_: str,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         # _update_pbar_desc(
@@ -202,7 +209,10 @@ class NL2ReasoningTaskSuite:
             progress_bar, f"⏳ {PBAR_TEMPLATE('natural language prompt')}"
         )
         nl_type, natural_language = self.generate_reasoning_natural_language(
-            domain, topic, complexity
+            domain=domain, 
+            topic=topic, 
+            complexity=complexity, 
+            object_=object_
         )
         _update_pbar_desc(progress_bar, f"⌛️ {PBAR_TEMPLATE('reasoning question answers generation')}")
         prompt, example = self.reasoning_example_generation(
@@ -222,6 +232,7 @@ class NL2ReasoningTaskSuite:
             "full_prompt": prompt,
             "natural_language": natural_language,
             "example": example,
+            "object": object_,
         }
         if llm_as_a_judge:
             _update_pbar_desc(
@@ -242,7 +253,7 @@ class NL2ReasoningTaskSuite:
         topic: str,
         complexity: str,
         llm_as_a_judge: bool,
-        syntax_validation: bool,
+        object_: str,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         return getattr(self, "create_nl2reasoning_record")(
@@ -250,6 +261,6 @@ class NL2ReasoningTaskSuite:
             topic=topic,
             complexity=complexity,
             llm_as_a_judge=llm_as_a_judge,
-            # syntax_validation=syntax_validation,
             progress_bar=progress_bar,
+            object_=object_
         )

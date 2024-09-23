@@ -25,7 +25,7 @@ LLM_SUITE_CONFIG = {
         "reasoning": "gretelai/gpt-mixtral-8x-22b",
         "judge": "gretelai/gpt-groq-llama-3-1-8b",
         "generate_kwargs": {
-            "nl": {},
+            "nl": {"max_tokens": 4096},
             "reasoning": {"max_tokens": 4096},
             "judge": {"temperature": 0.1, "max_tokens": 2048},
         },
@@ -64,9 +64,9 @@ class GretelLLMSuite:
             )
             self._nl_gen_kwargs = config["generate_kwargs"]["nl"]
 
-            logger.info(f"💻 Code LLM: {config['code']}")
-            self._code = self._gretel.factories.initialize_navigator_api(
-                "natural_language", backend_model=config["code"]
+            logger.info(f"💻 Reasoning LLM: {config['reasoning']}")
+            self._reasoning = self._gretel.factories.initialize_navigator_api(
+                "natural_language", backend_model=config["reasoning"]
             )
             self._reasoning_gen_kwargs = config["generate_kwargs"]["reasoning"]
 
