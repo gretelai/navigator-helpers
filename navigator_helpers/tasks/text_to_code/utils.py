@@ -99,6 +99,18 @@ def display_nl2code_sample(
         table.add_column("Syntax Validation", justify="right")
         row.append("PASSED" if record.syntax_validation == "passed" else "FAILED")
 
+<<<<<<< HEAD
+=======
+    # Add semantic validation result
+    if "semantic_validation" in record:
+        if table is None:
+            table = Table()
+        else:
+            table.title = "Evaluation, Syntax, and Semantic Validation"
+        table.add_column("Semantic Validation", justify="right")
+        row.append(f"{record.semantic_validation:.2f}" if isinstance(record.semantic_validation, Number) else "FAILED")
+
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
     if table is not None:
         table.add_row(*row)
         console.print(table)

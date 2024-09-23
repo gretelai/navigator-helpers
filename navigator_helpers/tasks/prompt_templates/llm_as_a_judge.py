@@ -119,6 +119,7 @@ Pythonic: Pythonic Code and Best Practices (Does the code follow Python conventi
 * Score = 2: The code generally follows Python conventions but has room for better alignment with Pythonic practices.
 * Score = 1: The code loosely follows Python conventions, with several deviations from best practices.
 * Score = 0: The code does not follow Python conventions or best practices, using non-Pythonic approaches.
+<<<<<<< HEAD
 """, reasoning_quality_rubric="""\
 You are a reasoning expert, specialising in problems involving physical interaction with the real world.
 Take a deep breath and use the rubric below to grade the quality of a pair of responses to a given question based on INSTRUCTIONS and CONTEXT.
@@ -178,5 +179,7 @@ Pythonic: Pythonic Code and Best Practices (Does the code follow Python conventi
 * Score = 2: The code generally follows Python conventions but has room for better alignment with Pythonic practices.
 * Score = 1: The code loosely follows Python conventions, with several deviations from best practices.
 * Score = 0: The code does not follow Python conventions or best practices, using non-Pythonic approaches.
+=======
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
 """,
 )

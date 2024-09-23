@@ -9,15 +9,21 @@ from navigator_helpers.tasks.prompt_templates.text_to_code import (
     nl2python_template_dict,
     nl2sql_template_dict,
 )
+<<<<<<< HEAD
 from navigator_helpers.tasks.prompt_templates.text_to_reasoning import (
 nl2reasoning_template_dict
 )
+=======
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
 
 
 class TemplateType(str, Enum):
     SQL = "sql"
     PYTHON = "python"
+<<<<<<< HEAD
     REASONING = "reasoning"
+=======
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
     LLM_AS_A_JUDGE = "llm_as_a_judge"
 
 
@@ -51,9 +57,16 @@ TEMPLATE_DICT = {
     "llm_as_a_judge": llm_as_a_judge_template_dict,
     "python": nl2python_template_dict,
     "sql": nl2sql_template_dict,
+<<<<<<< HEAD
     "reasoning": nl2reasoning_template_dict,
+=======
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
 }
 
 
 def load_prompt_template_suite(which: TemplateType) -> PromptTemplateSuite:
+<<<<<<< HEAD
     return PromptTemplateSuite(deepcopy(TEMPLATE_DICT[TemplateType(which).value]))
+=======
+    return PromptTemplateSuite(deepcopy(TEMPLATE_DICT[TemplateType(which).value]))
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28

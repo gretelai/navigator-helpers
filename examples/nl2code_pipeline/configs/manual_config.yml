@@ -32,3 +32,7 @@ complexity_levels:
     
 llm_as_a_judge: true
 syntax_validation: true
+<<<<<<< HEAD
+=======
+semantic_validation: true
+>>>>>>> 14c5a0ae2d27a27167af225a0a8cb615fdb77c28
