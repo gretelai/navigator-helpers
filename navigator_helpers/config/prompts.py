@@ -116,7 +116,6 @@ Guidelines for generating an effective DataModel:
 5. **Static Fields**:
    Include these unchanged:
      api_key: prompt
-     data_source: null
      evol_generations: 1
      llm_model: gretelai/gpt-auto
      log_level: INFO
