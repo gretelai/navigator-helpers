@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
-from navigator_helpers.tasks.base_task_suite import BaseTaskSuite
+from navigator_helpers.tasks.base import BaseTaskSuite
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
 from navigator_helpers.tasks.prompt_templates.template_suite import PromptTemplateSuite
 from navigator_helpers.tasks.prompt_templates.text_to_code import (

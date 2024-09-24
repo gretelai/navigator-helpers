@@ -9,9 +9,13 @@ class NL2CodeAutoConfig(PipelineConfig, BaseModel):
     num_domains: int = 10
     num_topics_per_domain: int = 10
     num_complexity_levels: int = 4
+    llm_as_a_judge: bool = True
+    syntax_validation: bool = True
 
 
 class NL2CodeManualConfig(PipelineConfig, BaseModel):
     code_lang: CodeLang = CodeLang.PYTHON
     domain_and_topics: dict[str, list[str]]
     complexity_levels: list[str]
+    llm_as_a_judge: bool = True
+    syntax_validation: bool = True

@@ -8,9 +8,7 @@ from navigator_helpers.llms.llm_suite import LLMSuiteType
 
 class PipelineConfig(BaseModel):
     llm_suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE
-    artifact_path: Optional[Union[str, Path]] = Path("./nl2code-artifacts")
-    llm_as_a_judge: bool = True
-    syntax_validation: bool = True
+    artifact_path: Optional[Union[str, Path]] = Path("./pipeline-artifacts")
 
     @model_validator(mode="after")
     def validate_artifact_path(self):

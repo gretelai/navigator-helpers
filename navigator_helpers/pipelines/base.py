@@ -13,7 +13,7 @@ from navigator_helpers.llms.llm_suite import GretelLLMSuite
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.pipelines.config.base import ConfigLike, PipelineConfig
 from navigator_helpers.pipelines.config.utils import smart_load_pipeline_config
-from navigator_helpers.tasks.base_task_suite import BaseTaskSuite
+from navigator_helpers.tasks.base import BaseTaskSuite
 from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
@@ -83,6 +83,10 @@ class BasePipeline(ABC):
                 json.dump(artifact, f)
 
     def setup_pipeline(self):
+        """Setup any necessary configurations for the pipeline.
+
+        This method is called at the end of the class constructor.
+        """
         pass
 
     @property
