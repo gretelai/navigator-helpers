@@ -1,7 +1,6 @@
 import json
 import logging
 import random
-import re
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -75,8 +74,8 @@ class DataField(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: Optional[List[str]] = None
-    evolution_rate: float = Field(default=None)
+    evolution_strategies: List[str] = Field(default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES.copy())
+    evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
 
 
@@ -320,8 +319,10 @@ class DataModel(BaseModel):
             data["contextual_tags"] = ContextualTags(
                 tags=[ContextualTag(**tag) for tag in tags_data]
             )
-        if "data_source" in data:
+        if "data_source" in data and data["data_source"] is not None:
             data["data_source"] = DataSource(**data["data_source"])
+        else:
+            data["data_source"] = None
         return cls(**data)
 
     def to_yaml(self) -> str:
@@ -347,7 +348,7 @@ class DataModel(BaseModel):
             yaml_output.append(f"    description: |")
             description_text = field.description.replace("\n", "\n      ")
             yaml_output.append(f"      {description_text}")
-            if field.evolution_rate and field.evolution_rate > 0:
+            if field.evolution_rate > 0.0:
                 yaml_output.append(f"    evolution_rate: {field.evolution_rate}")
                 if field.evolution_strategies:
                     yaml_output.append("    evolution_strategies:")
