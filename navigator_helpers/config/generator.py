@@ -3,6 +3,8 @@ import logging
 
 from typing import Optional, Tuple
 
+from gretel_client import Gretel
+
 from navigator_helpers.data_models import ContextualTag, ContextualTags, DataModel
 from navigator_helpers.text_inference import TextInference
 
@@ -24,8 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigGenerator:
-    def __init__(self, text_inference: TextInference):
-        self.text_inference = text_inference
+    def __init__(
+        self, api_key: Optional[str] = "prompt", model: str = "gretelai/gpt-auto"
+    ):
+        self.gretel = Gretel(api_key=api_key, validate=True)
+        self.llm = self.gretel.factories.initialize_navigator_api(
+            "natural_language", backend_model=model
+        )
+        self.text_inference = TextInference(self.llm)
         self.user_task: Optional[str] = None
         self.tags: Optional[ContextualTags] = None
         self.data_model: Optional[DataModel] = None
@@ -55,12 +63,10 @@ class ConfigGenerator:
         )
         return self.data_model
 
-    def get_final_config(self) -> str:
+    def get_config(self) -> str:
         """Get the final configuration as YAML."""
         if not self.data_model:
-            raise ValueError(
-                "Data model must be generated before getting the final config."
-            )
+            raise ValueError("Data model must be generated before getting the config.")
         return self.data_model.to_yaml()
 
 

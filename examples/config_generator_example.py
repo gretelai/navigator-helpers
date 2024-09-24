@@ -1,17 +1,14 @@
 import logging
 import textwrap
 
-from gretel_client import Gretel
-
 from navigator_helpers.config import ConfigGenerator
-from navigator_helpers.text_inference import TextInference
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OUTPUT_FILE = "final_config.yaml"
-MODEL = "gretelai/gpt-auto"
+OUTPUT_FILE = "synthetic_config.yaml"
+DEFAULT_MODEL = "gretelai/gpt-auto"
 
 
 def get_complexity_target():
@@ -23,30 +20,24 @@ def get_complexity_target():
         - 100000 is considered high complexity
         Your choice: """
     )
-
     complexity_input = input(prompt).strip()
     return int(complexity_input) if complexity_input else default_complexity
 
 
-def main():
-    # Initialize Gretel
-    gretel = Gretel(api_key="prompt")
-    llm = gretel.factories.initialize_navigator_api(
-        "natural_language", backend_model=MODEL
-    )
-    text_inference = TextInference(llm, logging.getLogger(__name__))
-
-    # Initialize ConfigGenerator
-    config_generator = ConfigGenerator(text_inference)
-
-    # Prompt user for task or use default
+def get_user_task():
     default_task = "Create a dataset of high-quality math problems with solutions, similar to GSM8K."
     user_task = input(
         f"\nPlease describe the dataset you want to generate (press Enter to use default: '{default_task}'): "
     ).strip()
-    print()
-    if not user_task:
-        user_task = default_task
+    return user_task if user_task else default_task
+
+
+def main():
+    # Initialize ConfigGenerator
+    config_generator = ConfigGenerator(api_key="prompt", model=DEFAULT_MODEL)
+
+    # Get user task
+    user_task = get_user_task()
     logger.info(f"User task: {user_task}")
 
     # Set user task
@@ -65,17 +56,15 @@ def main():
     # Generate data model
     logger.info("Generating data model...")
     data_model = config_generator.generate_data_model()
-    logger.info("Generated data model:")
-    logger.info(data_model.to_yaml())
+    logger.info("Generated data model")
 
-    # Get final config
-    final_config = config_generator.get_final_config()
-    logger.info("Final configuration:")
-    logger.info(final_config)
+    # Get config
+    config = config_generator.get_config()
+    logger.info(f"Synthetic Data Generation Configuration:\n'''\n{config}\n'''")
 
     # Save the final config to a file
     with open(OUTPUT_FILE, "w") as f:
-        f.write(final_config)
+        f.write(config)
     logger.info(f"Final configuration saved to '{OUTPUT_FILE}'")
 
 

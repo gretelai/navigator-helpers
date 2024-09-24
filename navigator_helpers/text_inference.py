@@ -7,9 +7,10 @@ from .prompts import DEFAULT_SYSTEM_PROMPT, REFLECTION_SYSTEM_PROMPT
 
 
 class TextInference:
-    def __init__(self, llm, logger=None):
+    def __init__(self, llm, logger=None, debug: bool = False):
         self.llm = llm
         self.logger = logger or logging.getLogger(__name__)
+        self.debug = debug
 
     def generate(
         self,
@@ -45,11 +46,12 @@ class TextInference:
         else:
             result = self._remove_excess_newlines(response)
 
-        self.logger.info(
-            f"\n{field_name.upper()}:\n"
-            f"--------------------------------------------------\n"
-            f"'''\n{result}\n'''\n"
-        )
+        if self.debug:
+            self.logger.info(
+                f"\n{field_name.upper()}:\n"
+                f"--------------------------------------------------\n"
+                f"'''\n{result}\n'''\n"
+            )
 
         return result
 
