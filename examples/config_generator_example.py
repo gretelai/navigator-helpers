@@ -56,13 +56,11 @@ def main():
     # Generate data model
     logger.info("Generating data model...")
     data_model = config_generator.generate_data_model()
-    logger.info("Generated data model:")
-    logger.info(data_model.to_yaml())
+    logger.info("Generated data model")
 
     # Get config
     config = config_generator.get_config()
-    logger.info("Synthetic Data Generation Configuration:")
-    logger.info(config)
+    logger.info(f"Synthetic Data Generation Configuration:\n'''\n{config}\n'''")
 
     # Save the final config to a file
     with open(OUTPUT_FILE, "w") as f:
