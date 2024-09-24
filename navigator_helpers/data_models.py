@@ -76,7 +76,7 @@ class DataField(BaseModel):
     description: str
     validator: Optional[str] = None
     evolution_strategies: Optional[List[str]] = None
-    evolution_rate: float = Field(default=None)
+    evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
 
 
@@ -320,8 +320,12 @@ class DataModel(BaseModel):
             data["contextual_tags"] = ContextualTags(
                 tags=[ContextualTag(**tag) for tag in tags_data]
             )
-        if "data_source" in data:
+        if "data_source" in data and data["data_source"] is not None:
             data["data_source"] = DataSource(**data["data_source"])
+        else:
+            data.pop(
+                "data_source", None
+            )  # Remove data_source if it's None or not present
         return cls(**data)
 
     def to_yaml(self) -> str:
