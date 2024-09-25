@@ -20,10 +20,8 @@ def get_diversity_target():
         - 100000 is considered high diversity
         Your choice: """
     )
-    diversity_input = input(prompt).strip()
-    return int(diversity_input) if diversity_input else default_diversity
 
-
+    
 def get_user_task():
     default_task = "Create a dataset of high-quality math problems with solutions, similar to GSM8K."
     user_task = input(

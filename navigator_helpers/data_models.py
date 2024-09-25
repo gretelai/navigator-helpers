@@ -322,7 +322,9 @@ class DataModel(BaseModel):
         if "data_source" in data and data["data_source"] is not None:
             data["data_source"] = DataSource(**data["data_source"])
         else:
-            data["data_source"] = None
+            data.pop(
+                "data_source", None
+            )
         return cls(**data)
 
     def to_yaml(self) -> str:
