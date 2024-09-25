@@ -1,10 +1,14 @@
-import os
 import re
 import pandas as pd
 import sqlfluff
 import sqlglot
+import time
 
 from docker.models.containers import Container
+from google.api_core.client_options import ClientOptions
+from google.api_core.exceptions import NotFound
+from google.auth.credentials import AnonymousCredentials
+from google.cloud import bigquery
 from sqlalchemy import create_engine, text
 from sqlvalidator.sql_validator import SQLQuery
 from typing import Tuple
@@ -340,3 +344,151 @@ class SqlserverValidator:
             except:
                 # print('Unable to remove db')
                 pass
+
+class GooglesqlValidator:
+
+    def _add_dataset_name_to_create_statement(create_statement, dataset_name):
+        """
+        This is a hack. Most BigQuery SQL statements do not include the dataset name
+        in the CREATE TABLE statement. This function adds the dataset name to the table name
+        that's being created so that we can query from multiple datasets within the same database instance.
+        """
+        # Regex to match the table name in the CREATE TABLE/CREATE VIEW/INSERT INTO statements
+        pattern_1 = r'(CREATE\s+TABLE\s+)(\w+)(\s*\()'
+        pattern_2 = r'(CREATE\s+VIEW\s+|INSERT\s+INTO\s+)(\w+)(\s*)'
+
+        # Replace with the dataset and table name in the format `dataset_name.table_name`
+        replacement = r'\1`' + dataset_name + r'.\2`\3'
+
+        # Apply the regex substitution
+        updated_statement = re.sub(pattern_1, replacement, create_statement)
+        updated_statement = re.sub(pattern_2, replacement, updated_statement)
+
+        return updated_statement
+    
+    def _add_dataset_name_to_select_statement(query, dataset_name):
+        """Similar hack as above, adds dataset name to table names in FROM and JOIN clauses"""
+
+        # Step 1: Edge case handling
+        # Find all EXTRACT(...FROM...) patterns and temporarily replace them to avoid modification
+        extract_pattern = r'EXTRACT\s*\(\s*\w+\s+FROM\s+[\w.\(]+\s*\)'
+        extracts = re.findall(extract_pattern, query, flags=re.IGNORECASE)
+        
+        # Temporarily replace EXTRACT(...FROM...) with placeholders
+        placeholder_query = query
+        for i, extract in enumerate(extracts):
+            placeholder_query = placeholder_query.replace(extract, f"__EXTRACT_PLACEHOLDER_{i}__")
+        
+        # Step 2: Add dataset name to table names in FROM and JOIN clauses
+        pattern = r'(?<=\bFROM\s|\bJOIN\s)(\w+)\b'
+        updated_query = re.sub(pattern, rf'{dataset_name}.\1', placeholder_query, flags=re.IGNORECASE)
+        
+        # Step 3: Restore the original EXTRACT(...) functions
+        for i, extract in enumerate(extracts):
+            updated_query = updated_query.replace(f"__EXTRACT_PLACEHOLDER_{i}__", extract)
+        
+        return updated_query
+    
+    def _delete_views(dataset_id, client):
+        dataset_ref = client.dataset(dataset_id)
+    
+        # List all tables in the dataset
+        tables = client.list_tables(dataset_ref)
+
+        # Loop through each table to check if it's a view
+        for table in tables:
+            table_ref = client.get_table(table)
+            if table_ref.table_type == 'VIEW':
+                # Try to delete the view
+                try:
+                    client.delete_table(table_ref)
+                except NotFound:
+                    pass
+                except Exception as e:
+                    print(f"Failed to delete view: {table.table_id}, error: {e}")
+
+    def _query_bigquery(
+            sql_query: str,
+            schema: str,
+            db_name: str,
+            db_creds: dict
+        ) -> pd.DataFrame:
+        """
+        Creates a temporary db from the table metadata string, runs query on the temporary db.
+        After the query is run, the temporary db is dropped.
+        """
+        client = None
+
+        try:
+            # Create a client
+            client_options = ClientOptions(api_endpoint=f"http://0.0.0.0:{db_creds['port']}")
+            client = bigquery.Client(
+                project=db_creds["project"],
+                client_options=client_options,
+                credentials=AnonymousCredentials(),  # Auth is disabled for our purposes
+                )
+
+            # Create a dataset
+            client.create_dataset(db_name, exists_ok=True, retry=None)
+            # Wait for the dataset to be created
+            time.sleep(1)
+        except Exception as e:
+            if client:
+                client.close()
+            raise RuntimeError(f"Error creating dataset: {e}")
+
+        try:
+            # Create a table
+            disambiguated_schema = GooglesqlValidator._add_dataset_name_to_create_statement(schema, db_name)
+            disambiguated_schema = GooglesqlValidator._add_dataset_name_to_select_statement(disambiguated_schema, db_name)
+            schema_creation = client.query(disambiguated_schema)
+            schema_creation.result()
+
+        except Exception as e:
+            if client:
+                try:
+                    GooglesqlValidator._delete_views(db_name, client)
+                    client.delete_dataset(db_name, delete_contents=True, not_found_ok=True, retry=None)
+                except:
+                    pass
+                client.close()
+            raise RuntimeError(f"Error creating tables: {e}")
+        
+        try:
+            # Execute the query
+            disambiguated_query = GooglesqlValidator._add_dataset_name_to_select_statement(sql_query, db_name)
+            query_job = client.query(disambiguated_query, retry=None) 
+            result = query_job.result()
+        except Exception as e:
+            if client:
+                try:
+                    GooglesqlValidator._delete_views(db_name, client)
+                    client.delete_dataset(db_name, delete_contents=True, not_found_ok=True, retry=None)
+                except:
+                    pass
+                client.close()
+            raise RuntimeError(f"Error querying transactions: {e}")
+        
+        try:
+            # Delete the dataset
+            GooglesqlValidator._delete_views(db_name, client)
+            client.delete_dataset(db_name, delete_contents=True, not_found_ok=True, retry=None)
+            client.close()
+        except:
+            pass
+
+        return result
+        
+    def is_valid_sql(query: str, schema: str, domain: str, db_creds: dict) -> Tuple[bool, str]:
+        db_name = domain.replace(' ','-').replace('_', '-').lower()
+        try:
+            GooglesqlValidator._query_bigquery(
+                sql_query=query,
+                schema=schema,
+                db_name=db_name,
+                db_creds=db_creds)
+            return True, None
+        except Exception as e:
+            # print(f"GoogleSQL Error: {e}")
+            return False, str(e)
+
