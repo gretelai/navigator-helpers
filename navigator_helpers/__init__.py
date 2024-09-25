@@ -24,7 +24,6 @@ __all__ = [
     "DataField",
     "DataModel",
     "ContextualTags",
-    "ConfigGenerator",
     "ContextualTag",
     "EvolDataGenerator",
     "ContentValidator",

@@ -3,7 +3,7 @@ api_key: prompt
 llm_model: gretelai/gpt-auto
 log_level: INFO
 use_reflection: true
-output_prefix: basic_nl2sql
+output_filename: basic_nl2sql.jsonl
 evol_generations: 1
 num_examples: 1000
 

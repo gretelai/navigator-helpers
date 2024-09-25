@@ -1,10 +1,10 @@
 import json
 import logging
+import os
 import random
 import textwrap
 
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from gretel_client import Gretel
 
@@ -40,6 +40,7 @@ class EvolDataGenerator:
 
         self.success_count = 0
         self.fail_count = 0
+        self.output_filename = None
 
     def _initialize_evolution_strategies(self) -> List[str]:
         """
@@ -321,24 +322,41 @@ class EvolDataGenerator:
             )
             return [{}] * num_examples
 
-    def generate_data(self) -> List[Dict[str, Any]]:
-        results = []
+    def generate_data(self) -> Generator[Dict[str, Any], None, str]:
+        """
+        Generates data records by processing the context, generating fields,
+        validating the records, and performing a judge check on each record.
+        Valid records are saved to an output file in JSONL format.
+
+        The method uses model definitions and fields from `self.model_definition` to
+        create records. It logs the progress and results and updates success and failure counts.
+
+        Yields:
+            Dict[str, Any]: A valid merged record combining the context and generated fields.
+        Returns:
+            str: The final filename that was used for writing the data.
+        """
         num_examples = self.model_definition.num_examples
-        output_prefix = self.model_definition.output_prefix
+        base_output_filename = self.model_definition.output_filename
         contexts = self._process_data_source(num_examples)
 
-        # Create a timestamped output file name using the prefix
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        self.output_filename = f"{output_prefix}_{timestamp}.jsonl"
+        # Ensure the filename is unique by appending a counter if necessary
+        self.output_filename = base_output_filename
+        counter = 1
+        while os.path.exists(self.output_filename):
+            self.output_filename = f"{base_output_filename}_{counter}.jsonl"
+            counter += 1
 
         self.logger.info(f"Output file: {self.output_filename}")
 
-        # Open the output file in append mode (creates if not exists)
+        # Open the output file in write mode to clear existing content
+        with open(self.output_filename, "w") as f:
+            pass  # Just to clear the file if it exists
+
         with open(self.output_filename, "a") as f:
             for i, context in enumerate(contexts):
                 self.logger.info(f"Generating record {i+1}/{num_examples}")
                 self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
-
                 record = {}
                 valid_record = True
 
@@ -351,10 +369,12 @@ class EvolDataGenerator:
                     field_value, is_valid = self._validate_and_correct_field_value(
                         field_value, field
                     )
+
                     if not is_valid:
                         valid_record = False
                         self.fail_count += 1
                         break
+
                     record[field.name] = field_value
 
                 # If the record is valid, proceed to judge check
@@ -364,16 +384,17 @@ class EvolDataGenerator:
                         # Combine the context and the generated record
                         merged_record = {**context, **record}
                         self._print_record(merged_record)
-                        results.append(merged_record)
                         self.success_count += 1
 
                         # Write the valid record to the output file
                         json.dump(merged_record, f)
                         f.write("\n")  # Ensure newline after each record
-
                         self.logger.debug(
                             f"Record passed LLM judge check: {judge_response}"
                         )
+
+                        # Yield the record
+                        yield merged_record
                     else:
                         self.logger.warning(
                             f"Record failed LLM judge check and was dropped: {judge_response}\n\n{record}\n\n"
@@ -386,8 +407,6 @@ class EvolDataGenerator:
                 self.logger.info(
                     f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
                 )
-
-        return results
 
     def _create_field_prompt(
         self,
@@ -419,7 +438,6 @@ class EvolDataGenerator:
             return int(value)
         elif field.type == "float":
             return float(value)
-        # Add more type parsing as needed
         return value
 
     def _print_record(self, record: Dict[str, Any]):
@@ -435,30 +453,3 @@ class EvolDataGenerator:
             else:
                 print(field_value)
         print("=" * 50)
-
-    def _write_to_output(self, synthetic_data, file_prefix):
-        """
-        Write the generated synthetic data to a file with a timestamped filename.
-        The filename is created once and subsequent generations are appended to it.
-
-        Args:
-            synthetic_data: The data to write to the output file.
-            file_prefix: The prefix for the output file name, a timestamp will be appended.
-        """
-        # Create the filename once if it hasn't been created yet
-        if self.output_filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            self.output_filename = f"{file_prefix}_{timestamp}.jsonl"
-
-        logging.info(f"Appending generated data to {self.output_filename}")
-
-        # Write the synthetic data to the file in append mode
-        with open(self.output_filename, "a") as f:
-            for item in synthetic_data:
-                json.dump(item, f)
-                f.write("\n")  # Ensure newline-separated entries
-
-        logging.info(f"Data successfully appended to {self.output_filename}")
-        print(
-            f"Synthetic data generation complete. Output file: {self.output_filename}"
-        )

@@ -3,9 +3,9 @@ api_key: prompt
 llm_model: gretelai/gpt-auto
 log_level: INFO
 use_reflection: true
-output_prefix: basic_gsm8k
+output_filename: basic_gsm8k.jsonl
 evol_generations: 1
-num_examples: 100000
+num_examples: 2
 
 # Data model definition
 fields:

@@ -15,10 +15,12 @@ def run_generation(config_file: str):
     # Initialize the EvolDataGenerator
     generator = EvolDataGenerator(model_definition)
 
-    # Generate the data
-    generator.generate_data()
+    # Generate the data and process each record as it's yielded
+    for record in generator.generate_data():
+        print(f"Generated record: {record}")
 
-    print(f"Data generation complete. Output saved to {model_definition.output_file}")
+    latest_filename = generator.output_filename
+    print(f"Data generation complete. Output saved to {latest_filename}")
 
 
 if __name__ == "__main__":

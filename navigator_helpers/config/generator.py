@@ -16,7 +16,7 @@ from .prompts import (
     TAG_EXTRACTION_SYSTEM_PROMPT,
 )
 from .utils import (
-    calculate_complexity,
+    calculate_diversity,
     extract_json_from_response,
     parse_yaml,
     safe_variable_name,
@@ -43,12 +43,12 @@ class ConfigGenerator:
         self.user_task = user_task
         logger.info(f"User task set: {user_task}")
 
-    def generate_tags(self, complexity_target: int = 10000) -> ContextualTags:
+    def generate_tags(self, diversity_target: int = 10000) -> ContextualTags:
         """Generate contextual tags based on the user task."""
         if not self.user_task:
             raise ValueError("User task must be set before generating tags.")
         self.tags = generate_contextual_tags(
-            self.user_task, self.text_inference, complexity_target
+            self.user_task, self.text_inference, diversity_target
         )
         return self.tags
 
@@ -71,15 +71,15 @@ class ConfigGenerator:
 
 
 def extract_tags_with_llm(
-    description: str, text_inference: TextInference, complexity_target: int = 10000
+    description: str, text_inference: TextInference, diversity_target: int = 10000
 ) -> ContextualTags:
     tags = []
-    current_complexity = 0
+    current_diversity = 0
     iteration = 0
 
-    while current_complexity < complexity_target:
+    while current_diversity < diversity_target:
         iteration += 1
-        logger.info(f"Iteration {iteration}: Current Complexity = {current_complexity}")
+        logger.info(f"Iteration {iteration}: Current diversity = {current_diversity}")
 
         if iteration == 1:
             user_prompt = TAG_EXTRACTION_INITIAL_USER_PROMPT.format(
@@ -128,20 +128,20 @@ def extract_tags_with_llm(
                     ContextualTag(name=tag_data["name"], values=tag_data["values"])
                 )
 
-        current_complexity = calculate_complexity(tags)
-        logger.info(f"Current complexity: {current_complexity}")
+        current_diversity = calculate_diversity(tags)
+        logger.info(f"Current diversity: {current_diversity}")
 
-        if current_complexity >= complexity_target:
-            logger.info(f"Complexity target met: {current_complexity}")
+        if current_diversity >= diversity_target:
+            logger.info(f"Diversity target met: {current_diversity}")
             break
 
     return ContextualTags(tags=tags)
 
 
 def generate_contextual_tags(
-    user_task: str, text_inference: TextInference, complexity_target: int = 10000
+    user_task: str, text_inference: TextInference, diversity_target: int = 10000
 ) -> ContextualTags:
-    return extract_tags_with_llm(user_task, text_inference, complexity_target)
+    return extract_tags_with_llm(user_task, text_inference, diversity_target)
 
 
 def generate_data_model(
@@ -198,7 +198,7 @@ def generate_data_model(
 def generate_config(
     user_task: str, text_inference: TextInference, max_retries: int = 3
 ) -> Tuple[Optional[DataModel], ContextualTags]:
-    tags = generate_contextual_tags(user_task, text_inference, complexity_target=10000)
+    tags = generate_contextual_tags(user_task, text_inference, diversity_target=10000)
     logger.info("\nGenerated Tags and Attributes:")
     logger.info(tags.to_yaml())
 
