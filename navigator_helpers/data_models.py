@@ -74,7 +74,9 @@ class DataField(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: List[str] = Field(default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES.copy())
+    evolution_strategies: List[str] = Field(
+        default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES.copy()
+    )
     evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
 
@@ -199,11 +201,9 @@ class DataModel(BaseModel):
         llm_model (str): The name of the large language model used for data generation.
         log_level (str): The level of logging verbosity.
         use_reflection (bool): If True, enables the reflection feature for improving data quality.
-        output_prefix (str): The prefix for the output file where generated data will be saved.
+        output_filename (str): The base filename where generated data will be saved.
         num_examples (int): The total number of examples to generate.
     """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
     fields: List[DataField]
     generation_instructions: str
@@ -214,7 +214,7 @@ class DataModel(BaseModel):
     llm_model: str
     log_level: str = "INFO"
     use_reflection: bool = True
-    output_prefix: str
+    output_filename: str = "synthetic_data.jsonl"
     num_examples: int
 
     @field_validator("data_source", "contextual_tags")
