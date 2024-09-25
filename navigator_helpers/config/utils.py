@@ -33,9 +33,9 @@ def extract_json_from_response(response_text: str) -> str:
     return json_content
 
 
-def calculate_complexity(tags: List[ContextualTag]) -> int:
+def calculate_diversity(tags: List[ContextualTag]) -> int:
     """
-    Calculates the complexity of a list of ContextualTags.
+    Calculates the diversity of a list of ContextualTags.
     """
     if not tags:
         return 0
