@@ -11,17 +11,17 @@ OUTPUT_FILE = "synthetic_config.yaml"
 DEFAULT_MODEL = "gretelai/gpt-auto"
 
 
-def get_complexity_target():
-    default_complexity = 10000
+def get_diversity_target():
+    default_diversity = 10000
     prompt = textwrap.dedent(
         f"""
-        Enter the desired complexity target (press Enter to use default: {default_complexity}):
-        - 10000 is a normal complexity target
-        - 100000 is considered high complexity
+        Enter the desired diversity target (press Enter to use default: {default_diversity}):
+        - 10000 is a normal diversity target
+        - 100000 is considered high diversity
         Your choice: """
     )
-    complexity_input = input(prompt).strip()
-    return int(complexity_input) if complexity_input else default_complexity
+    diversity_input = input(prompt).strip()
+    return int(diversity_input) if diversity_input else default_diversity
 
 
 def get_user_task():
@@ -43,13 +43,13 @@ def main():
     # Set user task
     config_generator.set_user_task(user_task)
 
-    # Prompt user for complexity target or use default
-    complexity_target = get_complexity_target()
-    logger.info(f"Complexity target: {complexity_target}")
+    # Prompt user for diversity target or use default
+    diversity_target = get_diversity_target()
+    logger.info(f"diversity target: {diversity_target}")
 
-    # Generate tags with the specified complexity target
+    # Generate tags with the specified diversity target
     logger.info("Generating tags...")
-    tags = config_generator.generate_tags(complexity_target=complexity_target)
+    tags = config_generator.generate_tags(diversity_target=diversity_target)
     logger.info("Generated tags:")
     logger.info(tags.to_yaml())
 

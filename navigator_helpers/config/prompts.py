@@ -3,7 +3,7 @@ api_key: prompt
 llm_model: gretelai/gpt-auto
 log_level: INFO
 use_reflection: true
-output_prefix: basic_closed_qa
+output_filename: basic_closed_qa.jsonl
 evol_generations: 1
 num_examples: 1000
 
@@ -122,7 +122,7 @@ Guidelines for generating an effective DataModel:
      log_level: INFO
      num_examples: 1000
      use_reflection: true
-   Set `output_prefix` to a relevant value based on the task.
+   Set `output_filename` to a relevant filename with a jsonl extension based on the task. E.g. synthetic_data.jsonl
 
 Sample DataModel structure:
 

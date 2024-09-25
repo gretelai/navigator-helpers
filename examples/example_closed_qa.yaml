@@ -3,7 +3,7 @@ api_key: prompt
 llm_model: gretelai/gpt-auto
 log_level: INFO
 use_reflection: true
-output_prefix: closed_qa_synthetic_data
+output_filename: closed_qa_synthetic_data.jsonl
 evol_generations: 1
 num_examples: 10
 
