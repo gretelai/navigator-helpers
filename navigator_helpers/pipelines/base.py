@@ -14,7 +14,6 @@ from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.pipelines.config.base import ConfigLike, PipelineConfig
 from navigator_helpers.pipelines.config.utils import smart_load_pipeline_config
 from navigator_helpers.tasks.base import BaseTaskSuite
-from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
@@ -36,13 +35,6 @@ class PipelineResults:
                 metadata = json.load(f)
         dataframe = pd.read_json(path / "synthetic_dataset.json")
         return cls(dataframe=dataframe, config=config, metadata=metadata)
-
-    def display_sample(self, index: Optional[int] = None, **kwargs):
-        if index is None:
-            record = self.dataframe.sample(1).iloc[0]
-        else:
-            record = self.dataframe.loc[index]
-        display_nl2code_sample(record, **kwargs)
 
     def save_artifacts(self, path: str | Path):
         path = Path(path)
