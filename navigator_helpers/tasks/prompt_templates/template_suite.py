@@ -1,6 +1,7 @@
 from copy import deepcopy
 from enum import Enum
 from string import Formatter
+from typing import Any, TYPE_CHECKING
 
 from navigator_helpers.tasks.prompt_templates.llm_as_a_judge import (
     llm_as_a_judge_template_dict,
@@ -22,7 +23,7 @@ class PromptTemplateSuite:
         self._template_dict = template_dict
         for name, template in template_dict.items():
             self.get_template_keywords(name)
-            setattr(self, f"_{name}", f"{template}")
+            setattr(self, f"_{name}", template)
             setattr(self, name, f"{template}".format)
 
     @property
@@ -41,6 +42,10 @@ class PromptTemplateSuite:
         for name in self.template_names:
             r += f"\n    {name}: {tuple(self.get_template_keywords(name))}"
         return r + "\n)"
+
+    if TYPE_CHECKING:
+        # This makes pyright okay with the dynamic attribute setting.
+        def __getattribute__(self, name: str) -> Any: ...
 
 
 TEMPLATE_DICT = {

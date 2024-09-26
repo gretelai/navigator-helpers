@@ -119,7 +119,7 @@ def _resolve_os_environ(identifier: str) -> str:
     if value is None:
         raise ValueError(f"Environment variable {identifier!r} is not set")
 
-    logger.info(f"Resolved ENV: {identifier!r} to '{value[:4]}...'")
+    logger.debug(f"Resolved ENV: {identifier!r} to '{value[:4]}...'")
     return value
 
 
