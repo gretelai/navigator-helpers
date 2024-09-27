@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import logging
 import re
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from .prompts import DEFAULT_SYSTEM_PROMPT, REFLECTION_SYSTEM_PROMPT
 
+if TYPE_CHECKING:
+    from gretel_client.inference_api.natural_language import NaturalLanguageInferenceAPI
+
 
 class TextInference:
-    def __init__(self, llm, logger=None, debug: bool = False):
+    def __init__(
+        self, llm: NaturalLanguageInferenceAPI, logger=None, debug: bool = False
+    ):
         self.llm = llm
         self.logger = logger or logging.getLogger(__name__)
         self.debug = debug

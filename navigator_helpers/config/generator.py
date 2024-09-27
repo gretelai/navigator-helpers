@@ -1,9 +1,10 @@
 import json
 import logging
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from gretel_client import Gretel
+from gretel_client.inference_api.base import InferenceAPIModelType
 
 from navigator_helpers.data_models import ContextualTag, ContextualTags, DataModel
 from navigator_helpers.text_inference import TextInference
@@ -22,6 +23,9 @@ from .utils import (
     safe_variable_name,
 )
 
+if TYPE_CHECKING:
+    from gretel_client.inference_api.natural_language import NaturalLanguageInferenceAPI
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,9 +34,11 @@ class ConfigGenerator:
         self, api_key: Optional[str] = "prompt", model: str = "gretelai/gpt-auto"
     ):
         self.gretel = Gretel(api_key=api_key, validate=True)
-        self.llm = self.gretel.factories.initialize_navigator_api(
-            "natural_language", backend_model=model
-        )
+        self.llm: NaturalLanguageInferenceAPI = (
+            self.gretel.factories.initialize_navigator_api(
+                InferenceAPIModelType.NATURAL_LANGUAGE, backend_model=model
+            )
+        )  # type: ignore
         self.text_inference = TextInference(self.llm)
         self.user_task: Optional[str] = None
         self.tags: Optional[ContextualTags] = None
@@ -73,9 +79,10 @@ class ConfigGenerator:
 def extract_tags_with_llm(
     description: str, text_inference: TextInference, diversity_target: int = 10000
 ) -> ContextualTags:
-    tags = []
     current_diversity = 0
     iteration = 0
+
+    contextual_tags = ContextualTags()
 
     while current_diversity < diversity_target:
         iteration += 1
@@ -86,18 +93,19 @@ def extract_tags_with_llm(
                 description=description
             )
         else:
-            tags_json = json.dumps([tag.model_dump() for tag in tags], indent=2)
+            tags_json = json.dumps(
+                [tag.model_dump() for tag in contextual_tags.tags], indent=2
+            )
             user_prompt = TAG_EXTRACTION_ITERATION_USER_PROMPT.format(
                 description=description, tags_json=tags_json
             )
 
-        full_prompt = TAG_EXTRACTION_SYSTEM_PROMPT + "\n\n" + user_prompt
-
         assistant_reply = text_inference.generate(
-            full_prompt,
+            user_prompt,
             use_reflection=False,
             temperature=0.7,
             max_tokens=2000,
+            system_message=TAG_EXTRACTION_SYSTEM_PROMPT,
         )
 
         json_content = extract_json_from_response(assistant_reply)
@@ -110,32 +118,23 @@ def extract_tags_with_llm(
             break
 
         for tag_data in new_tags_data:
-            tag_data["name"] = safe_variable_name(tag_data["name"])
-            existing_tag = next(
-                (tag for tag in tags if tag.name == tag_data["name"]), None
-            )
+            tag_name = safe_variable_name(tag_data["name"])
+            new_values = tag_data["values"]
 
-            if existing_tag:
-                existing_values = set(existing_tag.values)
-                new_values = [
-                    value
-                    for value in tag_data["values"]
-                    if value not in existing_values
-                ]
-                existing_tag.values.extend(new_values)
+            existing_tag = contextual_tags.get_tag_by_name(tag_name)
+            if not existing_tag:
+                contextual_tags.add_tag(ContextualTag(name=tag_name, values=new_values))
             else:
-                tags.append(
-                    ContextualTag(name=tag_data["name"], values=tag_data["values"])
-                )
+                existing_tag.add_values(new_values)
 
-        current_diversity = calculate_diversity(tags)
+        current_diversity = calculate_diversity(contextual_tags.tags)
         logger.info(f"Current diversity: {current_diversity}")
 
         if current_diversity >= diversity_target:
             logger.info(f"Diversity target met: {current_diversity}")
             break
 
-    return ContextualTags(tags=tags)
+    return contextual_tags
 
 
 def generate_contextual_tags(

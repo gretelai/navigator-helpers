@@ -15,8 +15,8 @@ from .data_models import ContextualTag, ContextualTags, DataField, DataModel
 from .evolutionary_data_generator import EvolDataGenerator
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 from .llms.llm_suite import GretelLLMSuite
-from .pipelines.text_to_code import NL2CodePipeline
 from .pipelines.config.utils import smart_load_pipeline_config
+from .pipelines.text_to_code import NL2CodePipeline
 from .tasks.text_to_code.task_suite import NL2PythonTaskSuite, NL2SQLTaskSuite
 from .text_inference import TextInference
 

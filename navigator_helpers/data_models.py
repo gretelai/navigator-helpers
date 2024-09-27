@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 
 from datasets import load_dataset
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 
@@ -105,8 +105,53 @@ class ContextualTag(BaseModel):
 
     name: str
     values: List[Union[str, WeightedValue]] = Field(
-        ..., description="List of values or weighted value objects"
+        ...,
+        description="List of values or weighted value objects",
+        min_length=1,
     )
+
+    def add_values(
+        self, values: Union[str, list[str]], weight: Optional[float] = None
+    ) -> int:
+        """
+        Adds a new value(s) to the tag.
+
+        Args:
+            values: The values to add.
+            weight: The optional weight associated with the value. If multiple values are provided,
+                this weight will be applied to all of them.
+
+        Returns: The number of new values added
+        """
+        added = 0
+
+        if isinstance(values, str):
+            values = [values]
+
+        for value in values:
+            exists = False
+            for existing_value in self.values:  # type: ignore
+                if (
+                    isinstance(existing_value, WeightedValue)
+                    and existing_value.value.lower() == value.lower()
+                ):
+                    exists = True
+
+                if (
+                    isinstance(existing_value, str)
+                    and existing_value.lower() == value.lower()
+                ):
+                    exists = True
+
+            if not exists:
+                if weight is not None:
+                    self.values.append(WeightedValue(value=value, weight=weight))
+                else:
+                    self.values.append(value)
+
+                added += 1
+
+        return added
 
 
 class ContextualTags(BaseModel):
@@ -117,7 +162,27 @@ class ContextualTags(BaseModel):
         tags (List[ContextualTag]): A list of ContextualTag objects.
     """
 
-    tags: List[ContextualTag] = Field(..., description="List of contextual tags")
+    tags: List[ContextualTag] = Field(
+        ..., description="List of contextual tags", default_factory=list
+    )
+
+    def add_tag(self, tag: ContextualTag) -> None:
+        """
+        Adds a new contextual tag to the collection.
+
+        Args:
+            tag (ContextualTag): The contextual tag to add.
+        """
+        for existing_tag in self.tags:
+            if existing_tag.name.lower() == tag.name.lower():
+                return None
+        self.tags.append(tag)
+
+    def get_tag_by_name(self, name: str) -> Optional[ContextualTag]:
+        for existing_tag in self.tags:
+            if existing_tag.name.lower() == name.lower():
+                return existing_tag
+        return None
 
     def mix_tags(self, num_rows: int) -> List[Dict[str, Any]]:
         """
@@ -267,7 +332,7 @@ class DataModel(BaseModel):
             df = pd.DataFrame(data)
         elif self.data_source.format == DataSourceFormat.HUGGINGFACE:
             dataset = load_dataset(self.data_source.uri)
-            df = dataset["train"].to_pandas()  # Assuming we want the 'train' split
+            df: pd.DataFrame = dataset["train"].to_pandas()  # type: ignore # Assuming we want the 'train' split
         else:
             raise ValueError(
                 f"Unsupported data source format: {self.data_source.format}"
@@ -296,7 +361,7 @@ class DataModel(BaseModel):
         """
         if self.data_source:
             df = self.load_data(print_sample=True)
-            return df.sample(n=min(num_rows, len(df)), replace=True).to_dict("records")
+            return df.sample(n=min(num_rows, len(df)), replace=True).to_dict("records")  # type: ignore
         elif self.contextual_tags:
             return self.contextual_tags.mix_tags(num_rows)
         else:
@@ -322,9 +387,7 @@ class DataModel(BaseModel):
         if "data_source" in data and data["data_source"] is not None:
             data["data_source"] = DataSource(**data["data_source"])
         else:
-            data.pop(
-                "data_source", None
-            )
+            data.pop("data_source", None)
         return cls(**data)
 
     def to_yaml(self) -> str:

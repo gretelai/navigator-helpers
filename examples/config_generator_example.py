@@ -11,7 +11,7 @@ OUTPUT_FILE = "synthetic_config.yaml"
 DEFAULT_MODEL = "gretelai/gpt-auto"
 
 
-def get_diversity_target():
+def get_diversity_target() -> int:
     default_diversity = 10000
     prompt = textwrap.dedent(
         f"""
@@ -20,9 +20,11 @@ def get_diversity_target():
         - 100000 is considered high diversity
         Your choice: """
     )
+    value = input(prompt).strip()
+    return default_diversity if not value else int(value)
 
-    
-def get_user_task():
+
+def get_user_task() -> str:
     default_task = "Create a dataset of high-quality math problems with solutions, similar to GSM8K."
     user_task = input(
         f"\nPlease describe the dataset you want to generate (press Enter to use default: '{default_task}'): "
@@ -53,7 +55,7 @@ def main():
 
     # Generate data model
     logger.info("Generating data model...")
-    data_model = config_generator.generate_data_model()
+    config_generator.generate_data_model()
     logger.info("Generated data model")
 
     # Get config
