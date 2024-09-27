@@ -166,17 +166,20 @@ class ContextualTags(BaseModel):
         ..., description="List of contextual tags", default_factory=list
     )
 
-    def add_tag(self, tag: ContextualTag) -> None:
+    def add_tag(self, tag: ContextualTag) -> int:
         """
         Adds a new contextual tag to the collection.
 
         Args:
             tag (ContextualTag): The contextual tag to add.
+
+        Returns 1 if the tag was added, 0 if it already exists.
         """
         for existing_tag in self.tags:
             if existing_tag.name.lower() == tag.name.lower():
-                return None
+                return 0
         self.tags.append(tag)
+        return 1
 
     def get_tag_by_name(self, name: str) -> Optional[ContextualTag]:
         for existing_tag in self.tags:

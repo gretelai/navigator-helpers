@@ -33,9 +33,13 @@ def test_contextual_tag():
 def test_contextual_tags():
     tags = ContextualTags()
     new_tag = ContextualTag(name="foo", values=["bar"])
-    tags.add_tag(new_tag)
+    assert tags.add_tag(new_tag) == 1
     assert tags.get_tag_by_name("foo") == new_tag
 
     # Test adding a tag with the same name
-    tags.add_tag(new_tag)
+    assert not tags.add_tag(new_tag)
     assert len(tags.tags) == 1
+
+    # New tag for real this time
+    assert tags.add_tag(ContextualTag(name="baz", values=["qux"])) == 1
+    assert len(tags.tags) == 2
