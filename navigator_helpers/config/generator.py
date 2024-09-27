@@ -121,11 +121,10 @@ def extract_tags_with_llm(
             tag_name = safe_variable_name(tag_data["name"])
             new_values = tag_data["values"]
 
-            existing_tag = contextual_tags.get_tag_by_name(tag_name)
-            if not existing_tag:
-                contextual_tags.add_tag(ContextualTag(name=tag_name, values=new_values))
-            else:
+            if existing_tag := contextual_tags.get_tag_by_name(tag_name):
                 existing_tag.add_values(new_values)
+            else:
+                contextual_tags.add_tag(ContextualTag(name=tag_name, values=new_values))
 
         current_diversity = calculate_diversity(contextual_tags.tags)
         logger.info(f"Current diversity: {current_diversity}")
