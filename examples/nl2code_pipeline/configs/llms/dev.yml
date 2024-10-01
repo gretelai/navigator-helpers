@@ -2,6 +2,9 @@
   litellm_params:
     model: openai/gretelai/gpt-mixtral-8x-22b
     base_url: https://llmproxy.dev.gretel.cloud/v1/
+    temperature: 0.9
+    max_tokens: 32768
+    top_p: 1.0
     extra_headers:
       Authorization: os.environ/GRETEL_DEV_API_KEY
   tags:
@@ -12,6 +15,7 @@
   litellm_params:
     model: openai/gretelai/gpt-codestral-mamba
     base_url: https://llmproxy.dev.gretel.cloud/v1/
+    temperature: 0.9
     extra_headers:
       Authorization: os.environ/GRETEL_DEV_API_KEY
   tags:
@@ -22,6 +26,9 @@
   litellm_params:
     model: openai/gretelai/gpt-groq-llama-3-1-8b
     base_url: https://llmproxy.dev.gretel.cloud/v1/
+    temperature: 0.6
+    max_tokens: 1024
+    top_p: 0.9
     extra_headers:
       Authorization: os.environ/GRETEL_DEV_API_KEY
   tags:

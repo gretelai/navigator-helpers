@@ -1,8 +1,11 @@
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional, Union
 
-from navigator_helpers.llms import LLMWrapper, str_to_message
-from navigator_helpers.llms.base import LLMRegistry
+import yaml
+
+from navigator_helpers.llms import LLMWrapper
+from navigator_helpers.llms.base import init_llms
 from navigator_helpers.logs import (
     get_logger,
     silence_iapi_initialization_logs,
@@ -27,15 +30,31 @@ LLM_SUITE_CONFIG = {
 }
 
 
+DEFAULT_LLM_CONFIG = yaml.safe_load(
+    """
+- model_name: gretelai-mistral-nemo-2407
+  litellm_params:
+    model: gretelai/gpt-mistral-nemo-2407
+    api_key: os.environ/GRETEL_PROD_API_KEY
+    api_base: https://api.gretel.ai
+  tags:
+  - open_license
+  - nl
+  - code
+  - judge
+"""
+)
+
+
 class GretelLLMSuite:
 
     def __init__(
         self,
-        suite_type: LLMSuiteType,
-        llm_registry: LLMRegistry,
+        suite_type: LLMSuiteType = LLMSuiteType.OPEN_LICENSE,
+        llm_config: Optional[Union[list[dict[str, Any]], str, Path]] = None,
         suite_config: Optional[dict] = None,
     ):
-        self._llm_registry = llm_registry
+        self._llm_registry = init_llms(llm_config or DEFAULT_LLM_CONFIG)
 
         suite_config = suite_config or LLM_SUITE_CONFIG
         if suite_type not in suite_config:
@@ -49,37 +68,34 @@ class GretelLLMSuite:
             config = suite_config[suite_type]
 
             self._nl = LLMWrapper.from_llm_configs(
-                llm_registry.find_by_tags({suite_type.value, "nl"})
+                self._llm_registry.find_by_tags({suite_type.value, "nl"})
             )
             logger.info(f"📖 Natural language LLM: {self._nl.model_name}")
             self._nl_gen_kwargs = config["generate_kwargs"]["nl"]
 
             self._code = LLMWrapper.from_llm_configs(
-                llm_registry.find_by_tags({suite_type.value, "code"})
+                self._llm_registry.find_by_tags({suite_type.value, "code"})
             )
             logger.info(f"💻 Code LLM: {self._code.model_name}")
             self._code_gen_kwargs = config["generate_kwargs"]["code"]
 
             self._judge = LLMWrapper.from_llm_configs(
-                llm_registry.find_by_tags({suite_type.value, "judge"})
+                self._llm_registry.find_by_tags({suite_type.value, "judge"})
             )
             logger.info(f"⚖️ Judge LLM: {self._judge.model_name}")
             self._judge_gen_kwargs = config["generate_kwargs"]["judge"]
 
     def nl_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._nl_gen_kwargs)
-        response = self._nl.completion([str_to_message(prompt)], **kwargs)
-        return response.choices[0].message.content
+        return self._nl.generate(prompt, **kwargs)
 
     def code_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._code_gen_kwargs)
-        response = self._code.completion([str_to_message(prompt)], **kwargs)
-        return response.choices[0].message.content
+        return self._code.generate(prompt, **kwargs)
 
     def judge_generate(self, prompt: str, **kwargs) -> str:
         kwargs.update(self._judge_gen_kwargs)
-        response = self._judge.completion([str_to_message(prompt)], **kwargs)
-        return response.choices[0].message.content
+        return self._judge.generate(prompt, **kwargs)
 
     def list_available_models(self) -> list[str]:
         # TODO: implement by iterating self._llm_registry

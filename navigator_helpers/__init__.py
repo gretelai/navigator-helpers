@@ -14,10 +14,10 @@ from .content_validator import ContentValidator
 from .data_models import ContextualTag, ContextualTags, DataField, DataModel
 from .evolutionary_data_generator import EvolDataGenerator
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
-from .tasks.text_to_code.config import smart_load_pipeline_config
-from .tasks.text_to_code.llm_suite import GretelLLMSuite
-from .tasks.text_to_code.pipeline import NL2CodePipeline
-from .tasks.text_to_code.task_suite import NL2CodeTaskSuite
+from .llms.llm_suite import GretelLLMSuite
+from .pipelines.config.utils import smart_load_pipeline_config
+from .pipelines.text_to_code import NL2CodePipeline
+from .tasks.text_to_code.task_suite import NL2PythonTaskSuite, NL2SQLTaskSuite
 from .text_inference import TextInference
 
 __all__ = [

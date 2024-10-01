@@ -17,6 +17,11 @@ style:
 	$(PYTHON) -m isort .
 	$(PYTHON) -m black .
 
+.PHONY: check-style
+check-style:
+	$(PYTHON) -m isort --check .
+	$(PYTHON) -m black --check .
+
 .PHONY: test
 test:
 	$(PYTHON) -m pytest

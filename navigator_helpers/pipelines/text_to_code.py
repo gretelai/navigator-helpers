@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -13,35 +12,25 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from navigator_helpers import IN_COLAB
-from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
-from navigator_helpers.tasks.text_to_code.config import (
-    ConfigLike,
+from navigator_helpers.pipelines.base import BasePipeline, PipelineResults
+from navigator_helpers.pipelines.config.text_to_code import (
+    NL2CodeAutoConfig,
     NL2CodeManualConfig,
-    smart_load_pipeline_config,
 )
 from navigator_helpers.tasks.text_to_code.contextual_tags import ContextualTags
-from navigator_helpers.tasks.text_to_code.task_suite import NL2CodeTaskSuite
+from navigator_helpers.tasks.text_to_code.task_suite import (
+    NL2CodeTaskSuite,
+    NL2PythonTaskSuite,
+    NL2SQLTaskSuite,
+)
 from navigator_helpers.tasks.text_to_code.utils import display_nl2code_sample
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
 @dataclass
-class PipelineResults:
-    dataframe: pd.DataFrame
-    contextual_tags: ContextualTags
-    config: ConfigLike
-
-    @classmethod
-    def from_artifacts(cls, path: str | Path) -> PipelineResults:
-        path = Path(path)
-        with open(path / "config.json") as f:
-            config = smart_load_pipeline_config(json.load(f))
-        contextual_tags = ContextualTags.from_json(path / "contextual_tags.json")
-        dataframe = pd.read_json(path / "synthetic_dataset.json")
-        return cls(dataframe, contextual_tags, config)
-
+class NL2CodePipelineResults(PipelineResults):
     def display_sample(self, index: Optional[int] = None, **kwargs):
         if index is None:
             record = self.dataframe.sample(1).iloc[0]
@@ -49,35 +38,27 @@ class PipelineResults:
             record = self.dataframe.loc[index]
         display_nl2code_sample(record, **kwargs)
 
-    def save_artifacts(self, path: str | Path):
-        path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
-        self.dataframe.to_json(path / "synthetic_dataset.json", orient="records")
-        with open(path / "contextual_tags.json", "w") as f:
-            json.dump(self.contextual_tags.model_dump(), f)
-        with open(path / "config.json", "w") as f:
-            json.dump(json.loads(self.config.model_dump_json()), f)
 
+class NL2CodePipeline(BasePipeline):
 
-class NL2CodePipeline:
+    @property
+    def tasks(self) -> NL2CodeTaskSuite:
+        return self._tasks
 
-    def __init__(self, llm_registry: LLMRegistry, config: ConfigLike, **session_kwargs):
+    def setup_pipeline(self):
         self.contextual_tags = None
-        self._setup(config)
-        self.tasks = NL2CodeTaskSuite(
-            llm_registry,
-            self.config.code_lang,
-            self.config.llm_suite_type,
-            **session_kwargs,
-        )
 
-    def _setup(self, config: ConfigLike):
-        self.config = smart_load_pipeline_config(config)
-        logger.info(f"⚙️ Setting up Text-to-{self.config.code_lang.title} pipeline")
-        if self.config.artifact_path is not None:
-            logger.info(f"📦 Artifact path: {self.config.artifact_path}")
+        if self.config.code_lang == "sql":
+            self._tasks = NL2SQLTaskSuite(llm_suite=self.llm_suite)
+        elif self.config.code_lang == "python":
+            self._tasks = NL2PythonTaskSuite(llm_suite=self.llm_suite)
+        else:
+            raise ValueError(
+                f"Unsupported code language: {self.config.code_lang}. "
+                f"Supported languages: ['sql', 'python']"
+            )
+
         if isinstance(self.config, NL2CodeManualConfig):
-            logger.info("🏷️ Setting contextual tags from config")
             self.set_contextual_tags(
                 ContextualTags(
                     domain_and_topics=self.config.domain_and_topics,
@@ -85,24 +66,24 @@ class NL2CodePipeline:
                 )
             )
 
-    def _save_artifact(self, name: str, artifact: dict | list[dict]):
-        if self.config.artifact_path is not None:
-            with open(self.config.artifact_path / f"{name}.json", "w") as f:
-                json.dump(artifact, f)
-
-    def create_contextual_tags(self):
+    def create_contextual_tags(self) -> ContextualTags:
         if self.contextual_tags is not None:
             raise ValueError(
                 "Contextual tags are already set. If you want to change them, "
                 "use `set_contextual_tags`."
             )
-        self.set_contextual_tags(
-            self.tasks.generate_contextual_tags(
-                num_domains=self.config.num_domains,
-                num_topics_per_domain=self.config.num_topics_per_domain,
-                num_complexity_levels=self.config.num_complexity_levels,
+        elif not isinstance(self.config, NL2CodeAutoConfig):
+            raise ValueError(
+                "You can only create contextual tags with an auto-config. "
+                "Use `set_contextual_tags` instead."
             )
+        tags = self.tasks.generate_contextual_tags(
+            num_domains=self.config.num_domains,
+            num_topics_per_domain=self.config.num_topics_per_domain,
+            num_complexity_levels=self.config.num_complexity_levels,
         )
+        self.set_contextual_tags(tags)
+        return tags
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
         if isinstance(tags, dict):
@@ -114,18 +95,17 @@ class NL2CodePipeline:
                 f"Unsupported type for contextual tags: {type(tags)}. "
                 f"Expected types: [dict, ContextualTags]"
             )
-        self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
+        self._save_artifact("metadata", self.contextual_tags.model_dump())
 
     def run(
         self, num_samples: int = 10, disable_progress_bar: bool = False
     ) -> PipelineResults:
         logger.info(
-            f"🚀 Starting Text-to-{self.config.code_lang.title} synthetic data pipeline"
+            f"🚀 Starting Text-to-{self.config.code_lang.logging_name} synthetic data pipeline"
         )
-        if self.contextual_tags is None:
-            self.create_contextual_tags()
 
         synthetic_dataset = []
+        tags = self.contextual_tags or self.create_contextual_tags()
 
         pbar = tqdm(
             total=num_samples,
@@ -136,7 +116,7 @@ class NL2CodePipeline:
 
         with logging_redirect_tqdm():
             for _ in range(num_samples):
-                domain, topic, complexity = self.contextual_tags.sample()
+                domain, topic, complexity = tags.sample()
                 record = self.tasks.create_record(
                     domain=domain,
                     topic=topic,
@@ -155,11 +135,11 @@ class NL2CodePipeline:
         pbar.close()
 
         self._save_artifact("config", json.loads(self.config.model_dump_json()))
-        self._save_artifact("contextual_tags", self.contextual_tags.model_dump())
+        self._save_artifact("metadata", tags.model_dump())
         logger.info("🥳 Synthetic dataset generation complete!")
 
-        return PipelineResults(
+        return NL2CodePipelineResults(
             dataframe=pd.DataFrame(synthetic_dataset),
-            contextual_tags=self.contextual_tags,
+            metadata=tags.model_dump(),
             config=self.config,
         )
