@@ -2,6 +2,7 @@ import ast
 import io
 import json
 import subprocess
+import tempfile
 
 from typing import Tuple
 
@@ -10,6 +11,8 @@ import parso
 from mypy import api
 from pyflakes.api import check
 from pyflakes.reporter import Reporter
+from pylint.lint import Run
+from pylint.reporters import BaseReporter
 
 
 def is_valid_python_with_complie(code_str: str) -> Tuple[bool, str]:
@@ -112,10 +115,10 @@ def is_valid_python_with_ruff(
 
     # Errors that will lead to runtime errors
     rules_about_errors = [
+        "PLE",
         "F821",
         "F822",
         "F823",  # Pyflakes: Undefined names, variables
-        "PLE",  # Pylint: Errors
     ]
 
     # Issues that are highly likely to cause runtime errors
@@ -146,3 +149,80 @@ def is_valid_python_with_ruff(
         return check_ruff(rules_about_issues)
 
     return True, None
+
+
+class CustomReporter(BaseReporter):
+    """Custom reporter to collect lint messages in a structured format."""
+
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+
+    def handle_message(self, msg):
+        """Store the relevant message details."""
+        self.messages.append(
+            {
+                "type": msg.category,  # "fatal", "error", "warning", "convention", "refactor"
+                "symbol": msg.symbol,  # The error code
+                "message": msg.msg,  # The actual error message
+            }
+        )
+
+    def display_messages(self, layout):
+        """We don't need to implement this for our purposes."""
+        pass
+
+    def display_reports(self, layout):
+        """We don't need to implement this for our purposes."""
+        pass
+
+
+def is_valid_python_with_pylint(code_str: str, level: str = "error"):
+    """Evaluate the code using pylint and return the score and error details."""
+
+    error_categories = ["fatal", "error", "warning", "convention", "refactor"]
+    assert level in error_categories, f"level should be one of {error_categories}"
+
+    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
+        f.write(code_str)
+        f.flush()
+
+        # Don't check for import errors because we don't install any required packages
+        pylint_opts = [
+            f.name,
+            "--enable=all",
+            "--disable=import-error,no-name-in-module",
+        ]
+        reporter = CustomReporter()
+        lint_results = Run(pylint_opts, reporter=reporter, exit=False)
+
+        score = lint_results.linter.stats.global_note
+        exit_code = lint_results.linter.msg_status
+
+        # Get the category of the most severe error
+        if exit_code == 0:
+            passed = True
+            severity = None
+        else:
+            for ind in range(len(error_categories)):
+                # Pylint uses bitwise encoding to store the error codes
+                # fatal - 1; error - 2; warning - 4; convention - 8; refactor - 16
+                if bool(exit_code & 2**ind):
+                    severity = error_categories[ind]
+                    break
+
+            # If the severity of the most severe error is less than the desired level, the code passes
+            passed = error_categories.index(severity) > error_categories.index(level)
+
+        # Sort the error messages by severity for easy inspection
+        messages_sorted = sorted(
+            reporter.messages,
+            key=lambda x: error_categories.index(x["type"]),
+            reverse=False,
+        )
+
+        return passed, {
+            "score": score,
+            "severity": severity,
+            "messages": messages_sorted,
+        }
