@@ -99,12 +99,22 @@ class BaseEvaluationTaskSuite():
             distribution = self.dataset[col].value_counts()
         return distribution
 
-    def _num_words_per_record(self):
+    def num_words_per_record(self):
         # Test for number of words per record
             # Input : Pandas dataset
             # Output : Returns a dictionary where each record is mapped to the count of words
             # Plan to use this private function for feature distribution
-        pass
+        """
+        Test for number of words per record in text columns.
+        Returns the average and distribution of word counts per record.
+        """
+        text_columns = self.dataset.select_dtypes(include=[object])
+        word_counts = text_columns.map(lambda x: len(str(x).split()) if isinstance(x, str) else 0)
+        avg_words_per_record = word_counts.mean().mean()
+        return {
+            "average_words_per_record": avg_words_per_record,
+            "word_counts_per_column": word_counts.mean().to_dict()
+        }
 
     def llm_as_a_critic_evaluation(self):
         # Test for LLM-as-a-critic evaluation based on a generic dataset rubric
