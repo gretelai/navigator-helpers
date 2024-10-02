@@ -1,5 +1,8 @@
 # Script with all the classes and tests implemented
 import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 class BaseEvaluationTaskSuite():
     # Generic class for evaluation task suites
@@ -36,7 +39,39 @@ class BaseEvaluationTaskSuite():
             # Example 2:
                 # Response 1 : "def square_root(num): ..."
                 # Response 2 : "def square_root_of(num): ..."
-        pass
+        """
+        Test for brute force row uniqueness / semantic uniqueness.
+        Returns:
+            - Percentage of rows that are unique
+            - Percentage of rows that are semantically unique (fuzzy match)
+            - IDs of rows that are not unique
+            - IDs of rows that are not semantically unique
+        """
+        #TODO: Try out https://github.com/dleemiller/WordLlama
+        # Row uniqueness based on exact match
+        total_rows = len(self.dataset)
+        #TODO: Is df.unique or drop_duplicates better?
+        unique_rows = self.dataset.drop_duplicates()
+        non_unique_ids = self.dataset[self.dataset.duplicated()].index.tolist()
+        percent_unique = len(unique_rows) / total_rows * 100
+
+        # Semantic uniqueness using cosine similarity and TF-IDF
+        #TODO: Check if this is including text columns
+        text_columns = self.dataset.select_dtypes(include=[object])
+        concatenated_text = text_columns.apply(lambda row: ' '.join(row.values.astype(str)), axis=1)
+        vectorizer = TfidfVectorizer().fit_transform(concatenated_text)
+        vectors = vectorizer.toarray()
+
+        cosine_sim = cosine_similarity(vectors)
+        non_semantically_unique_ids = np.where((cosine_sim > 0.85) & (cosine_sim < 1.0))[0]
+        percent_semantically_unique = (total_rows - len(non_semantically_unique_ids)) / total_rows * 100
+
+        return {
+            "percent_unique": percent_unique,
+            "percent_semantically_unique": percent_semantically_unique,
+            "non_unique_ids": non_unique_ids,
+            "non_semantically_unique_ids": non_semantically_unique_ids.tolist()
+        }
 
     def feature_cardinality(self):
         # Test for feature cardinality
