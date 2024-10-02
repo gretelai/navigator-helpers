@@ -40,50 +40,55 @@ class BaseEvaluationTaskSuite():
 
     def feature_cardinality(self):
         # Test for feature cardinality
-        pass
-
-    """
-    def expect_column_uniqueness(self, spec: dict[str, float]) -> list[ExpectResult]:
-        #spec should be in the form of {"column_name": min_unique_fraction, ...}
-        expect_name = "column_uniqueness"
-        if precondition_result := self.data_is_present(expect_name, spec.keys()):
-            return precondition_result
-
-        results = []
-        for column, min_unique_fraction in spec.items():
-            if precondition_result := self.column_is_present(expect_name, column):
-                results += precondition_result
-                continue
-            unique_fraction = len(self.observed_data[column].unique()) / len(
-                self.observed_data[column]
-            )
-            success = unique_fraction >= min_unique_fraction
-            results.append(
-                self.create_expect_result(
-                    name=expect_name,
-                    success=success,
-                    detail=self._get_detail(
-                        param=column,
-                        expected=f"unique_fraction >= {min_unique_fraction}",
-                        found=f"{unique_fraction = }",
-                        success=success,
-                    ),
-                )
-            )
-        return results
-    """
+            # Input : Pandas dataset
+            # Output : Returns a dictionary where each column is mapped to cardinality
+            # Algorithm for feature cardinality:
+                # 1. Calculate the percentage of unique values in each column using df.unique
+                # 2. Additional logging to show the distribution of unique values
+            # Related : https://github.com/Gretellabs/monogretel/blob/master/python/src/gretel_tabllm/astrolabe/expect/data.py#L117
+        cardinality = {col: self.dataset[col].nunique() / len(self.dataset) for col in self.dataset.columns}
+        return cardinality
 
     def feature_distribution(self):
         # Test for feature distribution
-        pass
+            # Input : Pandas dataset
+            # Output : Returns a dictionary where each column is mapped to a distribution
+            # Algorithm for feature distribution:
+                # 1. Calculate the distribution of values in each column using df.value_counts
+                # 2. Need to think about categorical, numerical and text columns
+                # 3. Example: For code column, we can take the distribution of code length
+            # Related : Look at HF dataset viualization
+        #TODO: Some preprocessing
+        distribution = {}
+        for col in self.dataset.columns:
+            distribution = self.dataset[col].value_counts()
+        return distribution
 
-    def num_words_per_record(self):
+    def _num_words_per_record(self):
         # Test for number of words per record
+            # Input : Pandas dataset
+            # Output : Returns a dictionary where each record is mapped to the count of words
+            # Plan to use this private function for feature distribution
         pass
 
     def llm_as_a_critic_evaluation(self):
         # Test for LLM-as-a-critic evaluation based on a generic dataset rubric
+        # Generic dataset rubric includes:
+            # 1. Diversity
+            # 2. Relevance
+            # 3. Correctness
+            # 4. Difficulty
+            # Want this rubric to be complimentary to linter-based scoring
+            # Related : https://github.com/gretelai/navigator-helpers/blob/main/navigator_helpers/tasks/prompt_templates/llm_as_a_judge.py
+        # We already have this, need to integrate it here
         pass
+
+# Check if validation was performed and if that column exists in the dataset
+# Let the user know you are performing validation by logging
+# Evaluate only the valid records
+# For now, we have only code specific validation for python & SQL
+# Report scores only on valid records
+# Validation functions can be seperate but should be called from the evaluation task suite
 
 class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
     # Class for evaluation task suites for natural language to code tasks
@@ -104,7 +109,7 @@ class NL2PythonEvaluationTaskSuite(BaseEvaluationTaskSuite):
     # Tests include:
         # 1. Linter-based scoring for python code
     def linter_based_scoring(self):
-        # Test for linter-based scoring for python code
+        # Validation test for linter-based scoring for python code
         pass
 
 class NL2SQLEvaluationTaskSuite(BaseEvaluationTaskSuite):
