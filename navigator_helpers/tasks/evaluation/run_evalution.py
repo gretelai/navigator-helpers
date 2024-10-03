@@ -5,13 +5,15 @@
 from navigator_helpers.llms.llm_suite import GretelLLMSuite
 
 from evaluation import BaseEvaluationTaskSuite, NL2SQLEvaluationTaskSuite
+
 from datasets import load_dataset
 
-dataset = load_dataset("gretelai/synthetic_text_to_sql", split = "train")
-dataset_10 = dataset.select(range(10))
+
+## TODO: add dict of datasets to test
+dataset = load_dataset("gretelai/synthetic_text_to_sql", split="train")
+dataset_10 = dataset.select(range(1000))
 
 dataset_10_pd = dataset_10.to_pandas()
-# print(dataset_10_pd.columns)
 
 llm_suite = GretelLLMSuite()
 results_1 = BaseEvaluationTaskSuite(llm_suite, dataset_10_pd).row_uniqueness()
@@ -38,3 +40,6 @@ print(results_3)
 print(results_4)
 print(results_5)
 print(results_6)
+
+# review specific records
+# print(dataset_10_pd.loc[results_1['non_semantically_unique_ids']])
