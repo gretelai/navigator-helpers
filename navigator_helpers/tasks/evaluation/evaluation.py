@@ -203,18 +203,6 @@ class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
             )
         return prompt
     
-    def llm_as_a_critic_evaluation(self,instruction_col_name: str, code_col_name: str):
-
-        # LLM-as-a-critic evaluation based on code rubric
-        self.dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
-            natural_language=row[instruction_col_name], 
-            code=row[code_col_name]
-            ), axis=1)
-        
-        # Calculate an overall score. Use average for now. Should revisit
-        self.dataset["overall_score"] = self.dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
-        return {'llm_as_a_critic_score': self.dataset.overall_score.mean()}
-
     def code_syntax_validation(self):
         # Test for code syntax validation
         pass
