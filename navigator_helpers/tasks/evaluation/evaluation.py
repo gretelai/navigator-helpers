@@ -5,9 +5,16 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# TODO: Add typing, docstrings
+from navigator_helpers.llms.llm_suite import GretelLLMSuite
+from navigator_helpers.tasks.base import BaseTaskSuite
+from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
+from navigator_helpers.tasks.text_to_code import utils
 
-class BaseEvaluationTaskSuite:
+
+llm_as_a_judge_prompts = load_prompt_template_suite("llm_as_a_judge")
+
+class BaseEvaluationTaskSuite(BaseTaskSuite):
+    # TODO: Add typing, docstrings
     # Generic class for evaluation task suites
     # Tests include:
     # 1. Row uniqueness
@@ -16,8 +23,32 @@ class BaseEvaluationTaskSuite:
     # 4. num_words per record
     # 5. LLM-as-a-critic evaluation based on a generic dataset rubric (e.g. data quality, relevance, correctness, readability)
 
-    def __init__(self, dataset: pd.DataFrame) -> None:
+    def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame) -> None:
+        super().__init__(llm_suite)
         self.dataset = dataset
+    
+    def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str) -> str:
+        rubric = llm_as_a_judge_prompts.general_response_quality_rubric
+        prompt = rubric(
+            natural_language=natural_language, code=code,
+        )
+        return prompt
+    
+    def _eval_response_with_llm_as_judge(
+        self,
+        natural_language: str,
+        code: str,
+        **kwargs,
+    ) -> dict:
+        prompt = self._get_llm_as_a_judge_prompt(
+            natural_language=natural_language, code=code, **kwargs
+        )
+        scores = {}
+        response = utils.parse_json_str(self.llm_suite.judge_generate(prompt)) or {}
+        for k, v in response.items():
+            scores[f"{k}_score"] = v["score"]
+            scores[f"{k}_reason"] = v["reasoning"]
+        return scores
 
     def row_uniqueness(self):
         # Test for brute force row uniqueness / semanantic uniqueness
@@ -163,7 +194,7 @@ class BaseEvaluationTaskSuite:
             "word_counts_per_column": word_counts.mean().to_dict(),
         }
 
-    def llm_as_a_critic_evaluation(self):
+    def llm_as_a_critic_evaluation(self,instruction_col_name: str, code_col_name: str):
         # Test for LLM-as-a-critic evaluation based on a generic dataset rubric
         # Generic dataset rubric includes:
         # 1. Diversity
@@ -173,7 +204,16 @@ class BaseEvaluationTaskSuite:
         # Want this rubric to be complimentary to linter-based scoring
         # Related : https://github.com/gretelai/navigator-helpers/blob/main/navigator_helpers/tasks/prompt_templates/llm_as_a_judge.py
         # We already have this, need to integrate it here
-        pass
+
+        # LLM-as-a-critic evaluation based on code rubric
+        self.dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
+            natural_language=row[instruction_col_name], 
+            code=row[code_col_name]
+            ), axis=1)
+        
+        # Calculate an overall score. Use average for now. Should revisit
+        self.dataset["overall_score"] = self.dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
+        return {'llm_as_a_critic_score': self.dataset.overall_score.mean()}
 
 
 # Check if validation was performed and if that column exists in the dataset
@@ -190,16 +230,33 @@ class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
     # 1. LLM-as-a-critic evaluation based on code rubric (e.g. code quality, correctness, readability)
     # 1.1 Seperate rubrics for SQL and Python
     # 2. Code syntax validation
-    def llm_as_a_critic_evaluation(self):
-        # Test for LLM-as-a-critic evaluation based on code rubric
-        pass
 
+    def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame, code_lang: str = None) -> None:
+        super().__init__(llm_suite, dataset)
+        self.code_lang = code_lang
+    
+    def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str, **kwargs) -> str:
+        if self.code_lang == "sql":
+            rubric = llm_as_a_judge_prompts.sql_quality_rubric
+            prompt = rubric(
+                natural_language=natural_language, code=code, **kwargs
+            )
+        else:
+            if self.code_lang == "python":
+                rubric = llm_as_a_judge_prompts.python_quality_rubric        
+            else:
+                rubric = llm_as_a_judge_prompts.general_code_quality_rubric
+            prompt = rubric(
+                natural_language=natural_language, code=code
+            )
+        return prompt
+    
     def code_syntax_validation(self):
         # Test for code syntax validation
         pass
 
 
-class NL2PythonEvaluationTaskSuite(BaseEvaluationTaskSuite):
+class NL2PythonEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
     # Class for evaluation task suites for natural language to python tasks
     # Tests include:
     # 1. Linter-based scoring for python code
@@ -208,10 +265,23 @@ class NL2PythonEvaluationTaskSuite(BaseEvaluationTaskSuite):
         pass
 
 
-class NL2SQLEvaluationTaskSuite(BaseEvaluationTaskSuite):
+class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
     # Class for evaluation task suites for natural language to SQL tasks
     # Tests include:
     # 1. Linter-based scoring for SQL code
+    
+    def llm_as_a_critic_evaluation(self, instruction_col_name: str, code_col_name: str, context_col_name: str):
+        # LLM-as-a-critic evaluation based on code rubric
+        self.dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
+            natural_language=row[instruction_col_name], 
+            code=row[code_col_name],
+            sql_context=row[context_col_name],
+            ), axis=1)
+        
+        # Calculate an overall score. Use average for now. Should revisit
+        self.dataset["overall_score"] = self.dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
+        return {'llm_as_a_critic_score': self.dataset.overall_score.mean()}
+
     def linter_based_scoring(self):
         # Test for linter-based scoring for SQL code
         pass
