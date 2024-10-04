@@ -1,15 +1,23 @@
+from __future__ import annotations
+
 import logging
 import re
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from .prompts import DEFAULT_SYSTEM_PROMPT, REFLECTION_SYSTEM_PROMPT
 
+if TYPE_CHECKING:
+    from gretel_client.inference_api.natural_language import NaturalLanguageInferenceAPI
+
 
 class TextInference:
-    def __init__(self, llm, logger=None):
+    def __init__(
+        self, llm: NaturalLanguageInferenceAPI, logger=None, debug: bool = False
+    ):
         self.llm = llm
         self.logger = logger or logging.getLogger(__name__)
+        self.debug = debug
 
     def generate(
         self,
@@ -45,11 +53,12 @@ class TextInference:
         else:
             result = self._remove_excess_newlines(response)
 
-        self.logger.info(
-            f"\n{field_name.upper()}:\n"
-            f"--------------------------------------------------\n"
-            f"'''\n{result}\n'''\n"
-        )
+        if self.debug:
+            self.logger.info(
+                f"\n{field_name.upper()}:\n"
+                f"--------------------------------------------------\n"
+                f"'''\n{result}\n'''\n"
+            )
 
         return result
 

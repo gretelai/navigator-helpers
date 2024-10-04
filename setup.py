@@ -14,7 +14,7 @@ def reqs(file_path: str) -> list[str]:
 
 setup(
     name="navigator-helpers",
-    version="0.1.2",  # Incremented version number
+    version="0.1.3",  # Incremented version number
     packages=find_packages(
         exclude=["tests", "examples"], include=["navigator_helpers*"]
     ),

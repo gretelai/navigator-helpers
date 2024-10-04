@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 
-from typing import Any
+from typing import Any, Optional
 
 from gretel_client import configure_session
 from gretel_client.inference_api.natural_language import NaturalLanguageInferenceAPI
-from litellm import CustomLLM
+from litellm.llms.custom_llm import CustomLLM
 from litellm.types.utils import Choices, Message, ModelResponse
+
+from navigator_helpers.logs import silence_iapi_initialization_logs
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +23,16 @@ class InferenceAPI(CustomLLM):
         self,
         model: str,
         messages: list,
-        optional_params: dict[str, Any] = None,
+        optional_params: Optional[dict[str, Any]] = None,
         *args,
         **kwargs,
     ) -> ModelResponse:
         backend_model = f"gretelai/{model}"
-        iapi = self._configure_inference_api(backend_model, kwargs)
 
+        with silence_iapi_initialization_logs():
+            iapi = self._configure_inference_api(backend_model, kwargs)
+
+        optional_params = optional_params or {}
         supported_params = ["temperature", "top_p", "top_k", "max_tokens"]
         generate_params = {
             p: optional_params[p] for p in supported_params if p in optional_params

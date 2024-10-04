@@ -1,0 +1,178 @@
+# Generator configuration
+api_key: prompt
+llm_model: gretelai/gpt-auto
+log_level: INFO
+use_reflection: true
+output_filename: advanced_nl2sql.jsonl
+evol_generations: 1
+num_examples: 100000
+
+# Data model definition
+generation_instructions: |
+  You are a seasoned SQL expert specializing in crafting intricate, context-rich queries and explanations. 
+  * Use the provided contextual tags as instructions for generation. Reference the provided Context to ensure relevance and appropriate complexity.
+  * Use proper spacing for all generated SQL content, with no extra comments or explanations when generating code.
+  * All SQL data should be PostgreSQL compatible SQL.
+  * Avoid excessive newlines, especially at the end of generated content.
+
+fields:
+  - name: sql_context
+    type: str
+    description: A single string comprising multiple valid PostgreSQL `CREATE TABLE` statements and a complex schema similar to a production application including multiple tables, separated by semicolons. The schema should be based on the provided Context, particularly the domain and domain_description.
+    validator: sql:postgres
+    evolution_strategies:
+      - Enhance the schema to include domain-specific tables and data types.
+      - Add relevant indexes, constraints, and views reflecting real-world designs.
+    evolution_rate: 0.1
+
+  - name: prompt
+    type: str
+    description: A detailed, nuanced natural language prompt that a user might ask to a database for a particular task, based on the provided `sql_context` field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.
+    validator: A natural language question or command written in English
+    evolution_strategies:
+      - Refine the prompt to sound more natural.
+      - Ensure the prompt reflects real-world business needs.
+    evolution_rate: 0.1
+
+  - name: sql
+    type: str
+    description: A fully executable SQL query that directly answers the `prompt` using the schema in `sql_context`, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.
+    validator: sql:postgres
+    evolution_strategies:
+      - Optimize the SQL solution for performance.
+      - Ensure the solution handles large datasets efficiently.
+    evolution_rate: 0.1
+
+  - name: sql_explanation
+    type: str
+    description: A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the `prompt` and the purpose of each part. Include references to the domain-specific context.
+    evolution_strategies:
+      - Provide a clear, step-by-step explanation.
+      - Explain the rationale behind specific SQL techniques.
+    evolution_rate: 0.1
+
+# Contextual tags
+contextual_tags:
+  tags:
+    - name: complexity
+      values:
+        - value: Moderate
+          weight: 0.3
+        - Complex
+        - Very Complex
+        - Expert
+
+    - name: concept
+      values:
+        - Multi-table Joins
+        - Subqueries
+        - Window Functions
+        - Common Table Expressions (CTEs)
+        - value: Set Operations
+          weight: 0.5
+        - Advanced Aggregations
+        - Recursive Queries
+        - Pivoting and Unpivoting
+        - value: Date and Time Operations
+          weight: 0.5
+        - value: String Manipulations
+          weight: 0.5
+        - Conditional Logic
+        - value: Data Type Conversions
+          weight: 0.5
+        - Hierarchical Data Queries
+        - Complex Grouping
+        - Advanced Filtering
+        - JSON Operations
+        - Full-Text Search
+        - Geospatial Queries
+        - Temporal Data Handling
+        - Dynamic SQL Generation
+
+    - name: domain
+      values:
+        - Finance
+        - Healthcare
+        - E-commerce
+        - Retail
+        - Manufacturing
+        - Telecommunications
+        - Insurance
+        - Education
+        - Real Estate
+        - Transportation and Logistics
+        - Energy and Utilities
+        - Media and Entertainment
+        - Government
+        - Nonprofit
+        - Agriculture
+        - Hospitality
+        - IoT
+        - Gaming
+        - Social Media
+        - Cybersecurity
+
+    - name: data_structure
+      values:
+        - Relational Tables
+        - JSON Documents
+        - value: XML Documents
+          weight: 0.5
+        - Key-Value Pairs
+        - Time Series
+        - Graph Data
+        - Geospatial Data
+        - Hierarchical Data
+        - value: Document Store
+          weight: 0.5
+        - value: Column-Oriented
+          weight: 0.5
+
+    - name: data_type_combination
+      values:
+        - Integer, Varchar, Date, Timestamp
+        - Integer, Float, Varchar, Text, Timestamp
+        - Integer, Decimal, Varchar, Date
+        - Integer, Varchar, Text, JSON
+        - Integer, Varchar, Timestamp, UUID
+        - Integer, Varchar, Date, Boolean
+        - Integer, Float, Varchar, Geometry
+        - Integer, Varchar, XML, Timestamp
+        - Integer, Varchar, JSONB, Array
+        - Integer, Varchar, Date, Interval
+        - Integer, Varchar, Decimal, UUID
+        - Integer, Varchar, JSONB, Boolean
+        - Integer, Varchar, Date, ENUM
+        - Integer, Varchar, BLOB, Timestamp
+
+    - name: analysis_type
+      values:
+        - Trend Analysis
+        - Cohort Analysis
+        - Funnel Analysis
+        - Anomaly Detection
+        - Predictive Modeling
+        - Customer Segmentation
+        - A/B Testing
+        - Time Series Analysis
+        - Geospatial Analysis
+        - Network Analysis
+        - Sentiment Analysis
+        - Risk Assessment
+        - Resource Optimization
+        - Performance Benchmarking
+        - Impact Analysis
+        - Fraud Detection
+        - Inventory Optimization
+        - Churn Prediction
+        - Recommendation Systems
+        - User Behavior Analysis
+        - Supply Chain Optimization
+        - value: Credit Scoring
+          weight: 0.5
+        - value: Deep Learning-based Analysis
+          weight: 0.5
+        - value: Market Segmentation
+          weight: 0.5
+        - value: Operational Efficiency
+          weight: 0.5

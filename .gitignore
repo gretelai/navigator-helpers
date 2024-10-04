@@ -1,3 +1,5 @@
+examples/*.jsonl
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -177,3 +179,4 @@ scratch.ipynb
 
 # default output directory for nl2code pipeline 
 nl2code-artifacts/
+pipeline-artifacts/
