@@ -3,20 +3,18 @@ from __future__ import annotations
 import logging
 import random
 import re
+import tempfile
 import uuid
 
 from enum import Enum
+from io import StringIO
 from typing import Optional
 
 import numpy as np
 
-from tqdm import tqdm
-
-import tempfile
-from io import StringIO
 from pylint.lint import Run
 from pylint.reporters.text import TextReporter
-
+from tqdm import tqdm
 
 from navigator_helpers.content_validator import ContentValidator
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
