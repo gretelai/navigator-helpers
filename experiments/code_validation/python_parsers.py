@@ -227,6 +227,7 @@ def is_valid_python_with_pylint(code_str: str, level: str = "error"):
             "messages": messages_sorted,
         }
 
+
 def is_valid_python(code_str: str, level: str = "error"):
     """
     # This is the overall implementation, written to illustrate logic, not tested
@@ -240,8 +241,8 @@ def is_valid_python(code_str: str, level: str = "error"):
     # Pyflakes
     _, err_msg = is_valid_python_with_pyflakes(code_str)
     if "unable to detect undefined names" in err_msg:
-        # this error happens when import * is used, 
-        # and pyflakes couldn't decide if a method is imported or not 
+        # this error happens when import * is used,
+        # and pyflakes couldn't decide if a method is imported or not
         # pylint calls that an error but the code may execute just fine
         severity = "warning"
         details_dict["severity"] = severity
