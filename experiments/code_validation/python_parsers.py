@@ -226,3 +226,33 @@ def is_valid_python_with_pylint(code_str: str, level: str = "error"):
             "severity": severity,
             "messages": messages_sorted,
         }
+
+def is_valid_python(code_str: str, level: str = "error"):
+    """
+    # This is the overall implementation, written to illustrate logic, not tested
+    # Approach: Use Pylint, except for:
+    #     - When Pyflakes error is like "unable to detect undefined names", call that a warning instead of an error
+    #     - Any code string that contains "# ..." is considered an error with error type "incomplete code"
+
+    # Pylint
+    passed, details_dict = is_valid_python_with_pylint(code_str. level)
+
+    # Pyflakes
+    _, err_msg = is_valid_python_with_pyflakes(code_str)
+    if "unable to detect undefined names" in err_msg:
+        # this error happens when import * is used, 
+        # and pyflakes couldn't decide if a method is imported or not 
+        # pylint calls that an error but the code may execute just fine
+        severity = "warning"
+        details_dict["severity"] = severity
+        passed = 'tbd' # need to be updated accordingly as well
+
+    if "# ..." in code_str:
+        severity = "error"
+        message = "Incomplete code"
+        # ... # haha, joke's on you
+
+    return passed, details_dict
+
+    """
+    pass
