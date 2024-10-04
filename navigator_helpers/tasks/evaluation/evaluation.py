@@ -26,6 +26,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
     def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame) -> None:
         super().__init__(llm_suite)
         self.dataset = dataset
+        self.output_dataset = None
     
     def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str) -> str:
         rubric = llm_as_a_judge_prompts.general_response_quality_rubric
@@ -195,25 +196,17 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         }
 
     def llm_as_a_critic_evaluation(self,instruction_col_name: str, code_col_name: str):
-        # Test for LLM-as-a-critic evaluation based on a generic dataset rubric
-        # Generic dataset rubric includes:
-        # 1. Diversity
-        # 2. Relevance
-        # 3. Correctness
-        # 4. Difficulty
-        # Want this rubric to be complimentary to linter-based scoring
-        # Related : https://github.com/gretelai/navigator-helpers/blob/main/navigator_helpers/tasks/prompt_templates/llm_as_a_judge.py
-        # We already have this, need to integrate it here
-
         # LLM-as-a-critic evaluation based on code rubric
-        self.dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
+        self.output_dataset = self.dataset.copy()
+        self.output_dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
             natural_language=row[instruction_col_name], 
             code=row[code_col_name]
             ), axis=1)
         
         # Calculate an overall score. Use average for now. Should revisit
-        self.dataset["overall_score"] = self.dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
-        return {'llm_as_a_critic_score': self.dataset.overall_score.mean()}
+        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
+
+        return {'llm_as_a_critic_score': self.output_dataset.overall_score.mean()}
 
 
 # Check if validation was performed and if that column exists in the dataset
@@ -272,15 +265,16 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
     
     def llm_as_a_critic_evaluation(self, instruction_col_name: str, code_col_name: str, context_col_name: str):
         # LLM-as-a-critic evaluation based on code rubric
-        self.dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
+        self.output_dataset = self.dataset.copy()
+        self.output_dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_judge(
             natural_language=row[instruction_col_name], 
             code=row[code_col_name],
             sql_context=row[context_col_name],
             ), axis=1)
         
         # Calculate an overall score. Use average for now. Should revisit
-        self.dataset["overall_score"] = self.dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
-        return {'llm_as_a_critic_score': self.dataset.overall_score.mean()}
+        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
+        return {'llm_as_a_critic_score': self.output_dataset.overall_score.mean()}
 
     def linter_based_scoring(self):
         # Test for linter-based scoring for SQL code
