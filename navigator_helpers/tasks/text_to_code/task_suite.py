@@ -52,7 +52,6 @@ class CodeLang(str, Enum):
 
 
 class NL2CodeTaskSuite(BaseTaskSuite):
-
     code_lang: CodeLang
     prompts: PromptTemplateSuite
 
@@ -69,7 +68,11 @@ class NL2CodeTaskSuite(BaseTaskSuite):
         with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
             f.write(code_string)
             f.flush()
-            pylint_opts = [f.name, "--disable=all", "--enable=C0114,C0115,C0116,W0311,E0401"]
+            pylint_opts = [
+                f.name,
+                "--disable=all",
+                "--enable=C0114,C0115,C0116,W0311,E0401",
+            ]
             reporter = TextReporter(pylint_output)
             lint_results = Run(pylint_opts, reporter=reporter, exit=False)
             pylint_output.seek(0)
@@ -100,7 +103,7 @@ class NL2CodeTaskSuite(BaseTaskSuite):
         for domain in domain_list:
             # Log individual domain generation message
             logger.info(f"🔖 Generating topics for domain: {domain}")
-            
+
             response = self.llm_suite.nl_generate(
                 self.prompts.topics_from_domains(
                     num_topics=num_topics_per_domain, domain=domain
@@ -109,7 +112,6 @@ class NL2CodeTaskSuite(BaseTaskSuite):
             topics[domain] = utils.parse_json_str(response) or {}
 
         return topics
-
 
     def generate_levels_of_complexity(self, num_levels: int = 3) -> list[str]:
         logger.info(f"🏷️ Generating levels of {self.code_lang.logging_name} complexity")
@@ -149,7 +151,6 @@ class NL2CodeTaskSuite(BaseTaskSuite):
 
 
 class NL2SQLTaskSuite(NL2CodeTaskSuite):
-
     code_lang = CodeLang.SQL
     prompts = sql_prompts
 
@@ -286,7 +287,6 @@ class NL2SQLTaskSuite(NL2CodeTaskSuite):
 
 
 class NL2PythonTaskSuite(NL2CodeTaskSuite):
-
     code_lang = CodeLang.PYTHON
     prompts = python_prompts
 
@@ -425,6 +425,8 @@ class NL2PythonTaskSuite(NL2CodeTaskSuite):
             self._update_pbar_desc(
                 progress_bar, f"⌛️ {PBAR_TEMPLATE('semantic validation')}"
             )
-            semantic_score = self.check_semantic_correctness(code)  # Call semantic validation
+            semantic_score = self.check_semantic_correctness(
+                code
+            )  # Call semantic validation
             record["semantic_validation"] = semantic_score
-        return record   
+        return record

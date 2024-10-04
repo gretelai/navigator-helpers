@@ -41,7 +41,6 @@ class NL2CodePipelineResults(PipelineResults):
 
 
 class NL2CodePipeline(BasePipeline):
-
     @property
     def tasks(self) -> NL2CodeTaskSuite:
         return self._tasks
@@ -89,9 +88,13 @@ class NL2CodePipeline(BasePipeline):
     def set_contextual_tags(self, tags: ContextualTags | dict):
         if isinstance(tags, dict):
             # Check if topics or complexity levels are empty and generate them
-            if not tags.get("domain_and_topics") or any(not topics for topics in tags["domain_and_topics"].values()):
-                tags["domain_and_topics"] = self._generate_missing_topics(tags["domain_and_topics"])
-            
+            if not tags.get("domain_and_topics") or any(
+                not topics for topics in tags["domain_and_topics"].values()
+            ):
+                tags["domain_and_topics"] = self._generate_missing_topics(
+                    tags["domain_and_topics"]
+                )
+
             if not tags.get("complexity_levels") or len(tags["complexity_levels"]) == 0:
                 tags["complexity_levels"] = self.tasks.generate_levels_of_complexity(
                     num_levels=self.config.num_complexity_levels
@@ -109,19 +112,21 @@ class NL2CodePipeline(BasePipeline):
 
     def _generate_missing_topics(self, domain_and_topics):
         """Generate missing topics for domains that have an empty list."""
-        
+
         # Only log once if any domain is missing topics
-        missing_domains = [domain for domain, topics in domain_and_topics.items() if not topics]
-        
+        missing_domains = [
+            domain for domain, topics in domain_and_topics.items() if not topics
+        ]
+
         if missing_domains:
             logger.info("🏷️ Generating topics for each domain with missing topics")
-        
+
         for domain in missing_domains:
             domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
                 domain_list=[domain],
                 num_topics_per_domain=self.config.num_topics_per_domain,
             )[domain]
-        
+
         return domain_and_topics
 
     def _generate_sample(self, progress_bar):
@@ -139,7 +144,10 @@ class NL2CodePipeline(BasePipeline):
         return record
 
     def run(
-        self, num_samples: int = 10, disable_progress_bar: bool = False, max_workers: int = 1
+        self,
+        num_samples: int = 10,
+        disable_progress_bar: bool = False,
+        max_workers: int = 1,
     ) -> PipelineResults:
         logger.info(
             f"🚀 Starting Text-to-{self.config.code_lang.logging_name} synthetic data pipeline"
@@ -159,9 +167,10 @@ class NL2CodePipeline(BasePipeline):
         with logging_redirect_tqdm():
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(self._generate_sample, pbar) for _ in range(num_samples)
+                    executor.submit(self._generate_sample, pbar)
+                    for _ in range(num_samples)
                 ]
-                
+
                 for future in as_completed(futures):
                     try:
                         record = future.result()
