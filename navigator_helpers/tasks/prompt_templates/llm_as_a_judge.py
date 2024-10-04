@@ -1,8 +1,10 @@
+# TODO: Think about how to make this more extensible
 # What if there are multiple instruction columns?
 # What if there are multiple response columns?
 # What if there is an overall "system instruction" applied to every record? e.g. in a preference dataset, one column is expected to be better than the other
 
-# My overall thought is that this base rubric should be generic, and inclusive of any derived rubrics
+# The generic dataset rubric should only include the most widely applicable criteria. 
+# There shouldn't be any criteria in it that cannot be applied to any derived, specialized rubric.
 general_response_quality_rubric="""\
 You are a domain expert in X. Please act as an impartial judge and use the rubric below to grade the quality of the response based on the Instructions.
 
