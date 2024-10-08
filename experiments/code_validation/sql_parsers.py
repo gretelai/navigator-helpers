@@ -14,7 +14,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import bigquery
 from sqlalchemy import create_engine, text
 from sqlvalidator.sql_validator import SQLQuery
-from utils import split_statements
+from utils import create_db_name, split_statements
 
 
 class SimpleSqlValidator:
@@ -174,7 +174,7 @@ class PostgresqlValidator:
     def is_valid_sql(
         query: str, schema: str, domain: str, db_creds: dict
     ) -> Tuple[bool, str]:
-        db_name = domain.replace(" ", "_").replace("-", "_").lower()
+        db_name = create_db_name(domain)
         try:
             PostgresqlValidator._query_postgres(
                 sql_query=query, schema=schema, db_name=db_name, db_creds=db_creds
@@ -244,7 +244,7 @@ class MysqlValidator:
     def is_valid_sql(
         query: str, schema: str, domain: str, db_creds: dict, mysql_container: Container
     ) -> Tuple[bool, str]:
-        db_name = domain.replace(" ", "_").replace("-", "_").lower()
+        db_name = create_db_name(domain)
         try:
             # A MySQL database need to be created before creating an engine
             MysqlValidator._create_db(db_name, db_creds, mysql_container)
@@ -313,7 +313,7 @@ class SqlserverValidator:
         db_creds: dict,
         sqlserver_container: Container,
     ) -> Tuple[bool, str]:
-        db_name = domain.replace(" ", "_").replace("-", "_").lower()
+        db_name = create_db_name(domain)
         try:
             # A SQL Server database need to be created before creating an engine
             SqlserverValidator._create_db(db_name, db_creds, sqlserver_container)
@@ -369,7 +369,7 @@ class GooglesqlValidator:
             )
 
         # Step 2: Add dataset name to table names in FROM and JOIN clauses
-        pattern = r"(?<=\bFROM\s|\bJOIN\s)(\w+)\b"
+        pattern = r"(?<=\bFROM\s+|\bJOIN\s+)(\w+)\b"
         updated_query = re.sub(
             pattern, rf"{dataset_name}.\1", placeholder_query, flags=re.IGNORECASE
         )
@@ -404,7 +404,7 @@ class GooglesqlValidator:
         sql_query: str, schema: str, db_name: str, db_creds: dict
     ) -> pd.DataFrame:
         """
-        Creates a temporary db from the table metadata string, runs query on the temporary db.
+        Creates a temporary db, runs query on the temporary db.
         After the query is run, the temporary db is dropped.
         """
         client = None
@@ -492,7 +492,13 @@ class GooglesqlValidator:
     def is_valid_sql(
         query: str, schema: str, domain: str, db_creds: dict
     ) -> Tuple[bool, str]:
-        db_name = domain.replace(" ", "-").replace("_", "-").lower()
+        """
+        Note that we want each db_name to be unique for each query.
+        Otherwise this emulator handles it poorly.
+        Suggested domain format: domain + uuid
+        """
+
+        db_name = create_db_name(domain)
         try:
             GooglesqlValidator._query_bigquery(
                 sql_query=query, schema=schema, db_name=db_name, db_creds=db_creds

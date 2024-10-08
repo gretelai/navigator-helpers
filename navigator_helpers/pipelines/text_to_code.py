@@ -41,6 +41,7 @@ class NL2CodePipelineResults(PipelineResults):
 
 
 class NL2CodePipeline(BasePipeline):
+
     @property
     def tasks(self) -> NL2CodeTaskSuite:
         return self._tasks

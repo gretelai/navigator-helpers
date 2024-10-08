@@ -52,6 +52,7 @@ class CodeLang(str, Enum):
 
 
 class NL2CodeTaskSuite(BaseTaskSuite):
+
     code_lang: CodeLang
     prompts: PromptTemplateSuite
 
@@ -151,6 +152,7 @@ class NL2CodeTaskSuite(BaseTaskSuite):
 
 
 class NL2SQLTaskSuite(NL2CodeTaskSuite):
+
     code_lang = CodeLang.SQL
     prompts = sql_prompts
 
@@ -287,6 +289,7 @@ class NL2SQLTaskSuite(NL2CodeTaskSuite):
 
 
 class NL2PythonTaskSuite(NL2CodeTaskSuite):
+
     code_lang = CodeLang.PYTHON
     prompts = python_prompts
 
