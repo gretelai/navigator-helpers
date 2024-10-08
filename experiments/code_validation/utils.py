@@ -1,5 +1,6 @@
 import re
 
+
 def split_statements(query):
     # Split a string of multiple statements into a list of individual statements
     statements = [s.strip() for s in query.split(";")]
