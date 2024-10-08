@@ -43,10 +43,12 @@ logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 @dataclass
 class SampleToDatasetConfig:
+    """Configuration for the SampleToDataset task."""
     verbose: bool = False
     model_tags: Tuple[str] = ("llama-3.1-8b",)
 
 class SampleToDatasetTaskSuite:
+    """A suite of tasks for generating synthetic datasets from sample data."""
 
     def __init__(
         self,
@@ -54,6 +56,15 @@ class SampleToDatasetTaskSuite:
         llm_registry: LLMRegistry,
         logger: logging.Logger=logger
     ) -> None:
+        """
+        Initialize the SampleToDatasetTaskSuite.
+
+        Args:
+            config (SampleToDatasetConfig): Configuration for the task suite.
+            llm_registry (LLMRegistry): Registry of language models.
+            logger (logging.Logger, optional): Logger instance. Defaults to the module-level logger.
+        """
+        
         self.config = config
         self.llm_registry = llm_registry
         self.agents = self._setup_agents()
@@ -61,16 +72,14 @@ class SampleToDatasetTaskSuite:
         self.logger = logger
 
     def _setup_logging(self) -> None:
-        """
-        Set up logging configuration to suppress unwanted logs.
-        """
+        """Set up logging configuration to suppress unwanted logs."""
+
         for module in ["groq", "mistralai", "openai", "httpx", "httpcore", "autogen"]:
             logging.getLogger(module).setLevel(logging.WARNING)
 
     def _setup_agents(self) -> Dict[str, autogen.AssistantAgent]:
-        """
-        Set up the autogen agents for both reflection and cognition
-        """
+        """Set up the autogen agents for both reflection and cognition."""
+
         primary_configs = self.llm_registry.find_by_tags(set(self.config.model_tags))
 
         if not primary_configs:
@@ -103,16 +112,36 @@ class SampleToDatasetTaskSuite:
 
     def _get_agent(self, prompt_type: str) -> autogen.AssistantAgent:
         """
-        Get the appropriate agent based on the prompt type
+        Get the appropriate agent based on the prompt type.
+
+        Args:
+            prompt_type (str): Type of prompt ('reflection' or 'cognition').
+
+        Returns:
+            autogen.AssistantAgent: The selected agent.
+
+        Raises:
+            ValueError: If an invalid prompt type is provided.
         """
+
         if prompt_type not in ["reflection", "cognition"]:
             raise ValueError("Invalid prompt type. Must be 'reflection' or 'cognition'.")
         return self.agents[prompt_type]
 
-    def execute_prompt(self, user_prompt: str, prompt_type: str) -> dict:
+    def execute_prompt(self, user_prompt: str, prompt_type: str) -> Tuple[str, Union[dict, list]]:
         """
-        Execute a prompt with either reflection or cognition
+        Execute a prompt with either reflection or cognition.
+
+        Args:
+            user_prompt (str): The prompt to execute.
+            prompt_type (str): Type of prompt ('reflection' or 'cognition').
+
+        Returns:
+            Tuple[str, Union[dict, list, None]]: A tuple containing:
+                - The extracted thinking (str)
+                - The JSON output (dict or list), or None if extraction failed
         """
+
         # TODO: rework this to batter handle history so we don't have to reset an agent every time
         self._setup_agents()
         agent = self._get_agent(prompt_type)
@@ -130,13 +159,25 @@ class SampleToDatasetTaskSuite:
 
         return thinking, json_output
 
-    def execute_prompt_w_reflection(self, user_prompt: str) -> dict:
+    def execute_prompt_w_reflection(self, user_prompt: str) -> Tuple[str, Union[dict, list]]:
+        """Execute a prompt with reflection."""
         return self.execute_prompt(user_prompt, "reflection")
 
-    def execute_prompt_w_cognition(self, user_prompt: str) -> dict:
+    def execute_prompt_w_cognition(self, user_prompt: str) -> Tuple[str, Union[dict, list]]:
+        """Execute a prompt with cognition."""
         return self.execute_prompt(user_prompt, "cognition")
 
-    def extract_data_seeds_in_one_shot(self, sample_dataset: pd.DataFrame, system_prompt_type='cognition') -> dict:
+    def extract_data_seeds_in_one_shot(self, sample_dataset: pd.DataFrame, system_prompt_type: str='cognition') -> Tuple[str, Union[dict, list]]:
+        """
+        Extract data seeds from a sample dataset in one shot.
+
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            Tuple[str, dict]: A tuple containing the extracted thinking and data seeds.
+        """
         data_jsonl = sample_dataset.to_json(orient='records', lines=True)
         data_schema = str(list(sample_dataset.columns))
 
@@ -154,14 +195,21 @@ class SampleToDatasetTaskSuite:
     
     def crowdsource_data_seeds(self, sample_dataset: pd.DataFrame, crowd_size=5, max_num_seeds=4, system_prompt_type='cognition') -> dict:
         """
-        Perform crowd-sourcing by executing the dataseed extraction prompt crowd_size times,
+        Perform crowd-sourcing by executing the dataseed extraction prompt multiple times,
         and generating a deduped and ranked list of high-quality data seeds.
 
-        :param user_prompt: The prompt for generating data seeds.
-        :param prompt_template: The prompt template for deduping and ranking data seeds.
-        :param yev_config: Configuration for the `execute_prompt_w_cognition` function.
-        :param crowd_size: Number of times to run the user prompt.
-        :return: A deduped and ranked list of data seeds or the original ranked_prompt_data if an error occurs.
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset.
+            crowd_size (int, optional): Number of times to run the user prompt. Defaults to 5.
+            max_num_seeds (int, optional): Maximum number of seeds to return. Defaults to 4.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            dict: A dictionary containing the ranked data seeds.
+
+        Raises:
+            ValueError: If all attempts to extract data seeds fail.
+            RuntimeError: If ranking fails after multiple attempts.
         """
 
         # Collect data seeds from crowd_size runs of execute_prompt_w_cognition
@@ -282,6 +330,19 @@ class SampleToDatasetTaskSuite:
         return {"columns": []}
 
     def generate_data_seeds(self, dataseeds: dict, system_prompt_type='cognition') -> dict:
+        """
+        Generate data seeds based on the provided dataseeds.
+
+        Args:
+            dataseeds (dict): The initial dataseeds.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            dict: A dictionary containing the generated data seeds.
+
+        Raises:
+            RuntimeError: If generation fails after multiple attempts.
+        """
         data_seed_generation_prompt = DATASEED_GENERATION_PROMPT_TEMPLATE.format(
             data_seeds=json.dumps(dataseeds, indent=2)
         )
@@ -329,7 +390,18 @@ class SampleToDatasetTaskSuite:
         # but it's here to satisfy the function's return type hint
         return {"columns": []}
     
-    def generate_seed_permutations(self, generated_seeds, max_permutations=10000):
+    def generate_seed_permutations(self, generated_seeds: dict, max_permutations: int=10000) -> pd.DataFrame:
+        """
+        Generate permutations of the data seeds.
+
+        Args:
+            generated_seeds (dict): The generated data seeds.
+            max_permutations (int, optional): Maximum number of permutations to generate. Defaults to 10000.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the seed permutations.
+        """
+
         columns = generated_seeds['columns']
         column_names = [col['column_name'] for col in columns]
         all_values = [col['all_values'] for col in columns]
@@ -359,7 +431,21 @@ class SampleToDatasetTaskSuite:
 
         return df
 
-    def generate_dataset_description(self, sample_dataset: pd.DataFrame, system_prompt_type='cognition') -> dict:
+    def generate_dataset_description(self, sample_dataset: pd.DataFrame, system_prompt_type='cognition') -> Union[dict, list]:
+        """
+        Generate a description of the dataset based on the sample dataset.
+
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            dict: A dictionary containing the dataset description.
+
+        Raises:
+            RuntimeError: If description generation fails after multiple attempts.
+        """
+
         data_jsonl = sample_dataset.to_json(orient='records', lines=True)
         data_schema = str(list(sample_dataset.columns))
 
@@ -408,6 +494,21 @@ class SampleToDatasetTaskSuite:
         return {"dataset_description": {}}
     
     def generate_data_generation_prompt(self, sample_dataset: pd.DataFrame, generated_seeds: dict, system_prompt_type='cognition') -> dict:
+        """
+        Generate a prompt for data generation based on the sample dataset and generated seeds.
+
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset.
+            generated_seeds (dict): The generated data seeds.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            dict: A dictionary containing the data generation prompt.
+
+        Raises:
+            RuntimeError: If prompt generation fails after multiple attempts.
+        """
+
         # look at column names and descriptions only; exclude examples so that not to poison the description
         data_seed_descriptions = {
             "columns": [
@@ -417,13 +518,13 @@ class SampleToDatasetTaskSuite:
         }
         dataset_description = self.generate_dataset_description(sample_dataset)
 
-        data_generation_prompt = DATA_GENERATION_PROMPT_TEMPLATE.format(
+        proto_data_generation_prompt = DATA_GENERATION_PROMPT_TEMPLATE.format(
             dataset_description=dataset_description["dataset_description"],
             data_seeds=json.dumps(data_seed_descriptions, indent=2)
         )
         if self.config.verbose:
-            print("------------------- Data generation prompt ------------")
-            print(data_generation_prompt)
+            print("------------------- Proto data generation prompt ------------")
+            print(proto_data_generation_prompt)
 
         # Define the data model
         class PromptModel(BaseModel):
@@ -432,7 +533,7 @@ class SampleToDatasetTaskSuite:
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
             try:
-                _, data_generation_prompt = self.execute_prompt(data_generation_prompt, system_prompt_type)
+                _, data_generation_prompt = self.execute_prompt(proto_data_generation_prompt, system_prompt_type)
                 is_valid_data_generation_prompt, validation_result = validate_json_with_pydantic(PromptModel, data_generation_prompt)
 
                 if is_valid_data_generation_prompt:
@@ -471,7 +572,24 @@ class SampleToDatasetTaskSuite:
 
     def generate_data(self, sample_dataset: pd.DataFrame, data_generation_prompt: dict, 
                       seed_permutations: pd.DataFrame, num_records_per_seed: int=5, 
-                      max_workers: int=4, system_prompt_type: str='cognition'):
+                      max_workers: int=4, system_prompt_type: str='cognition') -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Generate synthetic data based on the sample dataset and data generation prompt.
+
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset.
+            data_generation_prompt (dict): The data generation prompt.
+            seed_permutations (pd.DataFrame): The seed permutations.
+            num_records_per_seed (int, optional): Number of records to generate per seed. Defaults to 5.
+            max_workers (int, optional): Maximum number of concurrent workers. Defaults to 4.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing two DataFrames:
+                - The generated data.
+                - The generated data with seeds.
+        """
+
         def seed_data_prompt(row, template, seed_columns_list):
             format_dict = {}
             for col in seed_columns_list:

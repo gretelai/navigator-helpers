@@ -3,7 +3,7 @@ import json
 import re
 
 from pprint import pprint
-from typing import Tuple, Union
+from typing import Tuple, Type, Union
 
 import pandas as pd
 
@@ -66,6 +66,7 @@ def extract_thinking(input_string: str) -> str:
     Returns:
         str: The extracted content or an error message if extraction fails.
     """
+
     # Compile regex patterns - still at module level, but collocated with the function
     THINKING_OUTPUT_PATTERN = re.compile(r"<thinking>(.*?)</?thinking>.*?<output>|<thinking>(.*?)<output>", re.DOTALL)
     THINKING_PATTERN = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
@@ -107,6 +108,7 @@ def extract_output(input_string: str) -> str:
     Returns:
         str: The extracted content or an error message if extraction fails.
     """
+
     OUTPUT_PATTERN = re.compile(r"<output>(.*?)</output>|<output>(.*)", re.DOTALL)
 
     try:
@@ -134,7 +136,7 @@ def extract_output(input_string: str) -> str:
     except Exception as e:
         return f"Error in extract_output: {str(e)}"
 
-def validate_json_with_pydantic(model_class: BaseModel, json_data: dict) -> Tuple[bool, Union[BaseModel, dict]]:
+def validate_json_with_pydantic(model_class: Type[BaseModel], json_data: Union[dict, list]) -> Tuple[bool, Union[BaseModel, dict]]:
     """
     Validates the given json_data against the provided Pydantic model class and returns a bool indicating validity.
     
@@ -146,6 +148,7 @@ def validate_json_with_pydantic(model_class: BaseModel, json_data: dict) -> Tupl
         Tuple[bool, Union[BaseModel, dict]]: A tuple where the first element is a boolean indicating if the JSON is valid.
                                              The second element is either the parsed model (if valid) or an error message (if invalid).
     """
+
     try:
         # Dynamically validate the JSON using the passed model class
         validated_data = model_class(**json_data)
@@ -154,10 +157,33 @@ def validate_json_with_pydantic(model_class: BaseModel, json_data: dict) -> Tupl
         return False, {"error": str(e)}  # Return False and the detailed error message if validation fails
 
 def pretty_print_json(json_data, width=160):
+    """
+    Pretty print a JSON object with specified width.
+
+    Args:
+        json_data (dict or list): The JSON data to be printed.
+        width (int, optional): The maximum width of the output. Defaults to 160.
+
+    Returns:
+        None. Prints the formatted JSON to stdout.
+    """
     formatted_json = json.dumps(json_data, indent=2)
     pprint(json.loads(formatted_json), width=width, compact=False)
 
 def convert_complex_types_to_string(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert complex data types in a DataFrame to strings.
+
+    This function converts lists and dictionaries to JSON strings,
+    and other non-string, non-integer types to their string representation.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+
+    Returns:
+        pd.DataFrame: A new DataFrame with complex types converted to strings.
+    """
+
     def convert_value(val):
         if isinstance(val, (str, int)):
             return val
@@ -168,7 +194,22 @@ def convert_complex_types_to_string(df: pd.DataFrame) -> pd.DataFrame:
 
     return df.apply(lambda x: x.map(convert_value))
 
-def create_dataframe_from_jsonl(jsonl_string: str) -> pd.DataFrame:
+def create_dataframe_from_jsonl(jsonl_string: Union[dict, list, str]) -> pd.DataFrame:
+    """
+    Create a pandas DataFrame from a JSONL string, JSON array, or list of dictionaries.
+
+    This function attempts to parse the input as a JSON array first, then as JSONL if that fails.
+    It also handles potential JSON parsing errors and converts complex data types to strings.
+
+    Args:
+        jsonl_string (Union[dict, list, str]): The input data, which can be a JSONL string,
+                                               a JSON array string, or a list of dictionaries.
+
+    Returns:
+        pd.DataFrame: A DataFrame created from the input data. Returns an empty DataFrame
+                      if the input is invalid or an error occurs during processing.
+    """
+    
     try:
         if isinstance(jsonl_string, list):
             if not jsonl_string:  # Check if list is empty
