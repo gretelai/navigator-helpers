@@ -19,6 +19,7 @@ from .pipelines.config.utils import smart_load_pipeline_config
 from .pipelines.text_to_code import NL2CodePipeline
 from .tasks.text_to_code.task_suite import NL2PythonTaskSuite, NL2SQLTaskSuite
 from .text_inference import TextInference
+from .utils.logging import setup_logger
 
 __all__ = [
     "DataField",
@@ -29,4 +30,5 @@ __all__ = [
     "ContentValidator",
     "TextInference",
     "DEFAULT_EVOLUTION_STRATEGIES",
+    "setup_logger",
 ]
