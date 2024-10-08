@@ -4,7 +4,6 @@ import os
 import random
 import textwrap
 
-from logging import LogRecord
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from gretel_client import Gretel
@@ -12,13 +11,13 @@ from gretel_client import Gretel
 from .content_validator import ContentValidator
 from .data_models import DataField, DataModel
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
+from .text_inference import TextInference
 from .prompts import (
     CONTENT_CORRECTION_PROMPT,
     FIELD_GENERATION_PROMPT,
     LLM_JUDGE_PROMPT,
     MUTATION_PROMPT,
 )
-from .google_text_inference import TextInference
 from .utils.logging import setup_logger
 
 
@@ -350,14 +349,16 @@ class EvolDataGenerator:
         with open(self.output_filename, "a") as f:
             generated_count = 0
             context_index = 0
-            
+
             while generated_count < num_examples:
-                self.logger.info(f"Generating record {generated_count+1}/{num_examples}")
-                
+                self.logger.info(
+                    f"Generating record {generated_count+1}/{num_examples}"
+                )
+
                 # Cycle through contexts if we've used them all
                 if context_index >= len(contexts):
                     context_index = 0
-                
+
                 context = contexts[context_index]
                 self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
                 record = {}
@@ -411,7 +412,7 @@ class EvolDataGenerator:
                 self.logger.info(
                     f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
                 )
-                
+
                 # Move to the next context
                 context_index += 1
 
