@@ -13,8 +13,9 @@ from datasets import load_dataset
 from pydantic import BaseModel, Field, field_validator
 
 from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
+from .utils.logging import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def pretty_print_sample(sample: Dict[str, Any], sample_type: str):
