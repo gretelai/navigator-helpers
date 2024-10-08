@@ -10,8 +10,8 @@ from navigator_helpers.tasks.base import BaseTaskSuite
 from navigator_helpers.tasks.prompt_templates import load_prompt_template_suite
 from navigator_helpers.tasks.text_to_code import utils
 
-
 llm_as_a_judge_prompts = load_prompt_template_suite("llm_as_a_judge")
+
 
 class BaseEvaluationTaskSuite(BaseTaskSuite):
     """
@@ -27,14 +27,15 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         super().__init__(llm_suite)
         self.dataset = dataset
         self.output_dataset = None
-    
+
     def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str) -> str:
         rubric = llm_as_a_judge_prompts.general_response_quality_rubric
         prompt = rubric(
-            natural_language=natural_language, code=code,
+            natural_language=natural_language,
+            code=code,
         )
         return prompt
-    
+
     def _eval_response_with_llm_as_a_judge(
         self,
         natural_language: str,
@@ -136,9 +137,9 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             - Dictionary where each column is mapped to a distribution
         """
         # Algorithm for feature distribution:
-            # 1. Calculate the distribution of values in each column using df.value_counts
-            # 2. Need to think about categorical, numerical and text columns
-            # 3. Example: For code column, we can take the distribution of code length
+        # 1. Calculate the distribution of values in each column using df.value_counts
+        # 2. Need to think about categorical, numerical and text columns
+        # 3. Example: For code column, we can take the distribution of code length
         # TODO: Implement something similar to HF dataset visualization
         # TODO: classify columns as categorical, numerical, text
 
@@ -177,7 +178,9 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             "word_counts_per_column": word_counts.mean().to_dict(),
         }
 
-    def llm_as_a_judge_evaluation(self, instruction_col_name: str, code_col_name: str, context_col_name: str):
+    def llm_as_a_judge_evaluation(
+        self, instruction_col_name: str, code_col_name: str, context_col_name: str
+    ):
         """
         Evaluation test for LLM-as-a-judge evaluation based on generic rubric
         Returns:
@@ -185,16 +188,20 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         self.output_dataset = self.dataset.copy()
-        self.output_dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_a_judge(
-            natural_language=row[instruction_col_name], 
-            code=row[code_col_name]
-            ), axis=1)
-        
-        # TODO: Explore a better way to aggregate scores than average 
-        # Calculate the average score for each record
-        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
+        self.output_dataset["scores"] = self.dataset.apply(
+            lambda row: self._eval_response_with_llm_as_a_judge(
+                natural_language=row[instruction_col_name], code=row[code_col_name]
+            ),
+            axis=1,
+        )
 
-        return {'llm_as_a_judge_score': self.output_dataset.overall_score.mean()}
+        # TODO: Explore a better way to aggregate scores than average
+        # Calculate the average score for each record
+        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(
+            lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
+        )
+
+        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
 
 
 class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
@@ -203,20 +210,22 @@ class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
         1. LLM-as-a-judge evaluation based on code rubric (e.g. code quality, correctness, readability)
     """
 
-    def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame, code_lang: str = '') -> None:
+    def __init__(
+        self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame, code_lang: str = ""
+    ) -> None:
         super().__init__(llm_suite, dataset)
         self.code_lang = code_lang
-    
-    def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str, **kwargs) -> str:
+
+    def _get_llm_as_a_judge_prompt(
+        self, natural_language: str, code: str, **kwargs
+    ) -> str:
         if self.code_lang == "sql":
             rubric = llm_as_a_judge_prompts.sql_quality_rubric
         elif self.code_lang == "python":
             rubric = llm_as_a_judge_prompts.python_quality_rubric
         else:
             rubric = llm_as_a_judge_prompts.general_code_quality_rubric
-        prompt = rubric(
-                natural_language=natural_language, code=code, **kwargs
-            )
+        prompt = rubric(natural_language=natural_language, code=code, **kwargs)
         return prompt
 
 
@@ -224,6 +233,7 @@ class NL2PythonEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
     """
     Python evaluation class, which include a set of python specific evaluation tasks
     """
+
     def linter_based_scoring(self):
         # Validation test for linter-based scoring for python code
         # TODO: Do we want to combine validation into the evaluation suite?
@@ -234,16 +244,23 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
     """
     SQL evaluation class, which include a set of SQL specific evaluation tasks
     """
-    
-    def llm_as_a_judge_evaluation(self, instruction_col_name: str, code_col_name: str, context_col_name: str):
+
+    def llm_as_a_judge_evaluation(
+        self, instruction_col_name: str, code_col_name: str, context_col_name: str
+    ):
         # LLM-as-a-critic evaluation based on code rubric
         self.output_dataset = self.dataset.copy()
-        self.output_dataset["scores"] = self.dataset.apply(lambda row: self._eval_response_with_llm_as_a_judge(
-            natural_language=row[instruction_col_name], 
-            code=row[code_col_name],
-            sql_context=row[context_col_name],
-            ), axis=1)
-        
+        self.output_dataset["scores"] = self.dataset.apply(
+            lambda row: self._eval_response_with_llm_as_a_judge(
+                natural_language=row[instruction_col_name],
+                code=row[code_col_name],
+                sql_context=row[context_col_name],
+            ),
+            axis=1,
+        )
+
         # Calculate an overall score. Use average for now. Should revisit
-        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(lambda x: np.mean([int(v) for k, v in x.items() if "score" in k]))
-        return {'llm_as_a_judge_score': self.output_dataset.overall_score.mean()}
+        self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(
+            lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
+        )
+        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}

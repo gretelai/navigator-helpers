@@ -3,9 +3,9 @@
 # What if there are multiple response columns?
 # What if there is an overall "system instruction" applied to every record? e.g. in a preference dataset, one column is expected to be better than the other
 
-# The generic dataset rubric should only include the most widely applicable criteria. 
+# The generic dataset rubric should only include the most widely applicable criteria.
 # There shouldn't be any criteria in it that cannot be applied to any derived, specialized rubric.
-general_response_quality_rubric="""\
+general_response_quality_rubric = """\
 You are a domain expert in X. Please act as an impartial judge and use the rubric below to grade the quality of the response based on the Instructions.
 
 Provide output in the form of the following JSON:
@@ -28,7 +28,7 @@ Relevance: Adherence to Instructions
 * Score = 0: Does not adhere to the instructions.
 """
 
-code_quality_rubric="""\
+code_quality_rubric = """\
 You are a {coding_language}programming expert, bringing together expertise from across software engineering, data science, and algorithmic problem-solving.
 Take a deep breath and use the code quality rubric below to grade the quality of {coding_language}code generated based on the INSTRUCTIONS.
 Provide output in the form of the following JSON:
@@ -88,7 +88,7 @@ Convention: Convention and Best Practices (Does the code follow {coding_language
 * Score = 0: The code does not follow {coding_language}conventions or best practices, using non-{coding_language}coding approaches.
 """
 
-sql_quality_rubric="""\
+sql_quality_rubric = """\
 You are a SQL data expert, bringing together expertise from across data analysis, data science and data engineering.
 Take a deep breath and use the data quality rubric below to grade the quality of SQL generated based on INSTRUCTIONS and CONTEXT.
 Provide output in the form of a following JSON:
@@ -156,14 +156,16 @@ llm_as_a_judge_template_dict = dict(
     # We can do a general code quality rubric for all languages as a fallback
     # But we should typically expect a language name to be specified
     general_code_quality_rubric=code_quality_rubric.format(
-        coding_language="", 
+        coding_language="",
         coding_language_lower="",
         coding_language_dash="language-",
-        style="relevant style"), 
+        style="relevant style",
+    ),
     python_quality_rubric=code_quality_rubric.format(
-        coding_language="Python ", 
+        coding_language="Python ",
         coding_language_lower="python",
         coding_language_dash="Python-",
-        style="PEP 9"), 
+        style="PEP 9",
+    ),
     sql_quality_rubric=sql_quality_rubric,
 )
