@@ -4,6 +4,7 @@ import os
 import random
 import textwrap
 
+from logging import LogRecord
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from gretel_client import Gretel
@@ -17,7 +18,8 @@ from .prompts import (
     LLM_JUDGE_PROMPT,
     MUTATION_PROMPT,
 )
-from .text_inference import TextInference
+from .google_text_inference import TextInference
+from .utils.logging import setup_logger
 
 
 class EvolDataGenerator:
@@ -25,9 +27,10 @@ class EvolDataGenerator:
         self,
         model_definition: DataModel,
         custom_evolutionary_strategies: Optional[List[str]] = None,
+        logger: Optional[logging.Logger] = None,
     ):
         self.model_definition = model_definition
-        self._setup_logging()
+        self.logger = logger or setup_logger(__name__)
         self.gretel = Gretel(api_key=self.model_definition.api_key)
         self.llm = self.gretel.factories.initialize_navigator_api(
             "natural_language", backend_model=self.model_definition.llm_model
@@ -240,15 +243,6 @@ class EvolDataGenerator:
 
         return field_value
 
-    def _setup_logging(self):
-        """Set up logging for the EvolDataGenerator."""
-        logging.basicConfig(
-            level=getattr(logging, self.model_definition.log_level),
-            format="%(asctime)s - %(levelname)s - %(message)s",
-        )
-        self.logger = logging.getLogger(__name__)
-        logging.getLogger("sqlfluff").setLevel(logging.WARNING)
-
     def _initialize_validators(self) -> Dict[str, Callable]:
         validators = {}
         for field in self.model_definition.fields:
@@ -328,8 +322,8 @@ class EvolDataGenerator:
         validating the records, and performing a judge check on each record.
         Valid records are saved to an output file in JSONL format.
 
-        The method uses model definitions and fields from `self.model_definition` to
-        create records. It logs the progress and results and updates success and failure counts.
+        The method continues generating records until the requested number
+        of valid records have been produced.
 
         Yields:
             Dict[str, Any]: A valid merged record combining the context and generated fields.
@@ -354,8 +348,17 @@ class EvolDataGenerator:
             pass  # Just to clear the file if it exists
 
         with open(self.output_filename, "a") as f:
-            for i, context in enumerate(contexts):
-                self.logger.info(f"Generating record {i+1}/{num_examples}")
+            generated_count = 0
+            context_index = 0
+            
+            while generated_count < num_examples:
+                self.logger.info(f"Generating record {generated_count+1}/{num_examples}")
+                
+                # Cycle through contexts if we've used them all
+                if context_index >= len(contexts):
+                    context_index = 0
+                
+                context = contexts[context_index]
                 self.logger.debug(f"Context: {json.dumps(context, indent=2)}")
                 record = {}
                 valid_record = True
@@ -385,10 +388,11 @@ class EvolDataGenerator:
                         merged_record = {**context, **record}
                         self._print_record(merged_record)
                         self.success_count += 1
+                        generated_count += 1
 
                         # Write the valid record to the output file
                         json.dump(merged_record, f)
-                        f.write("\n")  # Ensure newline after each record
+                        f.write("\n")
                         self.logger.debug(
                             f"Record passed LLM judge check: {judge_response}"
                         )
@@ -403,10 +407,15 @@ class EvolDataGenerator:
                 else:
                     self.logger.warning("Record failed validation and was dropped")
 
-                # Print the stats after each record generation
+                # Print the stats after each record generation attempt
                 self.logger.info(
                     f"Stats: {self.success_count} successful generations, {self.fail_count} failed generations"
                 )
+                
+                # Move to the next context
+                context_index += 1
+
+        return self.output_filename
 
     def _create_field_prompt(
         self,
