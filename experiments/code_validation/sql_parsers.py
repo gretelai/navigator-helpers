@@ -14,6 +14,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import bigquery
 from sqlalchemy import create_engine, text
 from sqlvalidator.sql_validator import SQLQuery
+
 from utils import create_db_name, split_statements
 
 
