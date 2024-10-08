@@ -46,10 +46,14 @@ def extract_json(input_string: str) -> Union[dict, list]:
         return parsed_json
 
     except json.JSONDecodeError as e:
-        return {"error": f"JSON decoding error: {str(e)}. Please check the JSON format."}
+        return {
+            "error": f"JSON decoding error: {str(e)}. Please check the JSON format."
+        }
     except Exception as e:
-        return {"error": f"An unexpected error occurred: {str(e)}. Please check the input."}
-    
+        return {
+            "error": f"An unexpected error occurred: {str(e)}. Please check the input."
+        }
+
 
 def extract_thinking(input_string: str) -> str:
     """
@@ -68,7 +72,9 @@ def extract_thinking(input_string: str) -> str:
     """
 
     # Compile regex patterns - still at module level, but collocated with the function
-    THINKING_OUTPUT_PATTERN = re.compile(r"<thinking>(.*?)</?thinking>.*?<output>|<thinking>(.*?)<output>", re.DOTALL)
+    THINKING_OUTPUT_PATTERN = re.compile(
+        r"<thinking>(.*?)</?thinking>.*?<output>|<thinking>(.*?)<output>", re.DOTALL
+    )
     THINKING_PATTERN = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
 
     try:
@@ -83,7 +89,7 @@ def extract_thinking(input_string: str) -> str:
             return fallback_matches[0]
 
         # Attempt 3: Grab everything before the last opening <json> tag
-        json_tag_pos = input_string.rfind('<json>')
+        json_tag_pos = input_string.rfind("<json>")
         if json_tag_pos != -1:
             return input_string[:json_tag_pos].strip()
 
@@ -91,7 +97,7 @@ def extract_thinking(input_string: str) -> str:
 
     except Exception as e:
         return f"Error in extract_thinking: {str(e)}"
-    
+
 
 def extract_output(input_string: str) -> str:
     """
@@ -115,19 +121,25 @@ def extract_output(input_string: str) -> str:
         # Attempt 1: Extract content after <output> tag
         matches = OUTPUT_PATTERN.findall(input_string)
         if matches:
-            output_content = next((m[0] or m[1] for m in matches if (m[0] or m[1]).strip()), "")
+            output_content = next(
+                (m[0] or m[1] for m in matches if (m[0] or m[1]).strip()), ""
+            )
             if output_content:
                 return output_content.strip()
 
         # Attempt 2: Grab everything after the </thinking> tag
-        thinking_end_pos = input_string.find('</thinking>')
+        thinking_end_pos = input_string.find("</thinking>")
         if thinking_end_pos != -1:
-            content_after_thinking = input_string[thinking_end_pos + len('</thinking>'):].strip()
+            content_after_thinking = input_string[
+                thinking_end_pos + len("</thinking>") :
+            ].strip()
             if content_after_thinking:
-                return content_after_thinking  # Return content if found after </thinking>
+                return (
+                    content_after_thinking  # Return content if found after </thinking>
+                )
 
         # Attempt 3: Grab everything starting with the last <json> tag, including the tag
-        json_tag_pos = input_string.rfind('<json>')
+        json_tag_pos = input_string.rfind("<json>")
         if json_tag_pos != -1:
             return input_string[json_tag_pos:].strip()
 
@@ -136,10 +148,13 @@ def extract_output(input_string: str) -> str:
     except Exception as e:
         return f"Error in extract_output: {str(e)}"
 
-def validate_json_with_pydantic(model_class: Type[BaseModel], json_data: Union[dict, list]) -> Tuple[bool, Union[BaseModel, dict]]:
+
+def validate_json_with_pydantic(
+    model_class: Type[BaseModel], json_data: Union[dict, list]
+) -> Tuple[bool, Union[BaseModel, dict]]:
     """
     Validates the given json_data against the provided Pydantic model class and returns a bool indicating validity.
-    
+
     Args:
         model_class (BaseModel): The Pydantic model class to use for validation.
         json_data (dict): The JSON data to validate.
@@ -152,9 +167,15 @@ def validate_json_with_pydantic(model_class: Type[BaseModel], json_data: Union[d
     try:
         # Dynamically validate the JSON using the passed model class
         validated_data = model_class(**json_data)
-        return True, validated_data  # Return True and the validated model instance if successful
+        return (
+            True,
+            validated_data,
+        )  # Return True and the validated model instance if successful
     except ValidationError as e:
-        return False, {"error": str(e)}  # Return False and the detailed error message if validation fails
+        return False, {
+            "error": str(e)
+        }  # Return False and the detailed error message if validation fails
+
 
 def pretty_print_json(json_data, width=160):
     """
@@ -169,6 +190,7 @@ def pretty_print_json(json_data, width=160):
     """
     formatted_json = json.dumps(json_data, indent=2)
     pprint(json.loads(formatted_json), width=width, compact=False)
+
 
 def convert_complex_types_to_string(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -194,6 +216,7 @@ def convert_complex_types_to_string(df: pd.DataFrame) -> pd.DataFrame:
 
     return df.apply(lambda x: x.map(convert_value))
 
+
 def create_dataframe_from_jsonl(jsonl_string: Union[dict, list, str]) -> pd.DataFrame:
     """
     Create a pandas DataFrame from a JSONL string, JSON array, or list of dictionaries.
@@ -209,7 +232,7 @@ def create_dataframe_from_jsonl(jsonl_string: Union[dict, list, str]) -> pd.Data
         pd.DataFrame: A DataFrame created from the input data. Returns an empty DataFrame
                       if the input is invalid or an error occurs during processing.
     """
-    
+
     try:
         if isinstance(jsonl_string, list):
             if not jsonl_string:  # Check if list is empty
@@ -226,17 +249,21 @@ def create_dataframe_from_jsonl(jsonl_string: Union[dict, list, str]) -> pd.Data
                     df = pd.DataFrame(json_data)
                 else:
                     # If it's not a list, treat it as JSONL
-                    df = pd.read_json(io.StringIO(repaired_jsonl_string), lines=True, orient='records')
+                    df = pd.read_json(
+                        io.StringIO(repaired_jsonl_string), lines=True, orient="records"
+                    )
             except json.JSONDecodeError:
                 # If it's not valid JSON, try to read as JSONL
-                df = pd.read_json(io.StringIO(repaired_jsonl_string), lines=True, orient='records')
+                df = pd.read_json(
+                    io.StringIO(repaired_jsonl_string), lines=True, orient="records"
+                )
         else:
             # Instead of raising an exception, return an empty DataFrame
             return pd.DataFrame()
 
         df = convert_complex_types_to_string(df)
         return df
-    
+
     except Exception as e:
         # If any exception occurs during processing, log it and return an empty DataFrame
         print(f"An error occurred: {str(e)}")
