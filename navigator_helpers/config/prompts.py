@@ -1,43 +1,8 @@
-EXAMPLE_YAML = """
-api_key: prompt
-llm_model: gretelai/gpt-auto
-log_level: INFO
-use_reflection: true
-output_filename: basic_closed_qa.jsonl
-evol_generations: 1
-num_examples: 1000
-
-generation_instructions: |
-  You are an expert in generating balanced, context-rich questions and comprehensive answers based on given contexts. Your task is to:
-  1. Create questions that are specific, clear, and directly related to key points in the given context.
-  2. Ensure questions include sufficient background information for understanding without prior knowledge.
-  3. Craft questions that can be answered using only the information provided in the context.
-  4. Generate answers that are informative, concise when possible, and detailed when necessary.
-  5. Provide comprehensive responses that fully address the question, including relevant context and explanations.
-  6. Maintain consistency between the question, answer, and the original context.
-  7. Avoid revealing the answer in the question.
-  8. Adapt the level of detail in the answer based on the complexity of the topic.
-
-  Example Output:
-    - question: "What is the capital of France, and what historical landmarks is it known for?"
-    - response: "The capital of France is Paris. It is known for landmarks such as the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral."
-
-fields:
-  - name: question
-    type: str
-    description: |
-      Generate a specific, clear question that relates directly to a key point in the context. It should include enough background to be understood without prior knowledge, be answerable with the information given, and not reveal the answer within the question itself. The question should be concise but allow for a detailed response if needed and encourage critical thinking or analysis based on the context.
-
-  - name: response
-    type: str
-    description: |
-      Generate a detailed, informative answer to the question, using only the context provided. The response should be concise while fully addressing the question, include relevant background explanations as needed, and adapt detail to the topic's complexity. For more complex topics, provide deeper explanations, while ensuring consistency between the context, question, and response.
-"""
-
 TAG_EXTRACTION_SYSTEM_PROMPT = """
 You are an assistant that extracts contextual tags and their attributes from dataset descriptions. 
 For each tag, provide diverse attributes or values. 
-Ensure the attributes are specific and useful for data generation. 
+Ensure the attributes are specific and useful for data generation.
+Minimize overlap between tags. They will be mixed together randomly to create commands for an LLM, and all mixed together versions must remain coherent. 
 Present the output in JSON format as a list of objects with 'name' and 'values' fields. 
 Example:
 ```json
@@ -76,7 +41,7 @@ Current Tags:
 ```
 
 Expand on these tags and add new ones to increase complexity. 
-Add 2-3 new values for existing tags and create 1-2 new tags.
+Expand existing tags by 3-5 new values for existing tags and create 1 new tag.
 """
 
 DATA_MODEL_GENERATION_PROMPT = """
@@ -84,53 +49,75 @@ Create a DataModel for the following synthetic data generation task:
 
 Task: {user_task}
 
-Contextual tags and attributes for this task:
+INSTRUCTIONS:
 
+1. Field Creation:
+   - Create ONLY the fields explicitly mentioned in the user's task.
+   - Do NOT create any additional fields beyond what is explicitly requested or provided in the example.
+
+2. Field Types:
+   - Use 'str', 'int', 'float', or 'bool' as field types based on the task description.
+   - If the field type is not specified in the task, default to 'str'.
+
+3. Field Descriptions:
+   - Provide detailed descriptions for each field.
+
+4. Generation Instructions:
+   - Customize the instructions to align precisely with the user's task.
+   - **Include an example output format in the generation instructions:**
+     - If the user provided an example, include it **VERBATIM** in the "Example Output" section.
+     - If no user example is provided, create a synthetic example output for each field. When synthesizing text fields, be sure to create a compelling, detailed, complex synthetic text that provides all relevant background and information.
+
+
+DELIVERABLE:
+
+Provide a YAML-formatted DataModel with:
+1. Basic configuration (`api_key`, `llm_model`, etc.).
+2. A `generation_instructions` section that includes the task-specific instructions and an example output format.
+3. A `fields` section with ONLY the explicitly requested fields, using generic field names if necessary.
+
+Update the sample YAML template below and return a valid YAML format and object based on the provided instructions and Task.
+
+**Sample DataModel Template:** 
 ```yaml
-{tags_yaml}
-```
-
-Guidelines for generating an effective DataModel:
-
-1. **Primary Fields**:
-   - Create 2-3 primary fields that focus on generating long-form, rich content.
-   - These fields should be of type `str` and designed to produce substantial, detailed text.
-   - Use the contextual tags as a guide for what kind of content these fields should generate, but focus on creating fields that will result in longer, more detailed outputs.
-
-2. **Field Descriptions**:
-   - For each field, provide a detailed description that:
-     a) Explains what kind of long-form content should be generated.
-     b) Incorporates relevant contextual tags to guide the content generation.
-     c) Emphasizes the need for depth, detail, and richness in the generated text.
-   - Ensure each field has a distinct purpose that complements rather than overlaps with other fields.
-
-3. **Generation Instructions**:
-   - Craft clear instructions for generating diverse, high-quality, long-form content for each field.
-   - Explain how to use the contextual tags to inform the content generation without limiting it to short, categorical responses.
-   - Emphasize the creation of detailed, contextually rich content that demonstrates complex relationships or reasoning.
-
-4. **Leveraging Contextual Tags**:
-   - Use the provided contextual tags to inform the overall theme and specific details of the generated content.
-   - Explain how these tags should be incorporated into the long-form content without becoming simple categorical fields themselves.
-
-5. **Static Fields**:
-   Include these unchanged:
-     api_key: prompt
-     evol_generations: 1
-     llm_model: gretelai/gpt-auto
-     log_level: INFO
-     num_examples: 1000
-     use_reflection: true
-   Set `output_filename` to a relevant filename with a jsonl extension based on the task. E.g. synthetic_data.jsonl
-
-Sample DataModel structure:
-
 {example_yaml}
+```
+"""
 
-Provide a new DataModel in YAML format for the given task. Ensure that:
-1. The model focuses on 2-3 primary fields designed for long-form content generation.
-2. Field descriptions clearly guide the creation of rich, detailed content while leveraging the contextual tags.
-3. Generation instructions emphasize producing diverse, high-quality, long-form content.
-4. The model avoids creating separate fields for simple categorical data present in the contextual tags.
-5. Each field has a distinct purpose that results in substantial, non-overlapping content.
+EXAMPLE_YAML = """
+api_key: prompt
+llm_model: gretelai/gpt-auto
+log_level: INFO
+use_reflection: true
+output_filename: synthetic_data.jsonl
+evol_generations: 1
+num_examples: 3
+
+generation_instructions: |
+  Provide a clear and concise overview of the desired dataset. Specify the required data structure, context, and content diversity. Include any relevant constraints or guidelines for generating synthetic examples.
+  Example Output: 
+  (Provide a sample output format for guidance on how the data should appear, ensuring it matches the described schema and context.)
+
+fields:
+  - name: field_1
+    type: str
+    description: |
+      Provide a detailed description of `field_1` as per the task requirements.
+      Explain how to incorporate relevant contextual information to enrich this field's content.
+      Emphasize that any additional information should be used to generate diverse content within this field, **not as separate fields**.
+
+  - name: field_2
+    type: int
+    description: |
+      Provide a detailed description of `field_2` as per the task requirements.
+      Detail how to use appropriate contextual information to inform the generation of this field's content, ensuring relevance and diversity.
+      Stress that any contextual information should be integrated into this field's values, **not used to create additional fields**.
+
+  - name: field_N
+    type: [field_type]
+    description: |
+      Provide a detailed description of `field_N` as per the task requirements.
+      Include instructions on how to incorporate any relevant contextual information.
+
+# Note: No Fields should be included unless explicitly mentioned in the task.
 """
