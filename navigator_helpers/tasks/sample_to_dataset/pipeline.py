@@ -5,10 +5,10 @@ import time
 import pandas as pd
 
 from navigator_helpers.llms.base import LLMRegistry
-from navigator_helpers.logs import SIMPLE_LOG_FORMAT, get_logger
+from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.sample_to_dataset.task_suite import (
     SampleToDatasetConfig,
-    SampleToDatasetTaskSuite
+    SampleToDatasetTaskSuite,
 )
 
 logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)

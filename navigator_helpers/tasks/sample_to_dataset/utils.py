@@ -1,10 +1,12 @@
 import io
 import json
 import re
+
 from pprint import pprint
 from typing import Tuple, Union
 
 import pandas as pd
+
 from json_repair import repair_json
 from pydantic import BaseModel, ValidationError
 
