@@ -375,6 +375,7 @@ class NL2PythonTaskSuite(NL2CodeTaskSuite):
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         self._update_pbar_desc(
