@@ -8,6 +8,7 @@ def split_statements(query):
     statements = [s + ";" for s in statements if s[-1] != ";"]
     return statements
 
+
 def create_db_name(domain):
     # Given a domain name, create a valid database name
     db_name = domain.replace(" ", "_").replace("-", "_").lower()

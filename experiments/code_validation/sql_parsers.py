@@ -14,7 +14,6 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import bigquery
 from sqlalchemy import create_engine, text
 from sqlvalidator.sql_validator import SQLQuery
-
 from utils import create_db_name, split_statements
 
 
@@ -498,7 +497,7 @@ class GooglesqlValidator:
         Otherwise this emulator handles it poorly.
         Suggested domain format: domain + uuid
         """
-        
+
         db_name = create_db_name(domain)
         try:
             GooglesqlValidator._query_bigquery(
