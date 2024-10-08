@@ -2,6 +2,8 @@ import logging
 import math
 import time
 
+from typing import Tuple
+
 import pandas as pd
 
 from navigator_helpers.llms.base import LLMRegistry
@@ -15,12 +17,25 @@ logger = get_logger(__name__, fmt=SIMPLE_LOG_FORMAT)
 
 
 class Sample2DataSetPipeline:
+    """
+    A pipeline for generating synthetic datasets based on a sample dataset.
+
+    This class orchestrates the process of generating a larger dataset from a small sample,
+    using various LLM-powered tasks to create diverse and representative data.
+    """
 
     def __init__(
         self,
         config: SampleToDatasetConfig,
         llm_registry: LLMRegistry
     ) -> None:
+        """
+        Initialize the Sample2DataSetPipeline.
+
+        Args:
+            config (SampleToDatasetConfig): Configuration for the sample-to-dataset task.
+            llm_registry (LLMRegistry): Registry of Language Model interfaces.
+        """
         self.config = config
         self.llm_registry = llm_registry
         self.tasks = SampleToDatasetTaskSuite(
@@ -38,7 +53,23 @@ class Sample2DataSetPipeline:
             logging.getLogger(module).setLevel(logging.WARNING)
 
     def run(self, sample_dataset: pd.DataFrame, num_records: int, 
-            num_records_per_seed: int=5, max_workers: int=4, system_prompt_type: str='cognition'):
+            num_records_per_seed: int=5, max_workers: int=4,
+            system_prompt_type: str='cognition') -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Run the sample-to-dataset pipeline to generate synthetic data.
+
+        Args:
+            sample_dataset (pd.DataFrame): The input sample dataset.
+            num_records (int): Total number of records to generate.
+            num_records_per_seed (int, optional): Number of records to generate per seed. Defaults to 5.
+            max_workers (int, optional): Maximum number of parallel workers. Defaults to 4.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+
+        Returns:
+            tuple: A tuple containing two DataFrames:
+                - generated_data_df: The generated synthetic dataset.
+                - generated_data_w_seeds_df: The generated dataset with seed information.
+        """
         start_time = time.time()
         logger.info(
             f"🧭 Navigator request received."
