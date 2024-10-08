@@ -179,7 +179,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         }
 
     def llm_as_a_judge_evaluation(
-        self, instruction_col_name: str, code_col_name: str, context_col_name: str
+        self, instruction_col_name: str, code_col_name: str, **kwargs
     ):
         """
         Evaluation test for LLM-as-a-judge evaluation based on generic rubric
