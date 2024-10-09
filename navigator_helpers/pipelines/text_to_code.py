@@ -130,9 +130,9 @@ class NL2CodePipeline(BasePipeline):
 
         return domain_and_topics
 
-    def _generate_sample(self, progress_bar):
+    def _generate_sample(self, tags, progress_bar):
         """Helper function to generate a single sample."""
-        domain, topic, complexity = self.contextual_tags.sample()
+        domain, topic, complexity = tags.sample()
         record = self.tasks.create_record(
             domain=domain,
             topic=topic,
@@ -168,7 +168,7 @@ class NL2CodePipeline(BasePipeline):
         with logging_redirect_tqdm():
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(self._generate_sample, pbar)
+                    executor.submit(self._generate_sample, tags, pbar)
                     for _ in range(num_samples)
                 ]
 
