@@ -203,6 +203,14 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
 
+    def evaluate_all(self):
+        results = {}
+        results["row_uniqueness"] = self.row_uniqueness()
+        results["feature_cardinality"] = self.feature_cardinality()
+        results["feature_distribution"] = self.feature_distribution()
+        results["num_words_per_record"] = self.num_words_per_record()
+        return results
+
 
 class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
     """
