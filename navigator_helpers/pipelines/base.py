@@ -40,8 +40,8 @@ class PipelineResults:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         self.dataframe.to_json(path / "synthetic_dataset.json", orient="records")
-        # with open(path / "metadata.json", "w") as f:
-        #     json.dump(self.metadata.model_dump(), f)
+        with open(path / "metadata.json", "w") as f:
+            json.dump(self.metadata.model_dump(), f)
         with open(path / "config.json", "w") as f:
             json.dump(json.loads(self.config.model_dump_json()), f)
 
