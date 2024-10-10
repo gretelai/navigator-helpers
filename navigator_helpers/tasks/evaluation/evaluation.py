@@ -1,6 +1,10 @@
 # Script with all the classes and tests implemented
+from typing import Dict, Optional
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from pandas import Series
 from pandas.core.dtypes.common import is_numeric_dtype
@@ -25,9 +29,18 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         5. LLM-as-a-critic evaluation based on a generic dataset rubric (e.g. data quality, relevance, correctness, readability)
     """
 
-    def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame) -> None:
+    def __init__(
+        self,
+        llm_suite: GretelLLMSuite,
+        dataset: pd.DataFrame,
+        code_lang: Optional[str] = None,
+        eval_kwargs: Optional[Dict[str, str]] = None,
+    ) -> None:
         super().__init__(llm_suite)
         self.dataset = dataset
+        self.llm_suite = llm_suite
+        self.code_lang = code_lang
+        self.eval_kwargs = eval_kwargs
         self.output_dataset = None
     
     def _determine_column_data_type(self, column: Series) -> str:
@@ -121,6 +134,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         # Semantic uniqueness using cosine similarity and TF-IDF
         text_columns = self.dataset.select_dtypes(include=[object])
+        # text_columns = self.dataset.select_dtypes(include=[object, 'string'])
         concatenated_text = text_columns.apply(
             lambda row: " ".join(row.values.astype(str)), axis=1
         )
@@ -166,11 +180,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         def p(n, N):
-            """Relative abundance"""
-            if n == 0:
-                return 0
-            else:
-                return float(n) / N
+            return float(n) / N if n != 0 else 0
 
         N = sum(data.values())
         return 1 - sum(p(n, N) ** 2 for n in data.values() if n != 0)
@@ -235,6 +245,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         text_columns = self.dataset.select_dtypes(include=[object])
+        # text_columns = self.dataset.select_dtypes(include=[object, 'string'])
         word_counts = text_columns.map(
             lambda x: len(str(x).split()) if isinstance(x, str) else 0
         )
@@ -268,7 +279,59 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
         )
 
-        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
+        return {
+            "llm_as_a_judge_scores": self.output_dataset["scores"],
+            "llm_as_a_judge_mean": self.output_dataset.overall_score.mean(),
+        }
+
+    def evaluate_all(self):
+        """
+        Iterates through the evaluation methods and collects results with error checking.
+        """
+        evaluation_mapping = {
+            "row_uniqueness": self.row_uniqueness,
+            "feature_cardinality": self.feature_cardinality,
+            "feature_distribution": self.feature_distribution,
+            "num_words_per_record": self.num_words_per_record,
+        }
+
+        results = {}
+        for key, func in evaluation_mapping.items():
+            try:
+                results[key] = func()
+            except ValueError as e:
+                print(f"Error in {func.__name__}: {e}")
+
+        # Call LLM-as-a-judge evaluation on the dataset
+        if self.code_lang == "sql":
+            task = NL2SQLEvaluationTaskSuite(
+                llm_suite=self.llm_suite, dataset=self.dataset, code_lang="sql"
+            )
+        elif self.code_lang == "python":
+            task = NL2PythonEvaluationTaskSuite(
+                llm_suite=self.llm_suite, dataset=self.dataset, code_lang="python"
+            )
+        else:
+            task = BaseEvaluationTaskSuite(self.llm_suite, self.dataset)
+
+        try:
+            if self.eval_kwargs:
+                llm_results = task.llm_as_a_judge_evaluation(**self.eval_kwargs)
+            else:
+                # Use default values if eval_kwargs is not provided
+                default_eval_kwargs = {
+                    "instruction_col_name": "instruction",
+                    "code_col_name": "code",
+                }
+                if self.code_lang == "sql":
+                    default_eval_kwargs["context_col_name"] = "sql_context"
+
+                llm_results = task.llm_as_a_judge_evaluation(**default_eval_kwargs)
+            results.update(llm_results)
+        except ValueError as e:
+            print(f"Error in llm_as_a_judge_evaluation: {e}")
+
+        return results
 
 
 class NL2CodeEvaluationTaskSuite(BaseEvaluationTaskSuite):
@@ -326,8 +389,191 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
             axis=1,
         )
 
-        # Calculate an overall score. Use average for now. Should revisit
         self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(
             lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
         )
-        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
+
+        return {
+            "llm_as_a_judge_scores": self.output_dataset["scores"],
+            "llm_as_a_judge_mean": self.output_dataset.overall_score.mean(),
+        }
+
+
+class VisualizationTaskSuite(BaseTaskSuite):
+    """
+    Visualization class for visualizing different attributes and statistics of the dataset.
+    Includes methods to generate distribution plots, heatmaps, etc.
+    """
+
+    def __init__(self, dataset: pd.DataFrame, results: dict) -> None:
+        self.dataset = dataset
+        self.results = results
+
+    def plot_feature_cardinality(self):
+        """
+        Visualizes the cardinality of each feature in the dataset as a bar plot.
+        """
+        cardinality = self.results["feature_cardinality"]
+        plt.figure(figsize=(12, 8))
+        sns.barplot(x=list(cardinality.keys()), y=list(cardinality.values()))
+        plt.xticks(rotation=90)
+        plt.xlabel("Features")
+        plt.ylabel("Cardinality")
+        plt.title("Cardinality of Features")
+        plt.show()
+
+    def plot_row_uniqueness(self):
+        """
+        Visualizes the results of row uniqueness and semantic uniqueness analysis.
+        """
+        if "row_uniqueness" not in self.results:
+            raise ValueError("Row Uniqueness data is not available in the results.")
+
+        row_uniqueness = self.results["row_uniqueness"]
+
+        # Plotting unique vs non-unique rows
+        unique_data = {
+            "Unique Rows": row_uniqueness["percent_unique"],
+            "Non-Unique Rows": 100 - row_uniqueness["percent_unique"],
+        }
+        unique_labels = list(unique_data.keys())
+        unique_sizes = list(unique_data.values())
+
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.pie(
+            unique_sizes,
+            labels=unique_labels,
+            autopct="%1.1f%%",
+            startangle=140,
+            colors=["#66b3ff", "#ff9999"],
+        )
+        plt.axis("equal")
+        plt.title("Percentage of Unique and Non-Unique Rows")
+
+        # Plotting semantically unique vs non-semantically unique rows
+        semantic_data = {
+            "Semantically Unique Rows": row_uniqueness["percent_semantically_unique"],
+            "Non-Semantically Unique Rows": 100
+            - row_uniqueness["percent_semantically_unique"],
+        }
+        semantic_labels = list(semantic_data.keys())
+        semantic_sizes = list(semantic_data.values())
+
+        plt.subplot(1, 2, 2)
+        plt.pie(
+            semantic_sizes,
+            labels=semantic_labels,
+            autopct="%1.1f%%",
+            startangle=140,
+            colors=["#99ff99", "#ffcc99"],
+        )
+        plt.axis("equal")
+        plt.title("Percentage of Semantically Unique and Non-Semantically Unique Rows")
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_feature_distribution(self):
+        """
+        Visualizes the distribution of features in the dataset.
+        """
+        if "feature_distribution" not in self.results:
+            raise ValueError(
+                "Feature distribution data is not available in the results."
+            )
+
+        feature_distribution = self.results["feature_distribution"][1]
+        feature_names = list(feature_distribution.keys())
+        feature_counts = [feature_distribution[feature] for feature in feature_names]
+
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x=feature_names, y=feature_counts)
+        plt.xticks(rotation=90)
+        plt.xlabel("Features")
+        plt.ylabel("Count")
+        plt.title("Feature Distribution in the Dataset")
+        plt.show()
+
+    def plot_num_words_per_record(self):
+        """
+        Visualizes the number of words per record in the dataset.
+        """
+        if "num_words_per_record" not in self.results:
+            raise KeyError(
+                "Number of words per record data is not available in the results."
+            )
+
+        num_words_data = self.results["num_words_per_record"]
+        average_words = num_words_data["average_words_per_record"]
+        word_counts_per_column = num_words_data["word_counts_per_column"]
+
+        # Plotting the average number of words per record
+        plt.figure(figsize=(14, 6))
+        plt.subplot(1, 2, 1)
+        plt.bar(["Average Words per Record"], [average_words], color="#66b3ff")
+        plt.ylabel("Number of Words")
+        plt.title("Average Number of Words per Record")
+
+        # Plotting the word counts per column
+        plt.subplot(1, 2, 2)
+        column_names = list(word_counts_per_column.keys())
+        word_counts = list(word_counts_per_column.values())
+        sns.barplot(x=column_names, y=word_counts)
+        plt.xticks(rotation=90)
+        plt.xlabel("Columns")
+        plt.ylabel("Average Number of Words")
+        plt.title("Average Number of Words per Column")
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_llm_as_a_judge(self):
+        """
+        Visualizes the LLM-as-a-judge evaluation scores for each criterion.
+        """
+        if "llm_as_a_judge_scores" not in self.results:
+            raise ValueError(
+                "LLM-as-a-judge evaluation data is not available in the results."
+            )
+
+        llm_scores = self.results["llm_as_a_judge_scores"]
+        criteria = [
+            "relevance_score",
+            "correctness_score",
+            "readability_score",
+            "scalability_score",
+            "standards_score",
+        ]
+        # criteria = set(k for score in llm_scores for k in score if 'score' in k)
+        plt.figure(figsize=(16, 10))
+        for i, criterion in enumerate(criteria, 1):
+            plt.subplot(3, 2, i)
+            scores = [record[criterion] for record in llm_scores]
+            sns.histplot(scores, kde=True, bins=10, color="#66b3ff")
+            plt.xlabel(f'{criterion.replace("_", " ").title()}')
+            plt.ylabel("Frequency")
+            plt.title(f'Distribution of {criterion.replace("_", " ").title()}')
+
+        plt.tight_layout()
+        plt.show()
+
+    def visualize_all(self):
+        """
+        Iterates through the results dictionary and calls the corresponding visualization
+        methods based on what data is available.
+        """
+        visualization_mapping = {
+            "feature_cardinality": self.plot_feature_cardinality,
+            "row_uniqueness": self.plot_row_uniqueness,
+            "feature_distribution": self.plot_feature_distribution,
+            "num_words_per_record": self.plot_num_words_per_record,
+            "llm_as_a_judge_scores": self.plot_llm_as_a_judge,
+        }
+
+        for key, func in visualization_mapping.items():
+            if key in self.results:
+                try:
+                    func()
+                except ValueError as e:
+                    print(f"Error in {func.__name__}: {e}")
