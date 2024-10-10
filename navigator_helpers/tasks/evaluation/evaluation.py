@@ -1,4 +1,6 @@
 # Script with all the classes and tests implemented
+from typing import Dict, Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -25,9 +27,18 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         5. LLM-as-a-critic evaluation based on a generic dataset rubric (e.g. data quality, relevance, correctness, readability)
     """
 
-    def __init__(self, llm_suite: GretelLLMSuite, dataset: pd.DataFrame) -> None:
+    def __init__(
+        self,
+        llm_suite: GretelLLMSuite,
+        dataset: pd.DataFrame,
+        code_lang: Optional[str] = None,
+        eval_kwargs: Optional[Dict[str, str]] = None,
+    ) -> None:
         super().__init__(llm_suite)
         self.dataset = dataset
+        self.llm_suite = llm_suite
+        self.code_lang = code_lang
+        self.eval_kwargs = eval_kwargs
         self.output_dataset = None
 
     def _get_llm_as_a_judge_prompt(self, natural_language: str, code: str) -> str:
@@ -77,6 +88,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         # Semantic uniqueness using cosine similarity and TF-IDF
         text_columns = self.dataset.select_dtypes(include=[object])
+        # text_columns = self.dataset.select_dtypes(include=[object, 'string'])
         concatenated_text = text_columns.apply(
             lambda row: " ".join(row.values.astype(str)), axis=1
         )
@@ -122,11 +134,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         def p(n, N):
-            """Relative abundance"""
-            if n == 0:
-                return 0
-            else:
-                return float(n) / N
+            return float(n) / N if n != 0 else 0
 
         N = sum(data.values())
         return 1 - sum(p(n, N) ** 2 for n in data.values() if n != 0)
@@ -154,11 +162,8 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
                 distribution[col] = col_value_counts
                 score[col] = round(gini_simpson_index, 4)
             elif self.dataset[col].dtype in ["int64", "float64"]:
-                # TODO : Histogram Visualization
                 pass
-            else:  ## text
-                # TODO : string length, word count, characters per word, etc. - use Text SQS functions?
-                pass
+                # TODO : Histogram Visualization, string length, word count, characters per word, etc. - use Text SQS functions?
         return distribution, score
 
     def num_words_per_record(self):
@@ -170,6 +175,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         text_columns = self.dataset.select_dtypes(include=[object])
+        # text_columns = self.dataset.select_dtypes(include=[object, 'string'])
         word_counts = text_columns.map(
             lambda x: len(str(x).split()) if isinstance(x, str) else 0
         )
@@ -203,14 +209,58 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
         )
 
-        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
+        return {
+            "llm_as_a_judge_scores": self.output_dataset["scores"],
+            "llm_as_a_judge_mean": self.output_dataset.overall_score.mean(),
+        }
 
     def evaluate_all(self):
+        """
+        Iterates through the evaluation methods and collects results with error checking.
+        """
+        evaluation_mapping = {
+            "row_uniqueness": self.row_uniqueness,
+            "feature_cardinality": self.feature_cardinality,
+            "feature_distribution": self.feature_distribution,
+            "num_words_per_record": self.num_words_per_record,
+        }
+
         results = {}
-        results["row_uniqueness"] = self.row_uniqueness()
-        results["feature_cardinality"] = self.feature_cardinality()
-        results["feature_distribution"] = self.feature_distribution()
-        results["num_words_per_record"] = self.num_words_per_record()
+        for key, func in evaluation_mapping.items():
+            try:
+                results[key] = func()
+            except ValueError as e:
+                print(f"Error in {func.__name__}: {e}")
+
+        # Call LLM-as-a-judge evaluation on the dataset
+        if self.code_lang == "sql":
+            task = NL2SQLEvaluationTaskSuite(
+                llm_suite=self.llm_suite, dataset=self.dataset, code_lang="sql"
+            )
+        elif self.code_lang == "python":
+            task = NL2PythonEvaluationTaskSuite(
+                llm_suite=self.llm_suite, dataset=self.dataset, code_lang="python"
+            )
+        else:
+            task = BaseEvaluationTaskSuite(self.llm_suite, self.dataset)
+
+        try:
+            if self.eval_kwargs:
+                llm_results = task.llm_as_a_judge_evaluation(**self.eval_kwargs)
+            else:
+                # Use default values if eval_kwargs is not provided
+                default_eval_kwargs = {
+                    "instruction_col_name": "instruction",
+                    "code_col_name": "code",
+                }
+                if self.code_lang == "sql":
+                    default_eval_kwargs["context_col_name"] = "sql_context"
+
+                llm_results = task.llm_as_a_judge_evaluation(**default_eval_kwargs)
+            results.update(llm_results)
+        except ValueError as e:
+            print(f"Error in llm_as_a_judge_evaluation: {e}")
+
         return results
 
 
@@ -269,11 +319,14 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
             axis=1,
         )
 
-        # Calculate an overall score. Use average for now. Should revisit
         self.output_dataset["overall_score"] = self.output_dataset["scores"].apply(
             lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
         )
-        return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
+
+        return {
+            "llm_as_a_judge_scores": self.output_dataset["scores"],
+            "llm_as_a_judge_mean": self.output_dataset.overall_score.mean(),
+        }
 
 
 class VisualizationTaskSuite(BaseTaskSuite):
@@ -303,7 +356,7 @@ class VisualizationTaskSuite(BaseTaskSuite):
         """
         Visualizes the results of row uniqueness and semantic uniqueness analysis.
         """
-        if "feature_distribution" not in self.results:
+        if "row_uniqueness" not in self.results:
             raise ValueError("Row Uniqueness data is not available in the results.")
 
         row_uniqueness = self.results["row_uniqueness"]
@@ -377,7 +430,7 @@ class VisualizationTaskSuite(BaseTaskSuite):
         Visualizes the number of words per record in the dataset.
         """
         if "num_words_per_record" not in self.results:
-            raise ValueError(
+            raise KeyError(
                 "Number of words per record data is not available in the results."
             )
 
@@ -405,6 +458,36 @@ class VisualizationTaskSuite(BaseTaskSuite):
         plt.tight_layout()
         plt.show()
 
+    def plot_llm_as_a_judge(self):
+        """
+        Visualizes the LLM-as-a-judge evaluation scores for each criterion.
+        """
+        if "llm_as_a_judge_scores" not in self.results:
+            raise ValueError(
+                "LLM-as-a-judge evaluation data is not available in the results."
+            )
+
+        llm_scores = self.results["llm_as_a_judge_scores"]
+        criteria = [
+            "relevance_score",
+            "correctness_score",
+            "readability_score",
+            "scalability_score",
+            "standards_score",
+        ]
+        # criteria = set(k for score in llm_scores for k in score if 'score' in k)
+        plt.figure(figsize=(16, 10))
+        for i, criterion in enumerate(criteria, 1):
+            plt.subplot(3, 2, i)
+            scores = [record[criterion] for record in llm_scores]
+            sns.histplot(scores, kde=True, bins=10, color="#66b3ff")
+            plt.xlabel(f'{criterion.replace("_", " ").title()}')
+            plt.ylabel("Frequency")
+            plt.title(f'Distribution of {criterion.replace("_", " ").title()}')
+
+        plt.tight_layout()
+        plt.show()
+
     def visualize_all(self):
         """
         Iterates through the results dictionary and calls the corresponding visualization
@@ -415,6 +498,7 @@ class VisualizationTaskSuite(BaseTaskSuite):
             "row_uniqueness": self.plot_row_uniqueness,
             "feature_distribution": self.plot_feature_distribution,
             "num_words_per_record": self.plot_num_words_per_record,
+            "llm_as_a_judge_scores": self.plot_llm_as_a_judge,
         }
 
         for key, func in visualization_mapping.items():
