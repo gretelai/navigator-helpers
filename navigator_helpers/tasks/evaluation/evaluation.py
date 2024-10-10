@@ -1,6 +1,8 @@
 # Script with all the classes and tests implemented
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -272,3 +274,152 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
             lambda x: np.mean([int(v) for k, v in x.items() if "score" in k])
         )
         return {"llm_as_a_judge_score": self.output_dataset.overall_score.mean()}
+
+
+class VisualizationTaskSuite(BaseTaskSuite):
+    """
+    Visualization class for visualizing different attributes and statistics of the dataset.
+    Includes methods to generate distribution plots, heatmaps, etc.
+    """
+
+    def __init__(self, dataset: pd.DataFrame, results: dict) -> None:
+        self.dataset = dataset
+        self.results = results
+
+    def plot_feature_cardinality(self):
+        """
+        Visualizes the cardinality of each feature in the dataset as a bar plot.
+        """
+        cardinality = self.results["feature_cardinality"]
+        plt.figure(figsize=(12, 8))
+        sns.barplot(x=list(cardinality.keys()), y=list(cardinality.values()))
+        plt.xticks(rotation=90)
+        plt.xlabel("Features")
+        plt.ylabel("Cardinality")
+        plt.title("Cardinality of Features")
+        plt.show()
+
+    def plot_row_uniqueness(self):
+        """
+        Visualizes the results of row uniqueness and semantic uniqueness analysis.
+        """
+        if "feature_distribution" not in self.results:
+            raise ValueError("Row Uniqueness data is not available in the results.")
+
+        row_uniqueness = self.results["row_uniqueness"]
+
+        # Plotting unique vs non-unique rows
+        unique_data = {
+            "Unique Rows": row_uniqueness["percent_unique"],
+            "Non-Unique Rows": 100 - row_uniqueness["percent_unique"],
+        }
+        unique_labels = list(unique_data.keys())
+        unique_sizes = list(unique_data.values())
+
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.pie(
+            unique_sizes,
+            labels=unique_labels,
+            autopct="%1.1f%%",
+            startangle=140,
+            colors=["#66b3ff", "#ff9999"],
+        )
+        plt.axis("equal")
+        plt.title("Percentage of Unique and Non-Unique Rows")
+
+        # Plotting semantically unique vs non-semantically unique rows
+        semantic_data = {
+            "Semantically Unique Rows": row_uniqueness["percent_semantically_unique"],
+            "Non-Semantically Unique Rows": 100
+            - row_uniqueness["percent_semantically_unique"],
+        }
+        semantic_labels = list(semantic_data.keys())
+        semantic_sizes = list(semantic_data.values())
+
+        plt.subplot(1, 2, 2)
+        plt.pie(
+            semantic_sizes,
+            labels=semantic_labels,
+            autopct="%1.1f%%",
+            startangle=140,
+            colors=["#99ff99", "#ffcc99"],
+        )
+        plt.axis("equal")
+        plt.title("Percentage of Semantically Unique and Non-Semantically Unique Rows")
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_feature_distribution(self):
+        """
+        Visualizes the distribution of features in the dataset.
+        """
+        if "feature_distribution" not in self.results:
+            raise ValueError(
+                "Feature distribution data is not available in the results."
+            )
+
+        feature_distribution = self.results["feature_distribution"][1]
+        feature_names = list(feature_distribution.keys())
+        feature_counts = [feature_distribution[feature] for feature in feature_names]
+
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x=feature_names, y=feature_counts)
+        plt.xticks(rotation=90)
+        plt.xlabel("Features")
+        plt.ylabel("Count")
+        plt.title("Feature Distribution in the Dataset")
+        plt.show()
+
+    def plot_num_words_per_record(self):
+        """
+        Visualizes the number of words per record in the dataset.
+        """
+        if "num_words_per_record" not in self.results:
+            raise ValueError(
+                "Number of words per record data is not available in the results."
+            )
+
+        num_words_data = self.results["num_words_per_record"]
+        average_words = num_words_data["average_words_per_record"]
+        word_counts_per_column = num_words_data["word_counts_per_column"]
+
+        # Plotting the average number of words per record
+        plt.figure(figsize=(14, 6))
+        plt.subplot(1, 2, 1)
+        plt.bar(["Average Words per Record"], [average_words], color="#66b3ff")
+        plt.ylabel("Number of Words")
+        plt.title("Average Number of Words per Record")
+
+        # Plotting the word counts per column
+        plt.subplot(1, 2, 2)
+        column_names = list(word_counts_per_column.keys())
+        word_counts = list(word_counts_per_column.values())
+        sns.barplot(x=column_names, y=word_counts)
+        plt.xticks(rotation=90)
+        plt.xlabel("Columns")
+        plt.ylabel("Average Number of Words")
+        plt.title("Average Number of Words per Column")
+
+        plt.tight_layout()
+        plt.show()
+
+    def visualize_all(self):
+        """
+        Iterates through the results dictionary and calls the corresponding visualization
+        methods based on what data is available.
+        """
+        visualization_mapping = {
+            "feature_cardinality": self.plot_feature_cardinality,
+            "row_uniqueness": self.plot_row_uniqueness,
+            "feature_distribution": self.plot_feature_distribution,
+            "num_words_per_record": self.plot_num_words_per_record,
+        }
+
+        for key, func in visualization_mapping.items():
+            if key in self.results:
+                try:
+                    func()
+                except ValueError as e:
+                    print(f"Error in {func.__name__}: {e}")
