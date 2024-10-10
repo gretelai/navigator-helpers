@@ -42,16 +42,16 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         self.code_lang = code_lang
         self.eval_kwargs = eval_kwargs
         self.output_dataset = None
-    
+
     def _determine_column_data_type(self, column: Series) -> str:
         """
         Similar to https://github.com/Gretellabs/monogretel/blob/110622b0c8131f0c1a1443a8e25722a92857c3d2/python/src/gretel_core/harbor/artifacts/analyzers/field_features.py#L208C1-L281C20
 
-        Between the NavFT definition and the SQS Report definition of categorical variables, 
-        here we adopt the SQS definition, where the key difference is the percentage of maximum allowed unique 
-        values stays a constant 10% as dataset size increases, compared to the NavFT definition where that percentage 
-        shrinks as the dataset size gets really large, like 1 million records. 
-        The reasoning here is that the number of unique values, eg. data seeds, 
+        Between the NavFT definition and the SQS Report definition of categorical variables,
+        here we adopt the SQS definition, where the key difference is the percentage of maximum allowed unique
+        values stays a constant 10% as dataset size increases, compared to the NavFT definition where that percentage
+        shrinks as the dataset size gets really large, like 1 million records.
+        The reasoning here is that the number of unique values, eg. data seeds,
         should proportionally increase as the dataset size increases.
         """
         # If on average each entry has more than one space, we consider it a text field
@@ -72,17 +72,17 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         if diff_percent >= 0.9 or (diff_percent >= 0.7 and len(non_na_data) <= 50):
             return "Categorical"
-        
+
         if space_count / non_na_count > _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD:
             return "Text"
-        
+
         if is_numeric_dtype(non_na_data.dtype):
             # We can visualize numeric data with histograms, but we will not use it for diversity calculations
             return "Numeric"
 
         # "Other" includes datetime, ID fields, etc.
         return "Other"
-    
+
     def _get_tfidf_vectors(self, column: Series) -> np.ndarray:
         vectorizer = TfidfVectorizer().fit_transform(column)
         return vectorizer.toarray()
@@ -184,10 +184,10 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         N = sum(data.values())
         return 1 - sum(p(n, N) ** 2 for n in data.values() if n != 0)
-    
+
     def text_diversity(self, column: Series):
         """
-        Given a text column, returns the text diversity index. 
+        Given a text column, returns the text diversity index.
         It's calculated as the average cosine similarity between each record and the average embedding.
         If records are too similar with each other, the diversity index will be low.
         Returns:
@@ -229,7 +229,9 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             elif column_data_type == "Text":
                 # TODO: visualize string length, word count, characters per word, etc. - use Text SQS functions?
                 distribution[col] = None
-                score[col] = {"text_diverisity_index": self.text_diversity(self.dataset[col])}
+                score[col] = {
+                    "text_diverisity_index": self.text_diversity(self.dataset[col])
+                }
             else:
                 # Other types of columns, eg. datetime, ID fields, etc.
                 distribution[col] = None
