@@ -462,6 +462,7 @@ class VisualizationTaskSuite(BaseTaskSuite):
         """
         Visualizes the LLM-as-a-judge evaluation scores for each criterion.
         """
+        #TODO: Do discrete scores because LLM-as-a-judge scores are discrete
         if "llm_as_a_judge_scores" not in self.results:
             raise ValueError(
                 "LLM-as-a-judge evaluation data is not available in the results."
