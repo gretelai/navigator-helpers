@@ -57,7 +57,7 @@ Return enhanced schema in the JSON_OUTPUT_FORMAT format specified below:
         }}
     ]
 }}
-
+{dataset_context_str}
 <dataset>
 {sampled_dataset_jsonl}
 </dataset>
@@ -72,7 +72,6 @@ This is the output format you have to follow:
 </json>
 """
 
-
 DATASEED_CROWD_RANKING_PROMPT_TEMPLATE = """
 You are an expert data practioner, skilled in critically evaluating data and
 leveraging expertise across various domains, including data analysis, data
@@ -81,6 +80,7 @@ engineering, and a general understanding of programming concepts.
 Examine the dataset provided in JSONL format inside the <dataset></dataset> tags
 below. Note the schema of the dataset in the <schema></schema> tags.
 
+{dataset_context_str}
 <dataset>
 {sampled_dataset_jsonl}
 </dataset>
@@ -180,6 +180,7 @@ engineering, and a general understanding of programming concepts.
 Carefuly Examine the dataset provided in JSONL format inside the <dataset></dataset> tags
 below. Note the schema of the dataset provided in he <schema></schema> tags.
 
+{dataset_context_str}
 <dataset>
 {sampled_dataset_jsonl}
 </dataset>
@@ -234,8 +235,10 @@ Examine the dataset description in <dataset_description> tags.
 Turn this description into an LLM prompt that would ask an AI assistant to
 create such a dataset.
 
-Then, augment your prompt with dataseeds provided in <data_seeds></data_seeds>
+Augment your prompt with dataseeds provided in <data_seeds></data_seeds>
 tags by asking to consider them as important context for data.
+MAKE SURE to include column descriptions provided in <dataset_description> tags.
+
 DO NOT use the phrase "data seeds" in the prompt.
 DO NOT include data seeds as additional columns in the dataset.
 DO NOT include any other data seeds.

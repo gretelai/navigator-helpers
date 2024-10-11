@@ -51,16 +51,20 @@ class Sample2DataSetPipeline:
     def run(
         self,
         sample_dataset: pd.DataFrame,
-        num_records: int,
+        dataset_context: str = "",
+        num_records: int = 20,
         num_records_per_seed: int = 5,
         max_workers: int = 4,
         system_prompt_type: str = "cognition",
+        crowd_size: int = 3,
+        max_num_seeds: int = 3,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Run the sample-to-dataset pipeline to generate synthetic data.
 
         Args:
             sample_dataset (pd.DataFrame): The input sample dataset.
+            dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             num_records (int): Total number of records to generate.
             num_records_per_seed (int, optional): Number of records to generate per seed. Defaults to 5.
             max_workers (int, optional): Maximum number of parallel workers. Defaults to 4.
@@ -79,7 +83,9 @@ class Sample2DataSetPipeline:
 
         logger.info(f"🧠 Crowdsourcing relevant data seed types using Cognition")
         seed_names = self.tasks.crowdsource_data_seeds(
-            sample_dataset, system_prompt_type=system_prompt_type, crowd_size=3
+            sample_dataset, dataset_context=dataset_context,
+            system_prompt_type=system_prompt_type, crowd_size=crowd_size,
+            max_num_seeds=max_num_seeds
         )
         logger.info(f"  |-- 👀 Peeking at the data seed types: {seed_names}")
 
@@ -93,7 +99,10 @@ class Sample2DataSetPipeline:
 
         logger.info(f"🌱 Crafting and seeding the data generation prompt")
         data_generation_prompt = self.tasks.generate_data_generation_prompt(
-            sample_dataset, generated_seeds, system_prompt_type=system_prompt_type
+            sample_dataset,
+            generated_seeds,
+            dataset_context=dataset_context,
+            system_prompt_type=system_prompt_type
         )
 
         logger.info(

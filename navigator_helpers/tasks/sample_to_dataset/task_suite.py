@@ -166,9 +166,14 @@ class SampleToDatasetTaskSuite:
 
         if self.config.verbose:
             print(
+                f"----------------------- Extracted <thinking> ({prompt_type.upper()}) --------------------"
+            )
+            print(thinking)
+            print("------------------------------------------------------------------")
+            print(
                 f"----------------------- Extracted JSON output ({prompt_type.upper()}) --------------------"
             )
-            print(json_output)
+            pretty_print_json(json_output)
             print("------------------------------------------------------------------")
 
         return thinking, json_output
@@ -186,13 +191,14 @@ class SampleToDatasetTaskSuite:
         return self.execute_prompt(user_prompt, "cognition")
 
     def extract_data_seeds_in_one_shot(
-        self, sample_dataset: pd.DataFrame, system_prompt_type: str = "cognition"
+        self, sample_dataset: pd.DataFrame, dataset_context: str="", system_prompt_type: str="cognition"
     ) -> Tuple[str, Union[dict, list]]:
         """
         Extract data seeds from a sample dataset in one shot.
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
+            dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
 
         Returns:
@@ -202,7 +208,9 @@ class SampleToDatasetTaskSuite:
         data_schema = str(list(sample_dataset.columns))
 
         dataseed_prompt = DATASEED_REVERSE_ENG_PROMPT_TEMPLATE.format(
-            sampled_dataset_jsonl=data_jsonl, sampled_dataset_column_list=data_schema
+            sampled_dataset_jsonl=data_jsonl, 
+            dataset_context_str=dataset_context,
+            sampled_dataset_column_list=data_schema
         )
         if self.config.verbose:
             print("------------------- Dataseed prompt ------------")
@@ -215,8 +223,9 @@ class SampleToDatasetTaskSuite:
     def crowdsource_data_seeds(
         self,
         sample_dataset: pd.DataFrame,
-        crowd_size=5,
-        max_num_seeds=4,
+        dataset_context: str="",
+        crowd_size=3,
+        max_num_seeds=3,
         system_prompt_type="cognition",
     ) -> dict:
         """
@@ -225,8 +234,9 @@ class SampleToDatasetTaskSuite:
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
-            crowd_size (int, optional): Number of times to run the user prompt. Defaults to 5.
-            max_num_seeds (int, optional): Maximum number of seeds to return. Defaults to 4.
+            dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
+            crowd_size (int, optional): Number of times to run the user prompt. Defaults to 3.
+            max_num_seeds (int, optional): Maximum number of seeds to return. Defaults to 3.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
 
         Returns:
@@ -244,7 +254,7 @@ class SampleToDatasetTaskSuite:
             self.logger.info(f"  |-- 🫡 assistant opinion {i+1}")
             try:
                 _, data_seeds = self.extract_data_seeds_in_one_shot(
-                    sample_dataset, system_prompt_type
+                    sample_dataset, dataset_context, system_prompt_type
                 )
 
                 # Define the model for individual column entries
@@ -303,12 +313,13 @@ class SampleToDatasetTaskSuite:
         # Format the reflection prompt with the ranked seeds
         dataseed_crowd_ranking_prompt = DATASEED_CROWD_RANKING_PROMPT_TEMPLATE.format(
             sampled_dataset_jsonl=data_jsonl,
+            dataset_context_str=dataset_context,
             sampled_dataset_column_list=data_schema,
             data_seeds=json.dumps(final_data_seeds, indent=2),
         )
         if self.config.verbose:
             print("------------------- Dataseed crowd-ranking prompt ------------")
-            pretty_print_json(dataseed_crowd_ranking_prompt)
+            print(dataseed_crowd_ranking_prompt)
 
         # Define the model for individual column entries
         class RankedDataSeedColumnModel(BaseModel):
@@ -374,7 +385,7 @@ class SampleToDatasetTaskSuite:
         self, dataseeds: dict, system_prompt_type="cognition"
     ) -> dict:
         """
-        Generate data seeds based on the provided dataseeds.
+        Generate data seeds based on the provided dictionary of dataseeds types.
 
         Args:
             dataseeds (dict): The initial dataseeds.
@@ -502,13 +513,14 @@ class SampleToDatasetTaskSuite:
         return df
 
     def generate_dataset_description(
-        self, sample_dataset: pd.DataFrame, system_prompt_type="cognition"
+        self, sample_dataset: pd.DataFrame, dataset_context: str="", system_prompt_type="cognition"
     ) -> Union[dict, list]:
         """
         Generate a description of the dataset based on the sample dataset.
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
+            dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
 
         Returns:
@@ -523,7 +535,9 @@ class SampleToDatasetTaskSuite:
 
         # Format the reflection prompt with the ranked seeds
         dataset_description_prompt = DATASET_DESCRIPTION_PROMPT_TEMPLATE.format(
-            sampled_dataset_jsonl=data_jsonl, sampled_dataset_column_list=data_schema
+            sampled_dataset_jsonl=data_jsonl, 
+            dataset_context_str=dataset_context,
+            sampled_dataset_column_list=data_schema
         )
         if self.config.verbose:
             print("------------------- Dataset description prompt ------------")
@@ -564,7 +578,7 @@ class SampleToDatasetTaskSuite:
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
                     print(
-                        f"Dataset description attempt {attempt + 1} failed: {str(e)}. Retrying ..."
+                        f"Dataset description attempt {attempt + 1} failed: {str(e)}, {dataset_description} Retrying ..."
                     )
                 else:
                     print(
@@ -582,6 +596,7 @@ class SampleToDatasetTaskSuite:
         self,
         sample_dataset: pd.DataFrame,
         generated_seeds: dict,
+        dataset_context: str="",
         system_prompt_type="cognition",
     ) -> dict:
         """
@@ -589,6 +604,7 @@ class SampleToDatasetTaskSuite:
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
+            dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             generated_seeds (dict): The generated data seeds.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
 
@@ -606,7 +622,11 @@ class SampleToDatasetTaskSuite:
                 for column in generated_seeds["columns"]
             ]
         }
-        dataset_description = self.generate_dataset_description(sample_dataset)
+        dataset_description = self.generate_dataset_description(
+            sample_dataset, 
+            dataset_context=dataset_context,
+            system_prompt_type=system_prompt_type
+        )
 
         proto_data_generation_prompt = DATA_GENERATION_PROMPT_TEMPLATE.format(
             dataset_description=dataset_description["dataset_description"],
@@ -748,7 +768,7 @@ class SampleToDatasetTaskSuite:
             if self.config.verbose:
                 print(f"--------------------\nProcessing id {row.id}\n")
                 # pretty_print_json(data_prompt_w_seeds)
-                pretty_print_json(jsonl_data_prompt_w_seeds)
+                print(jsonl_data_prompt_w_seeds)
                 print("--------------------\n")
 
             MAX_RETRIES = 3
