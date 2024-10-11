@@ -92,7 +92,7 @@ python examples/run_generation.py examples/example_nl2sql.yml
 This script will:
 1. Load the YAML configuration
 2. Create a `DataModel` from the YAML
-3. Initialize the `EvolDataGenerator`
+3. Initialize the `SyntheticDataGenerator`
 4. Generate the data
 
 The output will be saved to the file specified by `output_filename` in the YAML configuration.
