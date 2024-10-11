@@ -1,4 +1,5 @@
 # Script with all the classes and tests implemented
+from collections import Counter
 from typing import Dict, Optional
 
 import matplotlib.pyplot as plt
@@ -62,7 +63,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         unique_count = int(non_na_data.nunique())
 
         if non_na_count == 0:
-            # empty field
+            # empty fieldn
             return "Other"
 
         diff = non_na_count - unique_count
@@ -185,58 +186,86 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         N = sum(data.values())
         return 1 - sum(p(n, N) ** 2 for n in data.values() if n != 0)
 
-    def text_diversity(self, column: Series):
-        """
-        Given a text column, returns the text diversity index.
-        It's calculated as the average cosine similarity between each record and the average embedding.
-        If records are too similar with each other, the diversity index will be low.
-        Returns:
-            - Text diversity index in the range [0, 1), where higher value indicates higher diversity
-        """
-
-        column_vectors = self._get_tfidf_vectors(column)
-        avg_column_vectors = column_vectors.mean(axis=0).reshape(1, -1)
-        cosine_sim = cosine_similarity(column_vectors, avg_column_vectors)
-        return 1 - cosine_sim.mean()
-
     def feature_distribution(self):
         """
-        Evaluation test for feature distribution
+        Evaluation test for feature distribution, providing distributions and diversity scores
+        for categorical, numerical, and text columns.
 
         Returns:
             - Dictionary where each column is mapped to a distribution
+            - Dictionary where each column is mapped to a diversity score (if applicable)
         """
-        # Algorithm for feature distribution:
-        # 1. Calculate the distribution of values in each column using df.value_counts
-        # 2. Need to think about categorical, numerical and text columns
-        # 3. Example: For code column, we can take the distribution of code length
-        # TODO: Implement something similar to HF dataset visualization
-        # TODO: classify columns as categorical, numerical, text
-
+        results = {}
         distribution = {}
         score = {}
+
+        # Iterate through each column to calculate appropriate distributions
         for col in self.dataset.columns:
             column_data_type = self._determine_column_data_type(self.dataset[col])
+
             if column_data_type == "Categorical":
+                # Distribution and diversity for categorical columns
                 col_value_counts = self.dataset[col].value_counts().to_dict()
                 gini_simpson_index = self.simpson_diversity_index(data=col_value_counts)
                 distribution[col] = col_value_counts
                 score[col] = {"gini_simpson_index": round(gini_simpson_index, 4)}
+
             elif column_data_type == "Numeric":
-                # TODO: Histogram Visualization
-                distribution[col] = None
-                score[col] = None
+                # Distribution for numerical columns - using histogram bins and basic stats
+                col_histogram = np.histogram(
+                    self.dataset[col].dropna(),
+                    bins=10,
+                    range=(self.dataset[col].min(), self.dataset[col].max()),
+                )
+                col_stats = {
+                    "mean": self.dataset[col].mean(),
+                    "median": self.dataset[col].median(),
+                    "std_dev": self.dataset[col].std(),
+                    "histogram": col_histogram[
+                        0
+                    ].tolist(),  # frequency counts in each bin
+                    "bin_edges": col_histogram[1].tolist(),  # edges of bins
+                }
+                distribution[col] = col_stats
+                score[col] = (
+                    None  # Numeric columns may not have a typical 'diversity' score
+                )
+
             elif column_data_type == "Text":
-                # TODO: visualize string length, word count, characters per word, etc. - use Text SQS functions?
-                distribution[col] = None
+                # Text-based distributions, like length of text and average word count
+                text_lengths = self.dataset[col].dropna().apply(len)
+                word_counts = self.dataset[col].dropna().apply(lambda x: len(x.split()))
+                avg_word_count = word_counts.mean()
+
+                text_stats = {
+                    "avg_length": text_lengths.mean(),
+                    "std_length": text_lengths.std(),
+                    "avg_word_count": avg_word_count,
+                    "word_count_histogram": np.histogram(
+                        word_counts, bins=10, range=(0, word_counts.max())
+                    )[0].tolist(),
+                }
+                distribution[col] = text_stats
                 score[col] = {
-                    "text_diverisity_index": self.text_diversity(self.dataset[col])
+                    "text_diversity_index": self.text_diversity(self.dataset[col])
                 }
             else:
-                # Other types of columns, eg. datetime, ID fields, etc.
+                # Handling for other column types
                 distribution[col] = None
                 score[col] = None
-        return distribution, score
+        results["distribution"] = distribution
+        results["score"] = score
+        return results
+
+    def text_diversity(self, text_column):
+        """
+        Example function to calculate text diversity, e.g., based on vocabulary richness.
+        """
+        unique_words = set(
+            word for text in text_column.dropna() for word in text.split()
+        )
+        total_words = sum(len(text.split()) for text in text_column.dropna())
+        return len(unique_words) / total_words if total_words > 0 else 0
 
     def num_words_per_record(self):
         """
@@ -401,7 +430,7 @@ class NL2SQLEvaluationTaskSuite(NL2CodeEvaluationTaskSuite):
         }
 
 
-class VisualizationTaskSuite(BaseTaskSuite):
+class VisualizationTaskSuite(BaseEvaluationTaskSuite):
     """
     Visualization class for visualizing different attributes and statistics of the dataset.
     Includes methods to generate distribution plots, heatmaps, etc.
@@ -478,23 +507,105 @@ class VisualizationTaskSuite(BaseTaskSuite):
 
     def plot_feature_distribution(self):
         """
-        Visualizes the distribution of features in the dataset.
+        Plots feature distributions for categorical, numerical, and text columns
+        in a single window with multiple subplots using distribution data from self.results.
+
+        Assumes self.results['distribution'] contains per-column distribution information
+        and self.results['score'] contains relevant diversity or statistical scores.
         """
-        if "feature_distribution" not in self.results:
-            raise ValueError(
-                "Feature distribution data is not available in the results."
-            )
+        # Extract distribution and score data from self.results
+        distribution = self.results["feature_distribution"]["distribution"]
+        score = self.results["feature_distribution"]["score"]
 
-        feature_distribution = self.results["feature_distribution"][1]
-        feature_names = list(feature_distribution.keys())
-        feature_counts = [feature_distribution[feature] for feature in feature_names]
+        num_cols = len(distribution)
+        num_rows = (
+            num_cols + 2
+        ) // 3  # Define rows to accommodate all columns in a 3-column layout
 
-        plt.figure(figsize=(14, 8))
-        sns.barplot(x=feature_names, y=feature_counts)
-        plt.xticks(rotation=90)
-        plt.xlabel("Features")
-        plt.ylabel("Count")
-        plt.title("Feature Distribution in the Dataset")
+        fig, axs = plt.subplots(num_rows, 3, figsize=(18, 4 * num_rows))
+        fig.suptitle("Feature Distributions", fontsize=16)
+
+        # Flatten axes array to handle as a 1D array
+        axs = axs.flatten()
+
+        for i, (col, dist) in enumerate(distribution.items()):
+            # Determine the data type based on the available statistics
+            column_data_type = self._determine_column_data_type(self.dataset[col])
+
+            if column_data_type == "Categorical" and dist:
+                # Plot categorical distributions as a bar chart without `palette`
+                categories = list(dist.keys())
+                frequencies = list(dist.values())
+                sns.barplot(x=categories, y=frequencies, ax=axs[i])
+                axs[i].set_xticklabels(categories, rotation=45, ha="right", fontsize=10)
+                axs[i].set_xlabel("Category", fontsize=10)
+                axs[i].set_ylabel("Frequency", fontsize=10)
+                axs[i].set_title(f"{col} (Categorical)", fontsize=12)
+
+            elif column_data_type == "Numeric" and dist:
+                # Plot histogram for numeric columns using stored histogram data
+                hist_data = dist.get("histogram", [])
+                bin_edges = dist.get("bin_edges", [])
+                if hist_data and bin_edges:
+                    axs[i].hist(
+                        bin_edges[:-1],
+                        bins=bin_edges,
+                        weights=hist_data,
+                        color="skyblue",
+                        edgecolor="black",
+                    )
+                    axs[i].set_xlabel("Value", fontsize=10)
+                    axs[i].set_ylabel("Frequency", fontsize=10)
+                    axs[i].set_title(f"{col} (Numeric)", fontsize=12)
+                    # Display basic stats on the plot
+                    mean = dist.get("mean", "N/A")
+                    median = dist.get("median", "N/A")
+                    std_dev = dist.get("std_dev", "N/A")
+                    axs[i].text(
+                        0.7,
+                        0.9,
+                        f"Mean: {mean:.2f}\nMedian: {median:.2f}\nStd Dev: {std_dev:.2f}",
+                        transform=axs[i].transAxes,
+                        fontsize=9,
+                        verticalalignment="top",
+                    )
+
+            elif column_data_type == "Text" and dist:
+                # Plot histogram for text distributions based on word count
+                word_count_histogram = dist.get("word_count_histogram", [])
+                axs[i].bar(
+                    range(len(word_count_histogram)),
+                    word_count_histogram,
+                    color="salmon",
+                    edgecolor="black",
+                )
+                axs[i].set_xlabel("Word Count Range", fontsize=10)
+                axs[i].set_ylabel("Frequency", fontsize=10)
+                axs[i].set_title(f"{col} (Text)", fontsize=12)
+                # Display text diversity score
+                text_diversity_score = score.get(col, {}).get(
+                    "text_diversity_index", "N/A"
+                )
+                axs[i].text(
+                    0.7,
+                    0.9,
+                    f"Text Diversity Index: {text_diversity_score:.4f}",
+                    transform=axs[i].transAxes,
+                    fontsize=9,
+                    verticalalignment="top",
+                )
+            else:
+                axs[i].set_visible(False)  # Hide empty subplots
+
+        # Hide any remaining unused subplots
+        for j in range(i + 1, len(axs)):
+            axs[j].set_visible(False)
+
+        # Increase spacing between subplots
+        plt.subplots_adjust(wspace=0.3, hspace=0.5)
+        plt.tight_layout(
+            rect=[0, 0, 1, 0.96]
+        )  # Adjust layout to make space for the main title
         plt.show()
 
     def plot_num_words_per_record(self):
@@ -534,11 +645,14 @@ class VisualizationTaskSuite(BaseTaskSuite):
         """
         Visualizes the LLM-as-a-judge evaluation scores for each criterion.
         """
-        #TODO: Do discrete scores because LLM-as-a-judge scores are discrete
+        # TODO: Do discrete scores because LLM-as-a-judge scores are discrete
         if "llm_as_a_judge_scores" not in self.results:
             raise ValueError(
                 "LLM-as-a-judge evaluation data is not available in the results."
             )
+
+        # Set the specific bins for discrete values from 0 to 4
+        bins = [0, 1, 2, 3, 4, 5]  # Include 5 to cover the upper edge of the last bin
 
         llm_scores = self.results["llm_as_a_judge_scores"]
         criteria = [
@@ -553,7 +667,12 @@ class VisualizationTaskSuite(BaseTaskSuite):
         for i, criterion in enumerate(criteria, 1):
             plt.subplot(3, 2, i)
             scores = [record[criterion] for record in llm_scores]
-            sns.histplot(scores, kde=True, bins=10, color="#66b3ff")
+            sns.histplot(scores, kde=True, bins=bins, color="#66b3ff")
+
+            # Set x-axis limits and ticks to be discrete integers from 0 to 4
+            plt.xlim(0, 4)
+            plt.xticks([0, 1, 2, 3, 4])
+
             plt.xlabel(f'{criterion.replace("_", " ").title()}')
             plt.ylabel("Frequency")
             plt.title(f'Distribution of {criterion.replace("_", " ").title()}')
@@ -573,6 +692,8 @@ class VisualizationTaskSuite(BaseTaskSuite):
             "num_words_per_record": self.plot_num_words_per_record,
             "llm_as_a_judge_scores": self.plot_llm_as_a_judge,
         }
+
+        # import pdb; pdb.set_trace()
 
         for key, func in visualization_mapping.items():
             if key in self.results:
