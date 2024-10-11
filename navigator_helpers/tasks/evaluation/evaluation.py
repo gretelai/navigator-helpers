@@ -525,7 +525,7 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
             num_cols + 2
         ) // 3  # Define rows to accommodate all columns in a 3-column layout
 
-        fig, axs = plt.subplots(num_rows, 3, figsize=(18, 4 * num_rows))
+        fig, axs = plt.subplots(num_rows, 3, figsize=(20, 5 * num_rows))
         fig.suptitle("Feature Distributions", fontsize=16)
 
         # Flatten axes array to handle as a 1D array
@@ -540,6 +540,7 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
                 categories = list(dist.keys())
                 frequencies = list(dist.values())
                 sns.barplot(x=categories, y=frequencies, ax=axs[i])
+                axs[i].set_xticks(range(len(categories)))  # Set x-ticks first
                 axs[i].set_xticklabels(categories, rotation=45, ha="right", fontsize=10)
                 axs[i].set_xlabel("Category", fontsize=10)
                 axs[i].set_ylabel("Frequency", fontsize=10)
@@ -560,7 +561,6 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
                     axs[i].set_xlabel("Value", fontsize=10)
                     axs[i].set_ylabel("Frequency", fontsize=10)
                     axs[i].set_title(f"{col} (Numeric)", fontsize=12)
-                    # Display basic stats on the plot
                     mean = dist.get("mean", "N/A")
                     median = dist.get("median", "N/A")
                     std_dev = dist.get("std_dev", "N/A")
@@ -585,7 +585,6 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
                 axs[i].set_xlabel("Word Count Range", fontsize=10)
                 axs[i].set_ylabel("Frequency", fontsize=10)
                 axs[i].set_title(f"{col} (Text)", fontsize=12)
-                # Display text diversity score
                 text_diversity_score = score.get(col, {}).get(
                     "text_diversity_index", "N/A"
                 )
@@ -604,11 +603,9 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
         for j in range(i + 1, len(axs)):
             axs[j].set_visible(False)
 
-        # Increase spacing between subplots
+        # Adjust layout
         plt.subplots_adjust(wspace=0.3, hspace=0.5)
-        plt.tight_layout(
-            rect=[0, 0, 1, 0.96]
-        )  # Adjust layout to make space for the main title
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
 
     def plot_num_words_per_record(self):
