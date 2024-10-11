@@ -1,7 +1,7 @@
 import logging
 import textwrap
 
-from navigator_helpers.config import ConfigGenerator
+from navigator_helpers.config_generator import ConfigGenerator
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

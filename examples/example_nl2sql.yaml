@@ -6,6 +6,7 @@ use_reflection: true
 output_filename: basic_nl2sql.jsonl
 evol_generations: 1
 num_examples: 1000
+generation_strategy: record
 
 # Data model definition
 generation_instructions: |
@@ -20,34 +21,25 @@ fields:
     type: str
     description: A single string comprising multiple valid PostgreSQL CREATE TABLE statements and a complex schema similar to a production application including multiple tables, separated by semicolons. The schema should be based on the provided Context, particularly the domain and domain_description.
     validator: sql:postgres
-    evolution_strategies:
-      - Enhance the schema to include domain-specific tables and data types.
-      - Add relevant indexes, constraints, and views reflecting real-world designs.
-    evolution_rate: 0.1
   - name: prompt
     type: str
     description: A detailed, nuanced natural language prompt that a user might ask to a database for a particular task, based on the provided sql_context field that challenges advanced understanding. The prompt should align with the domain and domain_description from the contextual tags.
-    validator: null
-    evolution_strategies:
-      - Refine the prompt to sound more natural.
-      - Ensure the prompt reflects real-world business needs.
-    evolution_rate: 0.1
   - name: sql
     type: str
     description: A fully executable SQL query that directly answers the prompt using the schema in sql_context, with no markup or extraneous explanations. The query complexity should match the sql_complexity specified in the contextual tags.
     validator: sql:postgres
-    evolution_strategies:
-      - Optimize the SQL solution for performance.
-      - Ensure the solution handles large datasets efficiently.
-    evolution_rate: 0.1
   - name: sql_explanation
     type: str
     description: A comprehensive step-by-step breakdown of the SQL query, detailing how it answers the prompt and the purpose of each part. Include references to the domain-specific context.
-    validator: null
-    evolution_strategies:
-      - Provide a clear, step-by-step explanation.
-      - Explain the rationale behind specific SQL techniques.
-    evolution_rate: 0.1
+
+evolution:
+  rate: 0.1
+  strategies:
+    - Add subtle structural and content variations to enhance diversity while maintaining coherence.
+    - Increase the complexity of relationships between data points while ensuring logical flow.
+    - Introduce nuanced patterns to diversify data while preserving its internal consistency.
+    - Refine the dataset with more intricate details and richer content, keeping it coherent.
+    - Introduce moderate variations in syntax and semantics to enhance complexity and diversity.
 
 contextual_tags:
   tags:
