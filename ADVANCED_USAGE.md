@@ -14,27 +14,17 @@ This document provides detailed information on advanced features and customizati
 
 ## The Evolutionary Approach to Data Generation
 
-### Overview
-
-The EvolDataGenerator uses an evolutionary algorithm to produce high-quality synthetic data:
-
-1. **Initial Population**: Generate an initial set of data based on the provided model definition.
-2. **Evaluation**: Judge the quality of each data point using specified validators.
-3. **Selection**: Keep the highest quality data points.
-4. **Evolution**: Apply evolutionary strategies to create variations of the selected data.
-5. **Iteration**: Repeat steps 2-4 for the specified number of generations.
-
-The number of evolutionary generations is controlled by the `evol_generations` parameter in the YAML configuration:
+The EvolDataGenerator uses an evolutionary algorithm to produce high-quality synthetic data through iterative generation, evaluation, selection, and evolution steps. The number of evolutionary generations is controlled by the `evolution_generations` parameter:
 
 ```yaml
-evol_generations: 1  # Number of evolutionary generations
+evolution_generations: 1  # Number of evolutionary generations
 ```
 
-This iterative process allows for the gradual improvement of data quality, reducing hallucinations and increasing relevance to the specified context, but with increased computational overhead. Typically 1-2 generations.
+This process allows for gradual improvement of data quality, typically with 1-2 generations.
 
 ## Contextual Tags and Data Volume
 
-The number of synthetic records created is determined by the `num_examples` parameter in the YAML configuration. Contextual tags serve as seeds for the generation process, influencing the content and characteristics of the generated data.
+Contextual tags influence the content and characteristics of the generated data:
 
 ```yaml
 num_examples: 1000  # Number of synthetic records to generate
@@ -42,30 +32,29 @@ contextual_tags:
   tags:
     - name: domain
       values:
-        - Healthcare
-        - Finance
-        - E-commerce
-      weights: [0.4, 0.3, 0.3]
+        - value: Healthcare
+          weight: 0.4
+        - value: Finance
+          weight: 0.3
+        - value: E-commerce
+          weight: 0.3
 ```
 
 ## Evolutionary Strategies
 
-### Using Evolutionary Strategies
-
-You can specify evolutionary strategies for each field in your YAML configuration:
+Specify evolutionary strategies in your YAML configuration:
 
 ```yaml
-fields:
-  - name: your_field
-    type: str
-    description: Field description
-    evolution_strategies:
-      - Enhance the content with more specific details
-      - Improve clarity and coherence
-    evolution_rate: 0.1
+evolution:
+  rate: 0.1
+  strategies:
+    - Enhance the content with more specific details
+    - Improve clarity and coherence
+    - Increase the complexity and nuance of the content where appropriate
+    - Make the content more diverse by introducing alternative perspectives or methods
 ```
 
-The `evolution_rate` determines how often these strategies are applied during the evolutionary process. For best performance, focus on iteratively improving data with small changes, not outright replacing it.
+The `rate` determines how often these strategies are applied during the evolutionary process.
 
 ## Using Validators
 
@@ -73,11 +62,14 @@ Validators ensure the quality and correctness of generated data. You can specify
 
 ### Built-in Validators
 
-Some built-in validators include:
+The following built-in validators are available:
 
-- `"sql:dialect"`: Validates SQL queries (supported dialects include `"postgres"`, `"ansi"`, `"bigquery"`, `"clickhouse"`, `"databricks"`, `"db2"`, `"duckdb"`,  `"hive"`, `"mysql"`, `"oracle"`, `"redshift"`, `"snowflake"`, `"soql"`, `"sparksql"`, `"sqlite"`, `"teradata"`, `"trino"`, `"tsql"`)
-- `"json"`: Validates JSON structures
-- `"python"`: Validates Python code
+1. SQL Validators:
+   `sql:postgres`, `sql:ansi`, `sql:bigquery`, `sql:clickhouse`, `sql:databricks`, `sql:db2`, `sql:duckdb`, `sql:hive`, `sql:mysql`, `sql:oracle`, `sql:redshift`, `sql:snowflake`, `sql:soql`, `sql:sparksql`, `sql:sqlite`, `sql:teradata`, `sql:trino`, `sql:tsql`
+
+2. Other Expert Validators:
+   - `json`: Validates JSON structures
+   - `python`: Validates Python code
 
 To use a built-in validator:
 
@@ -87,6 +79,16 @@ fields:
     type: str
     description: A SQL query
     validator: sql:postgres
+
+  - name: python_code
+    type: str
+    description: A Python function
+    validator: python
+
+  - name: json_data
+    type: str
+    description: A JSON object
+    validator: json
 ```
 
 ### Custom Validators
@@ -101,13 +103,11 @@ fields:
     validator: Fortran
 ```
 
+The LLM will interpret the validator name and description to perform appropriate validation.
+
 ## Reflection
 
-Reflection is a process where the AI analyzes and improves its own outputs. This self-reflection capability enhances the quality of generated data by providing additional context and reasoning.
-
-### Enabling Reflection
-
-To enable the Reflection feature, set `use_reflection: true` in your YAML configuration:
+Enable reflection to allow the AI to analyze and improve its own outputs:
 
 ```yaml
 use_reflection: true
@@ -117,18 +117,18 @@ When enabled, the system will perform reflection steps during the generation pro
 
 ## Detailed Examples
 
-For more examples, see the `examples/` directory in the repository. Here's how to run some of the advanced examples:
-
-### Example: Math and AI Reasoning Training Data
+For more examples, see the `examples/` directory in the repository. Here's how to run an advanced example:
 
 ```bash
 python examples/run_generation.py examples/example_advanced_gsm8k.yml
 ```
 
-This example shows how to generate high-quality math problems and their solutions, using evolutionary strategies to refine and validate the generated content.
+This example generates high-quality math problems and their solutions, using evolutionary strategies to refine and validate the generated content.
 
 ## Additional Resources
 
 For more information on extending and customizing Gretel Navigator, please refer to the following resources:
 
 - [Gretel AI Documentation](https://docs.gretel.ai/)
+- [Gretel AI Synthetic Data Generation Guide](https://docs.gretel.ai/guides/create-synthetic-data)
+- [Gretel AI API Reference](https://docs.gretel.ai/reference/client-api)
