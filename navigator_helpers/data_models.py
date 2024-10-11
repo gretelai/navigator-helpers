@@ -12,7 +12,7 @@ import yaml
 from datasets import load_dataset
 from pydantic import BaseModel, Field, field_validator
 
-from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
+from .prompts import DEFAULT_EVOLUTION_STRATEGIES
 from .utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -35,6 +35,11 @@ def pretty_print_sample(sample: Dict[str, Any], sample_type: str):
 class DataSourceFormat(str, Enum):
     """
     Enumeration of supported data source formats.
+
+    Attributes:
+        CSV: Comma-separated values format.
+        JSONL: JSON Lines format.
+        HUGGINGFACE: Hugging Face dataset format.
     """
 
     CSV = "csv"
@@ -66,8 +71,6 @@ class DataField(BaseModel):
         type (str): The data type of the field (e.g., 'str', 'int', etc.).
         description (str): A brief description of the field's purpose and role.
         validator (Optional[str]): An optional validator to verify the content of the field.
-        evolution_strategies (List[str]): A list of evolutionary strategies to apply to this field.
-        evolution_rate (float): A rate determining how much the field evolves during the evolutionary process.
         store_full_reflection (bool): If True, the full reflection output for this field will be stored.
     """
 
@@ -75,10 +78,6 @@ class DataField(BaseModel):
     type: str
     description: str
     validator: Optional[str] = None
-    evolution_strategies: List[str] = Field(
-        default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES.copy()
-    )
-    evolution_rate: float = Field(default=0.0)
     store_full_reflection: bool = Field(default=False)
 
 
@@ -101,7 +100,8 @@ class ContextualTag(BaseModel):
 
     Attributes:
         name (str): The name of the contextual tag.
-        values (List[Union[str, WeightedValue]]): A list of possible values for this tag, either as strings or WeightedValue objects.
+        values (List[Union[str, WeightedValue]]): A list of possible values for this tag,
+            either as strings or WeightedValue objects.
     """
 
     name: str
@@ -253,6 +253,34 @@ class ContextualTags(BaseModel):
         return yaml.dump(data, default_flow_style=False)
 
 
+class GenerationStrategy(str, Enum):
+    """
+    Enumeration of supported generation strategies.
+
+    Attributes:
+        FIELD: Generate data field by field.
+        RECORD: Generate entire records at once.
+    """
+
+    FIELD = "field"
+    RECORD = "record"
+
+
+class EvolutionConfig(BaseModel):
+    """
+    Configuration for the evolutionary process in data generation.
+
+    Attributes:
+        strategies (List[str]): List of evolutionary strategies to apply.
+        rate (float): The rate at which to apply evolutionary strategies.
+    """
+
+    strategies: List[str] = Field(
+        default_factory=lambda: DEFAULT_EVOLUTION_STRATEGIES.copy()
+    )
+    rate: float = 0.0
+
+
 class DataModel(BaseModel):
     """
     Represents the overall structure of the synthetic data model and generation configuration.
@@ -261,11 +289,13 @@ class DataModel(BaseModel):
     and configuration for the generation process.
 
     Attributes:
-        fields (List[DataFieldDefinition]): A list of field definitions for the data model.
+        fields (List[DataField]): A list of field definitions for the data model.
         generation_instructions (str): Detailed instructions for the data generation process.
         contextual_tags (Optional[ContextualTags]): Optional contextual tags to guide the generation.
         data_source (Optional[DataSource]): Optional data source for the generation process.
-        evol_generations (int): The number of evolutionary generations to run for each field.
+        evolution_generations (int): The number of evolutionary generations to run for each field.
+        evolution (EvolutionConfig): Configuration for the evolutionary process.
+        generation_strategy (str): The strategy to use for data generation.
         api_key (str): The API key for accessing the AI platform.
         llm_model (str): The name of the large language model used for data generation.
         log_level (str): The level of logging verbosity.
@@ -278,7 +308,9 @@ class DataModel(BaseModel):
     generation_instructions: str
     contextual_tags: Optional[ContextualTags] = None
     data_source: Optional[DataSource] = None
-    evol_generations: int = 1
+    evolution_generations: int = 1
+    evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
+    generation_strategy: str = Field(default=GenerationStrategy.RECORD)
     api_key: str
     llm_model: str
     log_level: str = "INFO"
@@ -374,13 +406,13 @@ class DataModel(BaseModel):
     @classmethod
     def from_yaml(cls, yaml_str: str) -> "DataModel":
         """
-        Creates a DataModel object from a YAML string.
+        Creates a DataModel instance from a YAML string.
 
         Args:
-            yaml_str (str): YAML string representation of the data model and configuration.
+            yaml_str (str): YAML string representation of the DataModel.
 
         Returns:
-            DataModel: Instantiated DataModel object.
+            DataModel: An instance of DataModel created from the YAML string.
         """
         data = yaml.safe_load(yaml_str)
         if "contextual_tags" in data:
@@ -392,39 +424,35 @@ class DataModel(BaseModel):
             data["data_source"] = DataSource(**data["data_source"])
         else:
             data.pop("data_source", None)
+        if "evolution" in data:
+            data["evolution"] = EvolutionConfig(**data["evolution"])
         return cls(**data)
 
     def to_yaml(self) -> str:
         """
-        Converts the DataModel object to a YAML string, ensuring fields are ordered as:
-        - generation_instructions
-        - fields
-        - contextual_tags (if present)
-        Followed by any additional fields.
+        Converts the DataModel object to a YAML string.
+
+        Returns:
+            str: YAML representation of the DataModel object.
         """
         yaml_output = []
 
-        # Generation instructions
         yaml_output.append("generation_instructions: |")
-        instructions_text = self.generation_instructions.replace("\n", "\n  ")
-        yaml_output.append(f"  {instructions_text}")
+        yaml_output.append(
+            f"  {self.generation_instructions.replace(chr(10), chr(10)+'  ')}"
+        )
 
-        # Fields
         yaml_output.append("fields:")
         for field in self.fields:
             yaml_output.append(f"  - name: {field.name}")
             yaml_output.append(f"    type: {field.type}")
             yaml_output.append(f"    description: |")
-            description_text = field.description.replace("\n", "\n      ")
-            yaml_output.append(f"      {description_text}")
-            if field.evolution_rate > 0.0:
-                yaml_output.append(f"    evolution_rate: {field.evolution_rate}")
-                if field.evolution_strategies:
-                    yaml_output.append("    evolution_strategies:")
-                    for strategy in field.evolution_strategies:
-                        yaml_output.append(f"      - {strategy}")
+            yaml_output.append(
+                f"      {field.description.replace(chr(10), chr(10)+'      ')}"
+            )
+            if field.validator:
+                yaml_output.append(f"    validator: {field.validator}")
 
-        # Contextual tags
         if self.contextual_tags:
             yaml_output.append("contextual_tags:")
             yaml_output.append("  tags:")
@@ -438,9 +466,19 @@ class DataModel(BaseModel):
                     else:
                         yaml_output.append(f"        - {value}")
 
-        # Other fields
+        yaml_output.append("evolution:")
+        yaml_output.append(f"  rate: {self.evolution.rate}")
+        yaml_output.append("  strategies:")
+        for strategy in self.evolution.strategies:
+            yaml_output.append(f"    - {strategy}")
+
         other_fields = self.model_dump(
-            exclude={"fields", "generation_instructions", "contextual_tags"}
+            exclude={
+                "fields",
+                "generation_instructions",
+                "contextual_tags",
+                "evolution",
+            }
         )
         yaml_output.append(yaml.dump(other_fields, default_flow_style=False))
 
