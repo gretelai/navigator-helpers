@@ -26,7 +26,7 @@ class ContentValidator:
                 return error_messages
             return None
         except Exception as e:
-            return f"Exception during SQL parsing: {str(e)[:50]}..."
+            return f"Exception during SQL parsing: {str(e)[:512]}..."
 
     @staticmethod
     def validate_json(content: str, content_type: str) -> Optional[str]:
