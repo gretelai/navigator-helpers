@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 
 from pandas import Series
-from pandas.core.dtypes.common import is_numeric_dtype
+from pandas.core.dtypes.common import is_integer_dtype, is_numeric_dtype
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -56,7 +56,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         should proportionally increase as the dataset size increases.
         """
         # If on average each entry has more than one space, we consider it a text field
-        _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD = 1
+        _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD = 0.1
 
         non_na_data = column.dropna()
         non_na_count = int(non_na_data.count())
@@ -76,15 +76,23 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             min_value = int(non_na_data.min())
             if unique_count <= 10 and min_value >= 0:
                 return "Categorical"
+            if unique_count == non_na_count and is_integer_dtype(non_na_data.dtype):
+                # All unique integer values, potentially an ID field
+                return "Other"
             return "Numeric"
 
         if diff_percent >= 0.9 or (diff_percent >= 0.7 and len(non_na_data) <= 50):
             return "Categorical"
 
         if space_count / non_na_count > _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD:
+            # Count datetime fields as "Other"
+            try:
+                pd.to_datetime(non_na_data)
+                return "Other"
+            except:
+                pass
             return "Text"
 
-        # "Other" includes datetime, ID fields, etc.
         return "Other"
 
     def _get_tfidf_vectors(self, column: Series) -> np.ndarray:
@@ -201,10 +209,12 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         results = {}
         distribution = {}
         score = {}
+        column_data_types = {}
 
         # Iterate through each column to calculate appropriate distributions
         for col in self.dataset.columns:
             column_data_type = self._determine_column_data_type(self.dataset[col])
+            column_data_types[col] = column_data_type
 
             if column_data_type == "Categorical":
                 # Distribution and diversity for categorical columns
@@ -258,17 +268,22 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
                 score[col] = None
         results["distribution"] = distribution
         results["score"] = score
+        results["column_data_types"] = column_data_types
         return results
 
-    def text_diversity(self, text_column):
+    def text_diversity(self, column: Series):
         """
-        Example function to calculate text diversity, e.g., based on vocabulary richness.
+        Given a text column, returns the text diversity index.
+        It's calculated as the average cosine similarity between each record and the average embedding.
+        If records are too similar with each other, the diversity index will be low.
+        Returns:
+            - Text diversity index in the range [0, 1), where higher value indicates higher diversity
         """
-        unique_words = set(
-            word for text in text_column.dropna() for word in text.split()
-        )
-        total_words = sum(len(text.split()) for text in text_column.dropna())
-        return len(unique_words) / total_words if total_words > 0 else 0
+
+        column_vectors = self._get_tfidf_vectors(column)
+        avg_column_vectors = column_vectors.mean(axis=0).reshape(1, -1)
+        cosine_sim = cosine_similarity(column_vectors, avg_column_vectors)
+        return 1 - cosine_sim.mean()
 
     def num_words_per_record(self):
         """
