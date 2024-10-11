@@ -71,15 +71,18 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         space_count = sum(str(entry).strip().count(" ") for entry in non_na_data)
 
+        if is_numeric_dtype(non_na_data.dtype):
+            # We can visualize numeric data with histograms, but we will not use it for diversity calculations
+            min_value = int(non_na_data.min())
+            if unique_count <= 10 and min_value >= 0:
+                return "Categorical"
+            return "Numeric"
+
         if diff_percent >= 0.9 or (diff_percent >= 0.7 and len(non_na_data) <= 50):
             return "Categorical"
 
         if space_count / non_na_count > _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD:
             return "Text"
-
-        if is_numeric_dtype(non_na_data.dtype):
-            # We can visualize numeric data with histograms, but we will not use it for diversity calculations
-            return "Numeric"
 
         # "Other" includes datetime, ID fields, etc.
         return "Other"
