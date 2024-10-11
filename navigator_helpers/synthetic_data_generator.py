@@ -8,12 +8,12 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 from gretel_client import Gretel
 
 from .data_models import DataField, DataModel, GenerationStrategy
-from .validator_manager import ValidatorManager
-from .record_generation import FieldByFieldGenerator, SingleShotGenerator
 from .gretel_text_inference import TextInference
 from .llm_eval import LLMEval
 from .prompts import DEFAULT_EVOLUTION_STRATEGIES, EVOLUTION_STRATEGY_PROMPT
+from .record_generation import FieldByFieldGenerator, SingleShotGenerator
 from .utils.logging import setup_logger
+from .validator_manager import ValidatorManager
 
 
 class SyntheticDataGenerator:
