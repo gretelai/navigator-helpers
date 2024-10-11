@@ -1,7 +1,7 @@
 import argparse
 
 from navigator_helpers.data_models import DataModel
-from navigator_helpers.evolutionary_data_generator import EvolDataGenerator
+from navigator_helpers.synthetic_data_generator import SyntheticDataGenerator
 
 
 def run_generation(config_file: str):
@@ -12,12 +12,12 @@ def run_generation(config_file: str):
     # Create the DataModelDefinition (all configuration in one place)
     model_definition = DataModel.from_yaml(yaml_content)
 
-    # Initialize the EvolDataGenerator
-    generator = EvolDataGenerator(model_definition)
+    # Initialize the SyntheticDataGenerator
+    generator = SyntheticDataGenerator(model_definition)
 
     # Generate the data and process each record as it's yielded
     for record in generator.generate_data():
-        print(f"Generated record: {record}")
+        pass
 
     latest_filename = generator.output_filename
     print(f"Data generation complete. Output saved to {latest_filename}")

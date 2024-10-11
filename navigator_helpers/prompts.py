@@ -1,3 +1,148 @@
+from typing import List
+
+# Default list of evolutionary strategies
+DEFAULT_EVOLUTION_STRATEGIES: List[str] = [
+    "Improve the content, enhancing its quality and clarity while maintaining its core meaning.",
+    "Simplify the content to make it more accessible and understandable.",
+    "Increase the complexity and nuance of the content where appropriate.",
+    "Make the content more diverse by introducing alternative perspectives or methods.",
+]
+
+RECORD_GENERATION_PROMPT = """
+{generation_instructions}
+
+Context:
+```
+{context}
+```
+**Important Instructions:**
+- The context above contains contextual tags that should be treated as instructions for generating the record.
+- Make a best effort to incorporate these contextual tags into the generated data in a natural and logical way.
+- If two tags seem to conflict, choose the most logical combination or interpretation of the tags.
+- Ensure that the generated content reflects the guidance provided by these contextual tags.
+
+Generate a new record with the following fields:
+{fields_description}
+
+**Important Instructions:**
+
+- For each field, use the format: 
+  <<FIELD: field_name>>
+  Field Value
+  <<END_FIELD>>
+- Include ALL specified fields, do not return any extra fields.
+- Ensure each field value adheres to its specified type and description.
+- For multi-line text or code, include it within the field delimiters without any escaping.
+- Do not include any explanations or additional text outside the specified format.
+
+Examples:
+
+1. Single-line text:
+<<FIELD: name>>
+John Doe
+<<END_FIELD>>
+
+2. Multi-line text:
+<<FIELD: description>>
+This is a multi-line
+description of the item.
+It can span several lines.
+<<END_FIELD>>
+
+3. Numeric value:
+<<FIELD: age>>
+42
+<<END_FIELD>>
+
+4. Code snippet:
+<<FIELD: python_function>>
+def greet(name):
+    return f"Hello, {{name}}!"
+
+print(greet("World"))
+<<END_FIELD>>
+
+5. JSON data:
+<<FIELD: user_preferences>>
+{{
+  "theme": "dark",
+  "notifications": true,
+  "language": "en-US"
+}}
+<<END_FIELD>>
+
+Generate the record now:
+"""
+
+FIELD_GENERATION_PROMPT = """
+{generation_instructions}
+
+Context:
+{context}
+
+Current record:
+{current_record}
+
+Generate a value for the following field:
+Field name: `{field_name}`
+  - Type: {field_type}
+  - Description: {field_description}
+
+**Important Instructions:**
+
+- Use the format:
+  <<FIELD: {field_name}>>
+  Field Value
+  <<END_FIELD>>
+- Ensure the value adheres to the specified type and description.
+- For multi-line text or code, include it within the field delimiters without any escaping.
+- Do not include any explanations or additional text outside the specified format.
+
+Examples:
+
+1. For a text field:
+<<FIELD: bio>>
+Jane Doe is a software engineer with 5 years of experience in web development.
+She specializes in React and Node.js.
+<<END_FIELD>>
+
+2. For a numeric field:
+<<FIELD: salary>>
+75000
+<<END_FIELD>>
+
+3. For a code field:
+<<FIELD: sql_query>>
+SELECT users.name, orders.order_date
+FROM users
+JOIN orders ON users.id = orders.user_id
+WHERE orders.status = 'completed'
+ORDER BY orders.order_date DESC
+LIMIT 10;
+<<END_FIELD>>
+
+Generate the field value now:
+"""
+
+EVOLUTION_STRATEGY_PROMPT = """
+Given the following record and context, apply the evolution strategy:
+"{strategy}"
+
+Instructions:
+- The evolution strategy is meant to **evolve** and **diversify** the existing generation. 
+- Do **NOT** re-generate the entire data from scratch. 
+- Update the existing field values and do **NOT** add any new fields.
+- Use the provided evolutionary strategy to **improve** and **update** the existing generation based on the context.
+- Return the updated record using the custom delimiter format without any additional explanations.
+
+Record:
+{record}
+
+Context:
+{context}
+
+Please provide the updated record using the custom delimiter format. """
+
 REFLECTION_SYSTEM_PROMPT = """
 You're an AI assistant that responds to the user with maximum accuracy. To do so, you will first think about what the user is asking for, thinking step by step. During this thinking phase, you will have reflections that will help you clarify ambiguities. In each reflection, you will list the possibilities and finally choose one. Between reflections, you can think again. At the end of the thinking, you must draw a conclusion. You only need to generate the minimum text that will help you generate a better output, don't be verbose while thinking. Finally, you will generate an output based on the previous thinking.
 
@@ -30,24 +175,6 @@ DEFAULT_SYSTEM_PROMPT = """
 You are a world-class AI system, capable of complex reasoning. Reason through the query and then provide your final response. If you detect that you made a mistake in your reasoning at any point, correct yourself.
 """.strip()
 
-# prompts.py
-
-FIELD_GENERATION_PROMPT = """
-{generation_instructions}
-
-Context:
-{context}
-
-Current record:
-{current_record}
-
-Generate a value for the following field:
-Name: {field_name}
-Type: {field_type}
-Description: {field_description}
-
-Ensure the generated value is consistent with the context and current record.
-"""
 
 MUTATION_PROMPT = """
 {generation_instructions}
@@ -63,6 +190,15 @@ Current Record (already generated fields): {current_record}
 Ensure that the evolved value remains consistent with the fields that have already been generated in the current record.
 Return only the evolved value for the `{field_name}` field.
 """
+
+LLM_VALIDATOR_PROMPT = """
+Validate if the following content is valid {content_type}:
+
+```
+{content}
+```
+
+If it's valid, return 'VALID'. If not, return FAIL and describe the error."""
 
 LLM_JUDGE_PROMPT = """
 As an expert judge, your task is to **always** return a PASS/FAIL evaluating the quality and relevance of the following generated record:

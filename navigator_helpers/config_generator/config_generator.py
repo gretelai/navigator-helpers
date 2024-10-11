@@ -1,13 +1,13 @@
 import json
 import logging
 
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from gretel_client import Gretel
 from gretel_client.inference_api.base import InferenceAPIModelType
 
 from navigator_helpers.data_models import ContextualTag, ContextualTags, DataModel
-from navigator_helpers.text_inference import TextInference
+from navigator_helpers.gretel_text_inference import TextInference
 
 from .prompts import (
     DATA_MODEL_GENERATION_PROMPT,
@@ -38,16 +38,22 @@ class ConfigGenerator:
             self.gretel.factories.initialize_navigator_api(
                 InferenceAPIModelType.NATURAL_LANGUAGE, backend_model=model
             )
-        )  # type: ignore
-        self.text_inference = TextInference(self.llm)
+        )
+        self.text_inference = TextInference(self.llm, debug=False)
+        self.tags: ContextualTags = ContextualTags(tags=[])
         self.user_task: Optional[str] = None
-        self.tags: Optional[ContextualTags] = None
         self.data_model: Optional[DataModel] = None
+        self.diversity_target = 10000
 
     def set_user_task(self, user_task: str):
         """Set the user's task description."""
         self.user_task = user_task
         logger.info(f"User task set: {user_task}")
+
+    def set_tags(self, tags: List[ContextualTag]):
+        """Set the contextual tags directly."""
+        self.tags = ContextualTags(tags=tags)
+        logger.info(f"Contextual tags set: {len(tags)} tags")
 
     def generate_tags(self, diversity_target: int = 10000) -> ContextualTags:
         """Generate contextual tags based on the user task."""
@@ -103,9 +109,10 @@ def extract_tags_with_llm(
         assistant_reply = text_inference.generate(
             user_prompt,
             use_reflection=False,
-            temperature=0.7,
-            max_tokens=2000,
+            temperature=0.2,
+            max_tokens=4096,
             system_message=TAG_EXTRACTION_SYSTEM_PROMPT,
+            field_name="EXPAND_TAGS",
         )
 
         json_content = extract_json_from_response(assistant_reply)
@@ -163,7 +170,7 @@ def generate_data_model(
         llm_response = text_inference.generate(
             prompt,
             use_reflection=True,
-            temperature=0.7,
+            temperature=0.2,
             max_tokens=2048,
             field_name="dataset_config",
         )

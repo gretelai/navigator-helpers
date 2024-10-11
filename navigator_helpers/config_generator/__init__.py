@@ -1,4 +1,4 @@
-from .generator import ConfigGenerator, generate_data_model
+from .config_generator import ConfigGenerator, generate_data_model
 from .utils import extract_yaml_from_markdown, parse_yaml
 
 __all__ = [
