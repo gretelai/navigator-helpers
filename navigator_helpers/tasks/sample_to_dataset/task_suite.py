@@ -344,6 +344,8 @@ class SampleToDatasetTaskSuite:
 
                 if is_valid_ranked_data_seeds:
                     columns = ranked_data_seeds.get("columns", [])
+                    # redundancy: remove columns that are the same as in the original dataset
+                    columns = [col for col in columns if col['column_name'] not in sample_dataset.columns]
                     sorted_columns = sorted(
                         columns, key=lambda col: -int(col.get("quality_rank", 0))
                     )
@@ -838,11 +840,15 @@ class SampleToDatasetTaskSuite:
 
         if generated_data_df:
             generated_data_df = pd.concat(generated_data_df, ignore_index=True)
+
+            # Shuffle the records of generated_data_df
+            generated_data_df = generated_data_df.sample(frac=1).reset_index(drop=True)
+
             generated_data_w_seeds_df = pd.merge(
-                seed_permutations, generated_data_df, on="id", how="inner"
+                generated_data_df, seed_permutations, on="id", how="inner"
             )
 
-            # drop the id column when done
+            # Drop the id column when done
             generated_data_df = generated_data_df.drop(columns=["id"])
             generated_data_w_seeds_df = generated_data_w_seeds_df.drop(columns=["id"])
             if self.config.verbose:
