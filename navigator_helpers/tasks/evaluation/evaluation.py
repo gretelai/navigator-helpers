@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 
 from pandas import Series
-from pandas.core.dtypes.common import is_numeric_dtype
+from pandas.core.dtypes.common import is_integer_dtype, is_numeric_dtype
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -76,6 +76,9 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             min_value = int(non_na_data.min())
             if unique_count <= 10 and min_value >= 0:
                 return "Categorical"
+            if unique_count == non_na_count and is_integer_dtype(non_na_data.dtype):
+                # All unique integer values, potentially an ID field
+                return "Other"
             return "Numeric"
 
         if diff_percent >= 0.9 or (diff_percent >= 0.7 and len(non_na_data) <= 50):
@@ -260,15 +263,19 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         results["score"] = score
         return results
 
-    def text_diversity(self, text_column):
+    def text_diversity(self, column: Series):
         """
-        Example function to calculate text diversity, e.g., based on vocabulary richness.
+        Given a text column, returns the text diversity index.
+        It's calculated as the average cosine similarity between each record and the average embedding.
+        If records are too similar with each other, the diversity index will be low.
+        Returns:
+            - Text diversity index in the range [0, 1), where higher value indicates higher diversity
         """
-        unique_words = set(
-            word for text in text_column.dropna() for word in text.split()
-        )
-        total_words = sum(len(text.split()) for text in text_column.dropna())
-        return len(unique_words) / total_words if total_words > 0 else 0
+
+        column_vectors = self._get_tfidf_vectors(column)
+        avg_column_vectors = column_vectors.mean(axis=0).reshape(1, -1)
+        cosine_sim = cosine_similarity(column_vectors, avg_column_vectors)
+        return 1 - cosine_sim.mean()
 
     def num_words_per_record(self):
         """
