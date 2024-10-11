@@ -191,7 +191,10 @@ class SampleToDatasetTaskSuite:
         return self.execute_prompt(user_prompt, "cognition")
 
     def extract_data_seeds_in_one_shot(
-        self, sample_dataset: pd.DataFrame, dataset_context: str="", system_prompt_type: str="cognition"
+        self,
+        sample_dataset: pd.DataFrame,
+        dataset_context: str = "",
+        system_prompt_type: str = "cognition",
     ) -> Tuple[str, Union[dict, list]]:
         """
         Extract data seeds from a sample dataset in one shot.
@@ -208,9 +211,9 @@ class SampleToDatasetTaskSuite:
         data_schema = str(list(sample_dataset.columns))
 
         dataseed_prompt = DATASEED_REVERSE_ENG_PROMPT_TEMPLATE.format(
-            sampled_dataset_jsonl=data_jsonl, 
+            sampled_dataset_jsonl=data_jsonl,
             dataset_context_str=dataset_context,
-            sampled_dataset_column_list=data_schema
+            sampled_dataset_column_list=data_schema,
         )
         if self.config.verbose:
             print("------------------- Dataseed prompt ------------")
@@ -223,7 +226,7 @@ class SampleToDatasetTaskSuite:
     def crowdsource_data_seeds(
         self,
         sample_dataset: pd.DataFrame,
-        dataset_context: str="",
+        dataset_context: str = "",
         crowd_size=3,
         max_num_seeds=3,
         system_prompt_type="cognition",
@@ -345,7 +348,11 @@ class SampleToDatasetTaskSuite:
                 if is_valid_ranked_data_seeds:
                     columns = ranked_data_seeds.get("columns", [])
                     # redundancy: remove columns that are the same as in the original dataset
-                    columns = [col for col in columns if col['column_name'] not in sample_dataset.columns]
+                    columns = [
+                        col
+                        for col in columns
+                        if col["column_name"] not in sample_dataset.columns
+                    ]
                     sorted_columns = sorted(
                         columns, key=lambda col: -int(col.get("quality_rank", 0))
                     )
@@ -515,7 +522,10 @@ class SampleToDatasetTaskSuite:
         return df
 
     def generate_dataset_description(
-        self, sample_dataset: pd.DataFrame, dataset_context: str="", system_prompt_type="cognition"
+        self,
+        sample_dataset: pd.DataFrame,
+        dataset_context: str = "",
+        system_prompt_type="cognition",
     ) -> Union[dict, list]:
         """
         Generate a description of the dataset based on the sample dataset.
@@ -537,9 +547,9 @@ class SampleToDatasetTaskSuite:
 
         # Format the reflection prompt with the ranked seeds
         dataset_description_prompt = DATASET_DESCRIPTION_PROMPT_TEMPLATE.format(
-            sampled_dataset_jsonl=data_jsonl, 
+            sampled_dataset_jsonl=data_jsonl,
             dataset_context_str=dataset_context,
-            sampled_dataset_column_list=data_schema
+            sampled_dataset_column_list=data_schema,
         )
         if self.config.verbose:
             print("------------------- Dataset description prompt ------------")
@@ -598,7 +608,7 @@ class SampleToDatasetTaskSuite:
         self,
         sample_dataset: pd.DataFrame,
         generated_seeds: dict,
-        dataset_context: str="",
+        dataset_context: str = "",
         system_prompt_type="cognition",
     ) -> dict:
         """
@@ -625,9 +635,9 @@ class SampleToDatasetTaskSuite:
             ]
         }
         dataset_description = self.generate_dataset_description(
-            sample_dataset, 
+            sample_dataset,
             dataset_context=dataset_context,
-            system_prompt_type=system_prompt_type
+            system_prompt_type=system_prompt_type,
         )
 
         proto_data_generation_prompt = DATA_GENERATION_PROMPT_TEMPLATE.format(
