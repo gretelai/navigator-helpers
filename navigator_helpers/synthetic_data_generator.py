@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 from gretel_client import Gretel
 
 from .data_models import DataField, DataModel, GenerationStrategy
-from .expert_validators import ExpertValidators
+from .validator_manager import ValidatorManager
 from .generation_strategies import FieldGenerationStrategy, RecordGenerationStrategy
 from .gretel_text_inference import TextInference
 from .llm_eval import LLMEval
@@ -40,7 +40,7 @@ class SyntheticDataGenerator:
         self.use_reflection = self.model_definition.use_reflection
         self.evolutionary_strategies = self._initialize_evolution_strategies()
         self.llm_eval = LLMEval(self.text_inference, self.use_reflection)
-        self.field_validators = ExpertValidators(
+        self.field_validators = ValidatorManager(
             self.text_inference, self.use_reflection
         )
         self.validators = self._initialize_validators()

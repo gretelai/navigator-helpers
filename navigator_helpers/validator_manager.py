@@ -6,7 +6,7 @@ from .data_models import DataField
 from .prompts import CONTENT_CORRECTION_PROMPT, LLM_VALIDATOR_PROMPT
 
 
-class ExpertValidators:
+class ValidatorManager:
     def __init__(self, text_inference: BaseTextInference, use_reflection: bool):
         self.text_inference = text_inference
         self.use_reflection = use_reflection
