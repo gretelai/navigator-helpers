@@ -460,6 +460,7 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
         """
         Visualizes the results of row uniqueness and semantic uniqueness analysis.
         """
+        # TODO: Combine unique and non-unique rows into a single pie chart
         if "row_uniqueness" not in self.results:
             raise ValueError("Row Uniqueness data is not available in the results.")
 
@@ -667,7 +668,16 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
         for i, criterion in enumerate(criteria, 1):
             plt.subplot(3, 2, i)
             scores = [record[criterion] for record in llm_scores]
-            sns.histplot(scores, kde=True, bins=bins, color="#66b3ff")
+            score_counts = [scores.count(x) for x in bins]
+            # sns.histplot(scores, kde=True, bins=bins, color="#66b3ff")
+
+            # Bar plot for discrete scores
+            sns.barplot(x=list(bins), y=score_counts, color="#66b3ff")
+
+            # Overlay KDE plot
+            sns.kdeplot(
+                scores, bw_adjust=0.5, color="red", fill=True, alpha=0.3, clip=(0, 4)
+            )
 
             # Set x-axis limits and ticks to be discrete integers from 0 to 4
             plt.xlim(0, 4)
