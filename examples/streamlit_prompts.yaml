@@ -1,0 +1,432 @@
+Advanced High School Level Math Dataset to Improve AI Reasoning: |
+
+  ### Objective:
+  Create a dataset of challenging mathematical problems suitable for advanced high school students or early undergraduate level. The problems should require sophisticated mathematical reasoning, involve multiple concepts, and necessitate a step-by-step approach to reach a solution. Each problem must have a single, clearly defined numerical answer.
+
+  ### Dataset Requirements:
+  1. Problems should span various mathematical fields such as algebra, geometry, trigonometry, probability, statistics, and basic calculus.
+  2. Each problem should require the application of multiple concepts and techniques.
+  3. Solutions should demonstrate rigorous mathematical thinking and detailed step-by-step reasoning.
+  4. Problems should have real-world applications or connections to practical scenarios when possible.
+  5. The final answer for each problem must be a single, well-defined number.
+
+  ### Output Schema:
+  Each entry in the dataset should contain the following fields in plain text format:
+  1. Question: A detailed description of the problem, including any necessary context or background information.
+  2. Answer: A comprehensive, step-by-step solution that includes:
+    - Initial approach and problem decomposition
+    - Relevant formulas, theorems, or principles applied
+    - Detailed mathematical derivations
+    - Intermediate results and their significance
+    - Final numerical solution
+
+  ### Example:
+
+  #### Question:
+  A city planner is designing a new circular park with a fountain at its center. The park has a radius of 50 meters, and eight equally spaced pathways radiate from the central fountain to the park's edge. The city wants to add a circular walking path that intersects all eight radial pathways at a distance of 30 meters from the fountain. Calculate the total area of grass in the park (excluding the fountain, pathways, and walking path) to the nearest square meter.
+
+  Assume:
+  - The central fountain has a radius of 2 meters.
+  - All pathways have a width of 1.5 meters.
+  - The circular walking path has a width of 2 meters.
+
+  #### Answer:
+  Let's approach this problem step-by-step:
+
+  1. First, let's identify the areas we need to calculate:
+    - Total area of the park
+    - Area of the fountain
+    - Area of the radial pathways
+    - Area of the circular walking path
+
+  2. Calculate the total area of the park:
+    A_total = πr² = π * 50² = 7,853.98 m²
+
+  3. Calculate the area of the fountain:
+    A_fountain = πr² = π * 2² = 12.57 m²
+
+  4. Calculate the area of the radial pathways:
+    - Each pathway is 1.5m wide and 50m long
+    - Area of one pathway = 1.5m * 50m = 75 m²
+    - Total area of pathways = 75 m² * 8 = 600 m²
+
+  5. Calculate the area of the circular walking path:
+    - Outer radius of the path = 30m + 1m = 31m
+    - Inner radius of the path = 30m - 1m = 29m
+    - A_path = π(R² - r²) = π(31² - 29²) = 371.95 m²
+
+  6. Calculate the total area of non-grass features:
+    A_non_grass = A_fountain + A_pathways + A_path
+    A_non_grass = 12.57 + 600 + 371.95 = 984.52 m²
+
+  7. Calculate the grass area:
+    A_grass = A_total - A_non_grass
+    A_grass = 7,853.98 - 984.52 = 6,869.46 m²
+
+  8. Round to the nearest square meter:
+    A_grass ≈ 6,869 m²
+
+  Therefore, the total area of grass in the park, rounded to the nearest square meter, is 6,869 m².
+
+Theoretical Math Dataset to Improve AI Reasoning: |
+  Task: Create a Collegiate Post-Doctoral Level Mathematical Dataset
+
+  Objective:
+  Create a dataset of advanced mathematical problems suitable for post-doctoral level research in mathematics, physics, or related fields. The problems should require sophisticated mathematical reasoning, involve multiple concepts, and necessitate a step-by-step approach to reach a solution. Each problem must have a single, clearly defined numerical answer.
+
+  Dataset Requirements:
+  1. Problems should span various advanced mathematical fields such as abstract algebra, topology, advanced calculus, complex analysis, differential geometry, number theory, and mathematical physics.
+  2. Each problem should require the application of multiple advanced concepts and techniques.
+  3. Solutions should demonstrate rigorous mathematical thinking and detailed step-by-step reasoning.
+  4. Problems should have real-world applications or connections to current research topics when possible.
+  5. The final answer for each problem must be a single, well-defined number.
+
+  Output Schema:
+  Each entry in the dataset should contain the following fields in plain text format:
+
+  1. Question: A detailed description of the problem, including any necessary context or background information.
+
+  2. Answer: A comprehensive, step-by-step solution that includes:
+    - Initial approach and problem decomposition
+    - Relevant theorems, lemmas, or principles applied
+    - Detailed mathematical derivations
+    - Intermediate results and their significance
+    - Final numerical solution
+
+  Example:
+
+  Question:
+  In a certain quantum system, the ground state energy E_0 is given by the smallest positive root of the equation:
+
+  J_0(sqrt(E)) - 2J_1(sqrt(E)) = 0
+
+  where J_0 and J_1 are Bessel functions of the first kind of order 0 and 1, respectively. Using numerical methods, determine the ground state energy E_0 to 6 decimal places.
+
+  Answer:
+  Let's approach this problem step-by-step:
+
+  1. We need to find the smallest positive root of the equation:
+    J_0(sqrt(E)) - 2J_1(sqrt(E)) = 0
+
+  2. This equation cannot be solved analytically, so we'll use numerical methods. We'll employ a combination of bracketing and refining techniques.
+
+  3. First, let's define our function:
+    f(E) = J_0(sqrt(E)) - 2J_1(sqrt(E))
+
+  4. We need to find an interval where f(E) changes sign. Let's evaluate f(E) for some values:
+    f(1) ≈ 0.3081 > 0
+    f(2) ≈ -0.1801 < 0
+
+    So, the root lies between 1 and 2.
+
+  5. Now, let's use the bisection method to refine our solution:
+
+    Iteration 1: E = 1.5, f(1.5) ≈ 0.0777 > 0
+    Iteration 2: E = 1.75, f(1.75) ≈ -0.0461 < 0
+    Iteration 3: E = 1.625, f(1.625) ≈ 0.0168 > 0
+    Iteration 4: E = 1.6875, f(1.6875) ≈ -0.0144 < 0
+    ...
+
+  6. Continuing this process and refining our solution, we eventually converge to:
+
+    E_0 ≈ 1.642854
+
+  7. To verify, we can check:
+    f(1.642854) ≈ -1.2e-7, which is very close to zero.
+
+  8. We can further refine this result using more advanced methods like Newton-Raphson, but this result is accurate to 6 decimal places.
+
+  Therefore, the ground state energy E_0 of the quantum system, rounded to 6 decimal places, is 1.642854.
+
+Translate Healthcare Analytics Commands to SQL Queries: |
+  # SQL Complex Query Dataset for Healthcare Analytics
+
+  ## Instructions:
+  Create a dataset of diverse, complex SQL queries and their corresponding natural language prompts in the Healthcare domain. Each entry should include a challenging healthcare database question, the necessary database schema, a SQL query to answer the question, and a detailed explanation of the query.
+
+  ## Fields to Generate:
+  1. prompt: A natural language question about a healthcare database, requiring a complex SQL query to answer. Ensure variety in the types of questions asked, covering different aspects of healthcare analytics.
+  2. context: SQL CREATE TABLE statements for the relevant healthcare database schema. Create schemas that support diverse healthcare scenarios.
+  3. sql: The SQL query that answers the prompt. Use a range of SQL features and techniques appropriate for the question.
+  4. explanation: A step-by-step explanation of how the SQL query works.
+
+  ## Guidelines for Diversity:
+  - Explore various aspects of healthcare data, such as:
+    * Patient care and outcomes
+    * Resource allocation and utilization
+    * Disease trends and epidemiology
+    * Treatment efficacy and comparative effectiveness
+    * Financial analysis and cost optimization
+    * Quality of care metrics
+    * Staffing and human resources
+    * Pharmacy and medication management
+    * Emergency department operations
+    * Chronic disease management
+  - Vary the complexity and structure of queries (e.g., nested subqueries, CTEs, window functions, pivoting, complex joins)
+  - Include different time-based analyses (e.g., trend analysis, seasonality, year-over-year comparisons)
+  - Consider various stakeholder perspectives (e.g., clinicians, administrators, researchers, patients)
+
+  ## Example:
+
+  prompt: '''
+  Generate a report showing the top 5 hospitals based on their patient outcomes and research funding in the last 3 years. Include the hospital names, locations, total research funding amount, average patient satisfaction score, and a list of their collaborating research institutions from different states.
+  '''
+
+  context: '''
+  CREATE TABLE Hospitals (
+      hospital_id INT PRIMARY KEY,
+      name VARCHAR(255),
+      location VARCHAR(100),
+      establishment_date DATE
+  );
+
+  CREATE TABLE PatientOutcomes (
+      outcome_id INT PRIMARY KEY,
+      hospital_id INT,
+      report_date DATE,
+      mortality_rate DECIMAL(5,2),
+      readmission_rate DECIMAL(5,2),
+      patient_satisfaction DECIMAL(5,2),
+      FOREIGN KEY (hospital_id) REFERENCES Hospitals(hospital_id)
+  );
+
+  CREATE TABLE ResearchProjects (
+      project_id INT PRIMARY KEY,
+      title VARCHAR(255),
+      start_date DATE,
+      end_date DATE,
+      funding_amount DECIMAL(12,2)
+  );
+
+  CREATE TABLE HospitalResearch (
+      hospital_id INT,
+      project_id INT,
+      role VARCHAR(50),
+      FOREIGN KEY (hospital_id) REFERENCES Hospitals(hospital_id),
+      FOREIGN KEY (project_id) REFERENCES ResearchProjects(project_id),
+      PRIMARY KEY (hospital_id, project_id)
+  );
+
+  CREATE TABLE Collaborations (
+      collaboration_id INT PRIMARY KEY,
+      hospital_id INT,
+      collaborator_id INT,
+      project_name VARCHAR(255),
+      start_date DATE,
+      FOREIGN KEY (hospital_id) REFERENCES Hospitals(hospital_id),
+      FOREIGN KEY (collaborator_id) REFERENCES Hospitals(hospital_id)
+  );
+  '''
+
+  sql: '''
+  WITH HospitalMetrics AS (
+      SELECT 
+          h.hospital_id,
+          h.name,
+          h.location,
+          SUM(rp.funding_amount) AS total_funding,
+          AVG(po.patient_satisfaction) AS avg_satisfaction,
+          COUNT(DISTINCT c.collaborator_id) AS collaborator_count
+      FROM 
+          Hospitals h
+      LEFT JOIN PatientOutcomes po ON h.hospital_id = po.hospital_id
+      LEFT JOIN HospitalResearch hr ON h.hospital_id = hr.hospital_id
+      LEFT JOIN ResearchProjects rp ON hr.project_id = rp.project_id
+      LEFT JOIN Collaborations c ON h.hospital_id = c.hospital_id
+      WHERE 
+          po.report_date >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
+          AND rp.start_date >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
+      GROUP BY 
+          h.hospital_id, h.name, h.location
+  ),
+  RankedHospitals AS (
+      SELECT 
+          *,
+          RANK() OVER (ORDER BY (total_funding * avg_satisfaction) DESC) AS hospital_rank
+      FROM 
+          HospitalMetrics
+  ),
+  CollaboratorList AS (
+      SELECT 
+          c.hospital_id,
+          GROUP_CONCAT(DISTINCT CONCAT(h.name, ' (', h.location, ')') ORDER BY h.name SEPARATOR ', ') AS collaborators
+      FROM 
+          Collaborations c
+      JOIN Hospitals h ON c.collaborator_id = h.hospital_id
+      WHERE 
+          c.hospital_id != c.collaborator_id
+          AND h.location != (SELECT location FROM Hospitals WHERE hospital_id = c.hospital_id)
+      GROUP BY 
+          c.hospital_id
+  )
+  SELECT 
+      rh.name,
+      rh.location,
+      rh.total_funding,
+      rh.avg_satisfaction,
+      cl.collaborators
+  FROM 
+      RankedHospitals rh
+  LEFT JOIN CollaboratorList cl ON rh.hospital_id = cl.hospital_id
+  WHERE 
+      rh.hospital_rank <= 5
+  ORDER BY 
+      rh.hospital_rank;
+  '''
+
+  explanation: '''
+  1. Create HospitalMetrics CTE:
+    - Join Hospitals with PatientOutcomes, ResearchProjects, and Collaborations tables.
+    - Calculate total funding amount, average patient satisfaction, and collaborator count for each hospital.
+    - Filter data for the last 3 years using report_date and project start_date.
+
+  2. Create RankedHospitals CTE:
+    - Use window function RANK() to rank hospitals based on a composite score (total funding * average satisfaction).
+
+  3. Create CollaboratorList CTE:
+    - Join Collaborations with Hospitals to get collaborator information.
+    - Use GROUP_CONCAT to create a list of collaborators from different locations.
+
+  4. Final SELECT:
+    - Combine data from RankedHospitals and CollaboratorList CTEs.
+    - Filter to include only the top 5 hospitals.
+    - Order results by hospital rank.
+
+  5. The query handles complex relationships:
+    - Many-to-many relationships between Hospitals and ResearchProjects.
+    - Self-referencing relationship in Collaborations table.
+
+  6. It uses advanced SQL features:
+    - Common Table Expressions (CTEs) for better query organization.
+    - Window functions for ranking.
+    - Aggregate functions (SUM, AVG, COUNT) with GROUP BY.
+    - Subqueries in the WHERE clause.
+    - GROUP_CONCAT for string aggregation.
+  
+  Note: This example represents just one type of healthcare analytics query. Your generated queries should explore a wide range of scenarios, complexities, and SQL techniques beyond this specific pattern.
+
+Multi-turn Conversation Dataset with Sentiment Analysis for Financial Services: |
+
+  ## Instructions:
+  Create a dataset of multi-turn conversations in the financial services industry, focusing on interactions between financial advisors and clients. Each entry should include a realistic dialogue showcasing various emotions and complex financial topics. The dataset should demonstrate the potential applications of AI and cloud solutions in financial services.
+
+  ## Fields to Generate:
+  1. conversation:
+    - Realistic dialogue between a financial advisor and a client
+    - Rich context, varied emotions, and complex financial topics
+    - New line for each turn
+    - NO sentiment labels in this column
+  2. sentiment_labels:
+    - Sentiment for each turn (e.g., 'anxious', 'reassuring', 'skeptical')
+    - Overall sentiment for the conversation
+      - Overall sentiment for the conversation
+      - Gradual reassurance
+      - Increasing frustration
+      - Mixed emotions
+      - Trust building
+      - Remaining skeptical
+      - Educational journey
+      - Emotional rollercoaster
+      - Professional detachment
+      - Growing enthusiasm
+    - New line for each label
+    - ONLY labels, NO conversation text
+
+  ## Example:
+
+  conversation: '''
+  Client: Hi, I'm really worried about the market crash. My 401(k) has dropped 15% in a month!
+  Advisor: I understand your concern. It's a volatile time. Can I have your account number to review your portfolio?
+  Client: Sure, it's ACT789012.
+  Advisor: Thank you. I see your portfolio is down 12.3% this month. While significant, it's actually outperforming the market.
+  Client: That's still a lot of money. Should I move everything to cash?
+  Advisor: Moving to cash might feel safe, but it could hurt long-term growth. Let's look at some data-driven options our AI has generated.
+  Client: AI? How can a computer know what to do with my retirement savings?
+  Advisor: Our AI analyzes vast amounts of market data and individual portfolios. It's suggesting a reallocation that could reduce volatility while maintaining growth potential.
+  Client: I'm skeptical, but go on.
+  Advisor: The AI recommends shifting 15% from equities to bonds, potentially reducing portfolio volatility by 20% with only a 7% decrease in expected returns.
+  Client: Those numbers sound good, but how do I know they're reliable?
+  Advisor: Great question. The AI's predictions are based on millions of data points and historical market trends. However, we always combine this with human expertise. What are your thoughts?
+  Client: It's a lot to take in. Can I think about it and get back to you?
+  Advisor: Absolutely. I'll send a detailed proposal to our secure client portal. You can review it at your convenience and we can discuss further.
+  Client: Okay, that sounds good. Thanks for your help.
+  Advisor: You're welcome. Remember, we're here to guide you through these uncertain times. Is there anything else I can assist you with today?
+  Client: No, that's all for now. I appreciate your time.
+  Advisor: Thank you for trusting us with your financial future. Have a great day, and don't hesitate to reach out with any questions.
+  Client: You too, goodbye.
+  '''
+
+  sentiment_labels: '''
+  Turn 1 (Client): 'anxious', 'worried'
+  Turn 2 (Advisor): 'empathetic', 'professional'
+  Turn 3 (Client): 'cooperative'
+  Turn 4 (Advisor): 'informative', 'reassuring'
+  Turn 5 (Client): 'concerned', 'uncertain'
+  Turn 6 (Advisor): 'cautious', 'analytical'
+  Turn 7 (Client): 'skeptical', 'doubtful'
+  Turn 8 (Advisor): 'explanatory', 'confident'
+  Turn 9 (Client): 'interested', 'cautious'
+  Turn 10 (Advisor): 'informative', 'persuasive'
+  Turn 11 (Client): 'curious', 'still skeptical'
+  Turn 12 (Advisor): 'patient', 'educational'
+  Turn 13 (Client): 'overwhelmed', 'indecisive'
+  Turn 14 (Advisor): 'understanding', 'accommodating'
+  Turn 15 (Client): 'grateful', 'relieved'
+  Turn 16 (Advisor): 'supportive', 'reassuring'
+  Turn 17 (Client): 'appreciative'
+  Turn 18 (Advisor): 'positive', 'encouraging'
+  Turn 19 (Client): 'polite'
+  Overall: 'gradual reassurance' (from anxiety and skepticism to cautious relief and appreciation)
+  '''
+
+Multi-Step Cloud Security Incident Resolution Dataset: |
+
+  ## Instructions:
+  Create a dataset of cloud security incidents and their resolutions. Each entry should include a detailed description of a security issue in a modern cloud environment, an initial response from a cloud security analyst, and a step-by-step resolution process. The dataset should cover a range of incidents, from common issues to complex scenarios, demonstrating various aspects of cloud security incident response.
+
+  ## Columns:
+  1. security_incident: Detailed description of the cloud security issue
+  2. initial_response: First empathetic and professional reply from the cloud security analyst
+  3. resolution_process: Numbered steps to investigate and resolve the cloud security incident
+
+  ## Example:
+
+  security_incident: '''
+  We've detected unusual activity associated with a senior developer's account. The user reported receiving suspicious emails, and our monitoring systems have identified:
+  1. Multiple login attempts to the user's email account from various international IP addresses
+  2. Successful logins to our cloud-based code repository and CI/CD pipeline using the compromised credentials
+  3. Unusual data transfer patterns from our cloud object storage, with large amounts of data being copied to an unrecognized external storage bucket
+  4. Creation of new IAM roles with elevated privileges in our cloud environment
+  '''
+
+  initial_response: '''
+  Thank you for reporting this critical security incident. We're treating this as a high-priority issue and have initiated our cloud incident response protocol. Can you confirm if the affected user has used any shared workstations recently or accessed company resources from a public network? Please advise the user not to log into any company accounts until we complete our initial assessment and provide further instructions.
+  '''
+
+  resolution_process: '''
+  1. Immediately suspend the affected user's access across all cloud and SaaS platforms
+  2. Enable multi-factor authentication on the user's account if not already active
+  3. Analyze login attempt patterns across all cloud services and SaaS applications
+  4. Review email logs for potential phishing attempts and identify any compromised information
+  5. Conduct a thorough audit of the user's recent activities in the code repository and CI/CD pipeline
+  6. Investigate all recent commits, pull requests, and pipeline executions for potential malicious code injection
+  7. Analyze data transfer logs in the cloud object storage to determine the scope of potential data exfiltration
+  8. Identify and isolate the unauthorized external storage bucket
+  9. Review and revoke any suspicious IAM roles or permissions created during the incident timeframe
+  10. Implement just-in-time access and privilege escalation processes for cloud resources
+  11. Perform a security assessment of all production systems accessed by the compromised account
+  12. Deploy cloud-native security tools to monitor for any persistent threats or backdoors
+  13. Initiate a company-wide password reset for all cloud and SaaS services
+  14. Implement IP allow-listing for access to critical cloud resources where applicable
+  15. Review and update Security Groups and Network Access Control Lists in the cloud environment
+  16. Enhance logging and monitoring for all cloud services, focusing on data access and transfer patterns
+  17. Conduct a gap analysis of current cloud security posture against best practices (e.g., CIS Benchmarks)
+  18. Implement data loss prevention (DLP) solutions for cloud storage and email systems
+  19. Develop and conduct specialized security awareness training on cloud security and phishing threats
+  20. Establish continuous monitoring of dark web forums for any leaked company credentials
+  21. Update the incident response plan to better address cloud-specific security scenarios
+  22. Prepare a detailed incident report including impact assessment, timeline, and remediation steps
+  23. Engage legal team to address any compliance implications related to potential data exposure
+  24. Implement additional security layers such as Cloud Access Security Broker (CASB) if not already in use
+  25. Conduct a lessons-learned session to improve cloud security practices and incident response procedures
+  '''
