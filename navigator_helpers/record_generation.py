@@ -50,7 +50,9 @@ class GenerationStrategyBase:
         return content.strip()
 
 
-class FieldGenerationStrategy(GenerationStrategyBase):
+class FieldByFieldGenerator(GenerationStrategyBase):
+    """Generates a record by creating each field individually."""
+
     def __init__(self, model_definition: DataModel, text_inference: BaseTextInference):
         self.model_definition = model_definition
         self.text_inference = text_inference
@@ -110,7 +112,9 @@ class FieldGenerationStrategy(GenerationStrategyBase):
             return response
 
 
-class RecordGenerationStrategy(GenerationStrategyBase):
+class SingleShotGenerator(GenerationStrategyBase):
+    """Generates an entire record in a single operation."""
+
     def __init__(self, model_definition: DataModel, text_inference: BaseTextInference):
         self.model_definition = model_definition
         self.text_inference = text_inference

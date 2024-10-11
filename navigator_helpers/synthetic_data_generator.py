@@ -9,7 +9,7 @@ from gretel_client import Gretel
 
 from .data_models import DataField, DataModel, GenerationStrategy
 from .validator_manager import ValidatorManager
-from .generation_strategies import FieldGenerationStrategy, RecordGenerationStrategy
+from .record_generation import FieldByFieldGenerator, SingleShotGenerator
 from .gretel_text_inference import TextInference
 from .llm_eval import LLMEval
 from .prompts import DEFAULT_EVOLUTION_STRATEGIES, EVOLUTION_STRATEGY_PROMPT
@@ -30,10 +30,10 @@ class SyntheticDataGenerator:
         )
         self.text_inference = TextInference(self.llm, self.logger, debug=False)
 
-        self.field_strategy = FieldGenerationStrategy(
+        self.field_strategy = FieldByFieldGenerator(
             model_definition, self.text_inference
         )
-        self.record_strategy = RecordGenerationStrategy(
+        self.record_strategy = SingleShotGenerator(
             model_definition, self.text_inference
         )
 
