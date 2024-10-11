@@ -56,7 +56,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         should proportionally increase as the dataset size increases.
         """
         # If on average each entry has more than one space, we consider it a text field
-        _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD = 1
+        _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD = 0.1
 
         non_na_data = column.dropna()
         non_na_count = int(non_na_data.count())
@@ -85,9 +85,14 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
             return "Categorical"
 
         if space_count / non_na_count > _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD:
+            # Count datetime fields as "Other"
+            try:
+                pd.to_datetime(non_na_data)
+                return "Other"
+            except:
+                pass
             return "Text"
 
-        # "Other" includes datetime, ID fields, etc.
         return "Other"
 
     def _get_tfidf_vectors(self, column: Series) -> np.ndarray:
@@ -204,10 +209,12 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         results = {}
         distribution = {}
         score = {}
+        column_data_types = {}
 
         # Iterate through each column to calculate appropriate distributions
         for col in self.dataset.columns:
             column_data_type = self._determine_column_data_type(self.dataset[col])
+            column_data_types[col] = column_data_type
 
             if column_data_type == "Categorical":
                 # Distribution and diversity for categorical columns
@@ -261,6 +268,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
                 score[col] = None
         results["distribution"] = distribution
         results["score"] = score
+        results["column_data_types"] = column_data_types
         return results
 
     def text_diversity(self, column: Series):
