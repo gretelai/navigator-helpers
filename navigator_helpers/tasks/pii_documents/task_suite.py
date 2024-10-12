@@ -63,7 +63,6 @@ class PiiDocsTaskSuite(BaseTaskSuite):  # Now inherits from BaseTaskSuite
         self, domain_list: list[str], num_doctypes_per_domain: int = 5
     ) -> dict[str, list[str]]:
         doctypes = {}
-        logger.info("🏷️ Generating document types for each domain")
         for domain in domain_list:
             # Log individual domain generation message
             logger.info(f"🔖 Generating document types for domain: {domain}")
