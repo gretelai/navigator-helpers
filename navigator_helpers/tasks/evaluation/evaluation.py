@@ -87,7 +87,8 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         if space_count / non_na_count > _TEXT_FIELD_AVG_SPACE_COUNT_THRESHOLD:
             # Count datetime fields as "Other"
             try:
-                pd.to_datetime(non_na_data)
+                # pd.to_datetime(non_na_data)
+                pd.to_datetime(non_na_data, format="%Y-%m-%d")
                 return "Other"
             except:
                 pass
@@ -473,54 +474,50 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
 
     def plot_row_uniqueness(self):
         """
-        Visualizes the results of row uniqueness and semantic uniqueness analysis.
+        Visualizes row uniqueness and semantic uniqueness analysis in a single pie chart with three categories:
+        Unique Rows, Partially Unique Rows, and Non-Unique Rows.
         """
-        # TODO: Combine unique and non-unique rows into a single pie chart
         if "row_uniqueness" not in self.results:
             raise ValueError("Row Uniqueness data is not available in the results.")
 
         row_uniqueness = self.results["row_uniqueness"]
 
-        # Plotting unique vs non-unique rows
-        unique_data = {
-            "Unique Rows": row_uniqueness["percent_unique"],
-            "Non-Unique Rows": 100 - row_uniqueness["percent_unique"],
-        }
-        unique_labels = list(unique_data.keys())
-        unique_sizes = list(unique_data.values())
+        # Define categories for the pie chart
+        unique_rows = row_uniqueness["percent_unique"]
+        semantically_unique_only = abs(
+            row_uniqueness["percent_semantically_unique"] - unique_rows
+        )
+        non_unique_rows = 100 - row_uniqueness["percent_semantically_unique"]
 
-        plt.figure(figsize=(12, 6))
-        plt.subplot(1, 2, 1)
-        plt.pie(
-            unique_sizes,
-            labels=unique_labels,
+        # Data for the pie chart
+        labels = [
+            "Unique Rows",
+            "Partially Unique Rows (Semantically Unique Only)",
+            "Non-Unique Rows",
+        ]
+        sizes = [unique_rows, semantically_unique_only, non_unique_rows]
+
+        # Colors for the pie chart
+        colors = ["#66b3ff", "#99ff99", "#ff9999"]
+
+        wedges, texts, autotexts = plt.pie(
+            sizes,
             autopct="%1.1f%%",
             startangle=140,
-            colors=["#66b3ff", "#ff9999"],
+            colors=colors,
+            wedgeprops={"edgecolor": "black"},
+            labeldistance=1.1,  # Fine-tune as needed
         )
+
+        # Customize text sizes
+        for text in autotexts:
+            text.set_size(12)
+
+        # Add legend
+        plt.legend(wedges, labels, loc="best", bbox_to_anchor=(1, 0, 0.5, 1))
+
         plt.axis("equal")
-        plt.title("Percentage of Unique and Non-Unique Rows")
-
-        # Plotting semantically unique vs non-semantically unique rows
-        semantic_data = {
-            "Semantically Unique Rows": row_uniqueness["percent_semantically_unique"],
-            "Non-Semantically Unique Rows": 100
-            - row_uniqueness["percent_semantically_unique"],
-        }
-        semantic_labels = list(semantic_data.keys())
-        semantic_sizes = list(semantic_data.values())
-
-        plt.subplot(1, 2, 2)
-        plt.pie(
-            semantic_sizes,
-            labels=semantic_labels,
-            autopct="%1.1f%%",
-            startangle=140,
-            colors=["#99ff99", "#ffcc99"],
-        )
-        plt.axis("equal")
-        plt.title("Percentage of Semantically Unique and Non-Semantically Unique Rows")
-
+        plt.title("Row Uniqueness and Semantic Uniqueness Analysis")
         plt.tight_layout()
         plt.show()
 
@@ -624,6 +621,39 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
 
+    # def plot_num_words_per_record(self):
+    #     """
+    #     Visualizes the number of words per record in the dataset.
+    #     """
+    #     if "num_words_per_record" not in self.results:
+    #         raise KeyError(
+    #             "Number of words per record data is not available in the results."
+    #         )
+
+    #     num_words_data = self.results["num_words_per_record"]
+    #     #average_words = num_words_data["average_words_per_record"]
+    #     word_counts_per_column = num_words_data["word_counts_per_column"]
+    #     average_words = float(num_words_data["average_words_per_record"])
+    #     word_counts = [float(value) for value in word_counts_per_column.values()]
+
+    #     # Plotting the word counts per column with a line for the average
+    #     plt.figure(figsize=(10, 6))
+    #     column_names = list(word_counts_per_column.keys())
+    #     word_counts = list(word_counts_per_column.values())
+    #     sns.barplot(x=column_names, y=word_counts, color="#66b3ff")
+
+    #     # Add the average as a horizontal line
+    #     plt.axhline(average_words, color="red", linestyle="--", label=f"Average words per record = ({average_words})")
+
+    #     plt.xticks(rotation=90)
+    #     plt.xlabel("Columns")
+    #     plt.ylabel("Average Number of Words")
+    #     plt.title("Average Number of Words per Column with Overall Average")
+    #     plt.legend()
+
+    #     plt.tight_layout()
+    #     plt.show()
+
     def plot_num_words_per_record(self):
         """
         Visualizes the number of words per record in the dataset.
@@ -634,25 +664,32 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
             )
 
         num_words_data = self.results["num_words_per_record"]
-        average_words = num_words_data["average_words_per_record"]
+        average_words = float(
+            num_words_data["average_words_per_record"]
+        )  # Ensure numeric type
         word_counts_per_column = num_words_data["word_counts_per_column"]
 
-        # Plotting the average number of words per record
-        plt.figure(figsize=(14, 6))
-        plt.subplot(1, 2, 1)
-        plt.bar(["Average Words per Record"], [average_words], color="#66b3ff")
-        plt.ylabel("Number of Words")
-        plt.title("Average Number of Words per Record")
-
-        # Plotting the word counts per column
-        plt.subplot(1, 2, 2)
+        # Convert word counts to float to ensure proper numeric handling
         column_names = list(word_counts_per_column.keys())
-        word_counts = list(word_counts_per_column.values())
-        sns.barplot(x=column_names, y=word_counts)
+        word_counts = [float(value) for value in word_counts_per_column.values()]
+
+        # Plotting the word counts per column with a line for the average
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=column_names, y=word_counts, color="#66b3ff")
+
+        # Add the average as a horizontal line
+        plt.axhline(
+            average_words,
+            color="red",
+            linestyle="--",
+            label=f"Average words per record = ({average_words})",
+        )
+
         plt.xticks(rotation=90)
         plt.xlabel("Columns")
         plt.ylabel("Average Number of Words")
-        plt.title("Average Number of Words per Column")
+        plt.title("Average Number of Words per Column with Overall Average")
+        plt.legend()
 
         plt.tight_layout()
         plt.show()
@@ -682,16 +719,17 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
         plt.figure(figsize=(16, 10))
         for i, criterion in enumerate(criteria, 1):
             plt.subplot(3, 2, i)
-            scores = [record[criterion] for record in llm_scores]
+            # scores = [record[criterion] for record in llm_scores]
+            # Convert the scores to integers or floats
+            scores = [int(record[criterion]) for record in llm_scores]
             score_counts = [scores.count(x) for x in bins]
-            # sns.histplot(scores, kde=True, bins=bins, color="#66b3ff")
 
             # Bar plot for discrete scores
-            sns.barplot(x=list(bins), y=score_counts, color="#66b3ff")
+            sns.barplot(x=list(bins), y=score_counts, color="red")
 
             # Overlay KDE plot
             sns.kdeplot(
-                scores, bw_adjust=0.5, color="red", fill=True, alpha=0.3, clip=(0, 4)
+                scores, bw_adjust=0.5, color="blue", fill=True, alpha=0.3, clip=(0, 4)
             )
 
             # Set x-axis limits and ticks to be discrete integers from 0 to 4
@@ -717,8 +755,6 @@ class VisualizationTaskSuite(BaseEvaluationTaskSuite):
             "num_words_per_record": self.plot_num_words_per_record,
             "llm_as_a_judge_scores": self.plot_llm_as_a_judge,
         }
-
-        # import pdb; pdb.set_trace()
 
         for key, func in visualization_mapping.items():
             if key in self.results:
