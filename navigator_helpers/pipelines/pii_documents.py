@@ -7,6 +7,7 @@ from typing import Optional
 
 import pandas as pd
 
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from gretel_client.inference_api.tabular import PROGRESS_BAR_FORMAT
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -131,9 +132,23 @@ class PiiDocsPipeline(BasePipeline):
 
         return domain_and_doctypes
 
+    def _generate_sample(self, tags, progress_bar):
+        """Helper function to generate a single sample."""
+        domain, doctype = tags.sample()
+        record = self.tasks.create_record(
+            domain=domain,
+            doctype=doctype,
+            entity_validation=self.config.entity_validation,
+            progress_bar=progress_bar,
+        )
+        return record
+
     def run(
-        self, num_samples: int = 10, disable_progress_bar: bool = False
-    ) -> PiiDocsPipelineResults:
+        self,
+        num_samples: int = 10,
+        disable_progress_bar: bool = False,
+        max_workers: int = 1,
+    ) -> PipelineResults:
         logger.info(
             f"🚀 Starting Text-to-{self.config.doc_lang.title} synthetic data pipeline"
         )
@@ -145,24 +160,28 @@ class PiiDocsPipeline(BasePipeline):
             total=num_samples,
             disable=disable_progress_bar,
             unit="sample",
+            bar_format=PROGRESS_BAR_FORMAT,
         )
 
         with logging_redirect_tqdm():
-            for _ in range(num_samples):
-                domain, doctype = tags.sample()
-                record = self.tasks.create_record(
-                    domain=domain,
-                    doctype=doctype,
-                    entity_validation=self.config.entity_validation,
-                    progress_bar=pbar,
-                )
-                synthetic_dataset.append(record)
-                self._save_artifact("synthetic_dataset", synthetic_dataset)
-                pbar.update(1)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(self._generate_sample, tags, pbar)
+                    for _ in range(num_samples)
+                ]
 
-            # Check for Colab and adjust progress bar handling
+                for future in as_completed(futures):
+                    try:
+                        record = future.result()
+                        synthetic_dataset.append(record)
+                        self._save_artifact("synthetic_dataset", synthetic_dataset)
+                    except Exception as exc:
+                        logger.error(f"Error generating sample: {exc}")
+                    pbar.update(1)
+                pbar.update(1)
+            # HACK: The progress bar doesn't end with a newline in Colab.
             if IN_COLAB and not disable_progress_bar:
-                pbar.write("")  # Adding this line to handle Colab newline
+                pbar.write("")
 
         pbar.close()
 

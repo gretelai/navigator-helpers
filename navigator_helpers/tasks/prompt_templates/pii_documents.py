@@ -23,8 +23,9 @@ Create a list of {num_pii_types} unique PII and PHI type entities that are relev
 
 ### Instructions:
     * Only selected PII types from the following list and use the exact same naming: {allowed_pii_types}
-    * Do not make up any other PII type names as provided in the list.
-    * Select relevant command and uncommon PII types from the list. Try to include state or country when appropriate.
+    * Ensure a balanced mix of both common and uncommon PII types from the list. Prioritize relevance but aim to include some less frequently used types as well.
+    * Where applicable, include state or country information.
+    * Do not make up any PII type names beyond those provided in the list.
     * Do not add any special characters such as line breaks or spaces.
     * List the PII types in a valid JSON array.
 """,
