@@ -10,12 +10,15 @@ from navigator_helpers.tasks.prompt_templates.text_to_code import (
     nl2python_template_dict,
     nl2sql_template_dict,
 )
-
+from navigator_helpers.tasks.prompt_templates.pii_documents import (
+    pii_document_template_dict
+)
 
 class TemplateType(str, Enum):
     SQL = "sql"
     PYTHON = "python"
     LLM_AS_A_JUDGE = "llm_as_a_judge"
+    PII_DOC = "pii_doc"
 
 
 class PromptTemplateSuite:
@@ -52,6 +55,7 @@ TEMPLATE_DICT = {
     "llm_as_a_judge": llm_as_a_judge_template_dict,
     "python": nl2python_template_dict,
     "sql": nl2sql_template_dict,
+    "pii_doc": pii_document_template_dict,
 }
 
 

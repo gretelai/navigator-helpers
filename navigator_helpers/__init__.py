@@ -17,6 +17,7 @@ from .evolutionary_strategies import DEFAULT_EVOLUTION_STRATEGIES
 from .llms.llm_suite import GretelLLMSuite
 from .pipelines.config.utils import smart_load_pipeline_config
 from .pipelines.text_to_code import NL2CodePipeline
+from .pipelines.pii_documents import PiiDocsPipeline
 from .tasks.text_to_code.task_suite import NL2PythonTaskSuite, NL2SQLTaskSuite
 from .text_inference import TextInference
 

@@ -14,7 +14,12 @@ class PipelineConfig(BaseModel):
     def validate_artifact_path(self):
         if self.artifact_path is not None:
             self.artifact_path = Path(self.artifact_path)
-            self.artifact_path = self.artifact_path / f"{self.code_lang.value}"
+            if hasattr(self, 'code_lang'):
+                self.artifact_path = self.artifact_path / self.code_lang.value
+            elif hasattr(self, 'doc_lang'):
+                self.artifact_path = self.artifact_path / self.doc_lang.value
+            else:
+                self.artifact_path = self.artifact_path / "default"
             self.artifact_path.mkdir(parents=True, exist_ok=True)
         return self
 
