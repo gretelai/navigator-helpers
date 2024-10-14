@@ -66,7 +66,7 @@ class NL2CodeTaskSuite(BaseTaskSuite):
     def check_semantic_correctness(self, code_string: str) -> float:
         """Evaluate the code using pylint and return the score."""
         pylint_output = StringIO()
-        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=True, delete_on_close=False) as f:
             f.write(code_string)
             f.flush()
             pylint_opts = [
