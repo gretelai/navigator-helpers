@@ -6,22 +6,21 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 from gretel_client import Gretel
 from gretel_client.inference_api.base import InferenceAPIModelType
 
-from navigator_helpers.data_models import ContextualTag, ContextualTags, DataModel
-from navigator_helpers.gretel_text_inference import TextInference
-
-from .prompts import (
+from navigator_helpers.config_generator.config_prompts import (
     DATA_MODEL_GENERATION_PROMPT,
     EXAMPLE_YAML,
     TAG_EXTRACTION_INITIAL_USER_PROMPT,
     TAG_EXTRACTION_ITERATION_USER_PROMPT,
     TAG_EXTRACTION_SYSTEM_PROMPT,
 )
-from .utils import (
+from navigator_helpers.config_generator.utils import (
     calculate_diversity,
     extract_json_from_response,
     parse_yaml,
     safe_variable_name,
 )
+from navigator_helpers.data_models import ContextualTag, ContextualTags, DataModel
+from navigator_helpers.gretel_text_inference import TextInference
 
 if TYPE_CHECKING:
     from gretel_client.inference_api.natural_language import NaturalLanguageInferenceAPI
@@ -70,6 +69,7 @@ class ConfigGenerator:
             raise ValueError(
                 "User task and tags must be set before generating the data model."
             )
+        logger.info("Generating Data Model")
         self.data_model = generate_data_model(
             self.user_task, EXAMPLE_YAML, self.tags, self.text_inference
         )
