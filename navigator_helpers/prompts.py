@@ -34,6 +34,8 @@ Generate a new record with the following fields:
 - Ensure each field value adheres to its specified type and description.
 - For multi-line text or code, include it within the field delimiters without any escaping.
 - Do not include any explanations or additional text outside the specified format.
+- CRITICAL: ALWAYS include <<END_FIELD>> for EVERY field, including the last one.
+- CRITICAL: ALWAYS include <<RECORD_COMPLETE>> at the end of each record generation.
 
 Examples:
 
@@ -71,7 +73,7 @@ print(greet("World"))
 }}
 <<END_FIELD>>
 
-Generate the record now:
+Generate the record now, ensuring EVERY field ends with <<END_FIELD>> and the record ends with <<RECORD_COMPLETE>>:
 """
 
 FIELD_GENERATION_PROMPT = """
@@ -143,38 +145,27 @@ Context:
 
 Please provide the updated record using the custom delimiter format. """
 
-REFLECTION_SYSTEM_PROMPT = """
-You're an AI assistant that responds to the user with maximum accuracy. To do so, you will first think about what the user is asking for, thinking step by step. During this thinking phase, you will have reflections that will help you clarify ambiguities. In each reflection, you will list the possibilities and finally choose one. Between reflections, you can think again. At the end of the thinking, you must draw a conclusion. You only need to generate the minimum text that will help you generate a better output, don't be verbose while thinking. Finally, you will generate an output based on the previous thinking.
-
-This is the output format you have to follow:
-
-```
-<thinking>
-
-Here you will think about what the user asked for.
-
-<reflection>
-This is a reflection.
-</reflection>
-
-<reflection>
-This is another reflection.
-</reflection>
-
-</thinking>
-
-<output>
-
-Here you will include the output
-
-</output>
-```
-""".strip()
-
 DEFAULT_SYSTEM_PROMPT = """
 You are a world-class AI system, capable of complex reasoning. Reason through the query and then provide your final response. If you detect that you made a mistake in your reasoning at any point, correct yourself.
 """.strip()
 
+REFLECTION_PROMPT = """
+To respond with maximum accuracy, first think about what the user is asking for, thinking step by step. During this thinking phase, have reflections that will help you clarify ambiguities. In each reflection, list the possibilities and finally choose one. Between reflections, you can think again. At the end of the thinking, draw a conclusion. Generate only the minimum text that will help you generate a better output, don't be verbose while thinking. Finally, generate an output based on the previous thinking.
+
+Use this format for your response:
+<thinking>
+Think about what the user asked for.
+<reflection>
+This is a reflection.
+</reflection>
+<reflection>
+This is another reflection.
+</reflection>
+</thinking>
+<output>
+Include the output here
+</output>
+""".strip()
 
 MUTATION_PROMPT = """
 {generation_instructions}
