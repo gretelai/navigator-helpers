@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
 
@@ -87,6 +88,19 @@ class NL2CodePipeline(BasePipeline):
 
     def set_contextual_tags(self, tags: ContextualTags | dict):
         if isinstance(tags, dict):
+            # Check if topics or complexity levels are empty and generate them
+            if not tags.get("domain_and_topics") or any(
+                not topics for topics in tags["domain_and_topics"].values()
+            ):
+                tags["domain_and_topics"] = self._generate_missing_topics(
+                    tags["domain_and_topics"]
+                )
+
+            if not tags.get("complexity_levels") or len(tags["complexity_levels"]) == 0:
+                tags["complexity_levels"] = self.tasks.generate_levels_of_complexity(
+                    num_levels=self.config.num_complexity_levels
+                )
+
             self.contextual_tags = ContextualTags.model_validate(tags)
         elif isinstance(tags, ContextualTags):
             self.contextual_tags = tags
@@ -97,8 +111,44 @@ class NL2CodePipeline(BasePipeline):
             )
         self._save_artifact("metadata", self.contextual_tags.model_dump())
 
+    def _generate_missing_topics(self, domain_and_topics):
+        """Generate missing topics for domains that have an empty list."""
+
+        # Only log once if any domain is missing topics
+        missing_domains = [
+            domain for domain, topics in domain_and_topics.items() if not topics
+        ]
+
+        if missing_domains:
+            logger.info("🏷️ Generating topics for each domain with missing topics")
+
+        for domain in missing_domains:
+            domain_and_topics[domain] = self.tasks.generate_topics_from_domains(
+                domain_list=[domain],
+                num_topics_per_domain=self.config.num_topics_per_domain,
+            )[domain]
+
+        return domain_and_topics
+
+    def _generate_sample(self, tags, progress_bar):
+        """Helper function to generate a single sample."""
+        domain, topic, complexity = tags.sample()
+        record = self.tasks.create_record(
+            domain=domain,
+            topic=topic,
+            complexity=complexity,
+            llm_as_a_judge=self.config.llm_as_a_judge,
+            syntax_validation=self.config.syntax_validation,
+            semantic_validation=self.config.semantic_validation,
+            progress_bar=progress_bar,
+        )
+        return record
+
     def run(
-        self, num_samples: int = 10, disable_progress_bar: bool = False
+        self,
+        num_samples: int = 10,
+        disable_progress_bar: bool = False,
+        max_workers: int = 1,
     ) -> PipelineResults:
         logger.info(
             f"🚀 Starting Text-to-{self.config.code_lang.logging_name} synthetic data pipeline"
@@ -107,6 +157,7 @@ class NL2CodePipeline(BasePipeline):
         synthetic_dataset = []
         tags = self.contextual_tags or self.create_contextual_tags()
 
+        # Progress bar setup
         pbar = tqdm(
             total=num_samples,
             disable=disable_progress_bar,
@@ -115,18 +166,20 @@ class NL2CodePipeline(BasePipeline):
         )
 
         with logging_redirect_tqdm():
-            for _ in range(num_samples):
-                domain, topic, complexity = tags.sample()
-                record = self.tasks.create_record(
-                    domain=domain,
-                    topic=topic,
-                    complexity=complexity,
-                    llm_as_a_judge=self.config.llm_as_a_judge,
-                    syntax_validation=self.config.syntax_validation,
-                    progress_bar=pbar,
-                )
-                synthetic_dataset.append(record)
-                self._save_artifact("synthetic_dataset", synthetic_dataset)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(self._generate_sample, tags, pbar)
+                    for _ in range(num_samples)
+                ]
+
+                for future in as_completed(futures):
+                    try:
+                        record = future.result()
+                        synthetic_dataset.append(record)
+                        self._save_artifact("synthetic_dataset", synthetic_dataset)
+                    except Exception as exc:
+                        logger.error(f"Error generating sample: {exc}")
+                    pbar.update(1)
                 pbar.update(1)
             # HACK: The progress bar doesn't end with a newline in Colab.
             if IN_COLAB and not disable_progress_bar:

@@ -11,6 +11,7 @@ class NL2CodeAutoConfig(PipelineConfig, BaseModel):
     num_complexity_levels: int = 4
     llm_as_a_judge: bool = True
     syntax_validation: bool = True
+    semantic_validation: bool = True
 
 
 class NL2CodeManualConfig(PipelineConfig, BaseModel):
@@ -19,3 +20,4 @@ class NL2CodeManualConfig(PipelineConfig, BaseModel):
     complexity_levels: list[str]
     llm_as_a_judge: bool = True
     syntax_validation: bool = True
+    semantic_validation: bool = True

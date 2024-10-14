@@ -3,13 +3,17 @@ from __future__ import annotations
 import logging
 import random
 import re
+import tempfile
 import uuid
 
 from enum import Enum
+from io import StringIO
 from typing import Optional
 
 import numpy as np
 
+from pylint.lint import Run
+from pylint.reporters.text import TextReporter
 from tqdm import tqdm
 
 from navigator_helpers.content_validator import ContentValidator
@@ -48,7 +52,6 @@ class CodeLang(str, Enum):
 
 
 class NL2CodeTaskSuite(BaseTaskSuite):
-
     code_lang: CodeLang
     prompts: PromptTemplateSuite
 
@@ -58,6 +61,25 @@ class NL2CodeTaskSuite(BaseTaskSuite):
         )
         message = "passed" if message is None else message
         return message
+
+    def check_semantic_correctness(self, code_string: str) -> float:
+        """Evaluate the code using pylint and return the score."""
+        pylint_output = StringIO()
+        with tempfile.NamedTemporaryFile(
+            suffix=".py", mode="w", delete=True, delete_on_close=False
+        ) as f:
+            f.write(code_string)
+            f.flush()
+            pylint_opts = [
+                f.name,
+                "--disable=all",
+                "--enable=C0114,C0115,C0116,W0311,E0401",
+            ]
+            reporter = TextReporter(pylint_output)
+            lint_results = Run(pylint_opts, reporter=reporter, exit=False)
+            pylint_output.seek(0)
+            score = lint_results.linter.stats.global_note
+            return score
 
     def extract_code(self, text: str) -> str:
         code_string = text
@@ -79,14 +101,18 @@ class NL2CodeTaskSuite(BaseTaskSuite):
         self, domain_list: list[str], num_topics_per_domain: int = 5
     ) -> dict[str, list[str]]:
         topics = {}
-        logger.info("🏷️ Generating topics for each domain")
+
         for domain in domain_list:
+            # Log individual domain generation message
+            logger.info(f"🔖 Generating topics for domain: {domain}")
+
             response = self.llm_suite.nl_generate(
                 self.prompts.topics_from_domains(
                     num_topics=num_topics_per_domain, domain=domain
                 )
             )
             topics[domain] = utils.parse_json_str(response) or {}
+
         return topics
 
     def generate_levels_of_complexity(self, num_levels: int = 3) -> list[str]:
@@ -120,13 +146,13 @@ class NL2CodeTaskSuite(BaseTaskSuite):
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         raise NotImplementedError
 
 
 class NL2SQLTaskSuite(NL2CodeTaskSuite):
-
     code_lang = CodeLang.SQL
     prompts = sql_prompts
 
@@ -263,7 +289,6 @@ class NL2SQLTaskSuite(NL2CodeTaskSuite):
 
 
 class NL2PythonTaskSuite(NL2CodeTaskSuite):
-
     code_lang = CodeLang.PYTHON
     prompts = python_prompts
 
@@ -352,6 +377,7 @@ class NL2PythonTaskSuite(NL2CodeTaskSuite):
         complexity: str,
         llm_as_a_judge: bool,
         syntax_validation: bool,
+        semantic_validation: bool,
         progress_bar: Optional[tqdm] = None,
     ) -> dict:
         self._update_pbar_desc(
@@ -398,4 +424,12 @@ class NL2PythonTaskSuite(NL2CodeTaskSuite):
                 progress_bar, f"⌛️ {PBAR_TEMPLATE('syntax validation')}"
             )
             record["syntax_validation"] = self.validate_code(code)
+        if semantic_validation:
+            self._update_pbar_desc(
+                progress_bar, f"⌛️ {PBAR_TEMPLATE('semantic validation')}"
+            )
+            semantic_score = self.check_semantic_correctness(
+                code
+            )  # Call semantic validation
+            record["semantic_validation"] = semantic_score
         return record
