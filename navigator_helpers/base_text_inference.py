@@ -65,8 +65,7 @@ class BaseTextInference(ABC):
         tags_to_remove = ["thinking", "reflection", "output"]
         for tag in tags_to_remove:
             content = re.sub(f"<{tag}>|</{tag}>", "", content)
-        content = re.sub(r"\s+", " ", content).strip()
-        return self._remove_excess_newlines(content)
+        return content
 
     def _remove_excess_newlines(self, content: str) -> str:
         content = content.strip()
