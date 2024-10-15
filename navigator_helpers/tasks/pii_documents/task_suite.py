@@ -157,7 +157,7 @@ class PiiDocsTaskSuite(BaseTaskSuite):  # Now inherits from BaseTaskSuite
 
         # If all entities are found, return "valid"
         if not missing_entities:
-            return "valid"
+            return "passed"
         else:
             # Return a message showing the entities that are not found
             missing_entities_str = ", ".join(missing_entities)
