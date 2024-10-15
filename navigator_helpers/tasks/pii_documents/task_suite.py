@@ -144,24 +144,60 @@ class PiiDocsTaskSuite(BaseTaskSuite):  # Now inherits from BaseTaskSuite
         )
         return response.strip('"')
 
+    # def validate_entities(self, text: str, entities: list) -> str:
+    #     missing_entities = []
+
+    #     # Check if each entity is present in the text
+    #     for entity in entities:
+    #         entity_value = entity['entity']
+    #         entity_types = entity['types']
+    #         if entity_value not in text:
+    #             # Append the entity types to the missing_entities list
+    #             missing_entities.extend(entity_types)
+
+    #     # If all entities are found, return "valid"
+    #     if not missing_entities:
+    #         return "passed"
+    #     else:
+    #         # Return a message showing the entities that are not found
+    #         missing_entities_str = ", ".join(missing_entities)
+    #         return f"Missing entities: {missing_entities_str}"
+
     def validate_entities(self, text: str, entities: list) -> str:
         missing_entities = []
+        overused_entities = []
+        entity_counts = {}
 
-        # Check if each entity is present in the text
+        # Count occurrences of each entity in the text using count()
         for entity in entities:
             entity_value = entity['entity']
             entity_types = entity['types']
-            if entity_value not in text:
-                # Append the entity types to the missing_entities list
+
+            # Count occurrences of the exact entity in the text
+            entity_count_in_text = text.count(entity_value)
+
+            # If the entity is not found, add to missing_entities
+            if entity_count_in_text == 0:
                 missing_entities.extend(entity_types)
 
-        # If all entities are found, return "valid"
-        if not missing_entities:
-            return "passed"
-        else:
-            # Return a message showing the entities that are not found
+            # Check if the entity appears more than expected
+            expected_count = entities.count(entity)  # Count how many times the entity is expected
+            if entity_count_in_text > expected_count:
+                overused_entities.append(entity_value)
+
+            # Add the count to the entity_counts dictionary
+            entity_counts[entity_value] = entity_count_in_text
+
+        # Prepare the result for missing entities
+        if missing_entities:
             missing_entities_str = ", ".join(missing_entities)
             return f"Missing entities: {missing_entities_str}"
+        elif overused_entities:
+            overused_entities_str = ", ".join(overused_entities)
+            return f"Overused entities: {overused_entities_str}"
+        else:
+            # If no missing or overused entities, return "passed"
+            return "passed"
 
     def create_record(
         self,

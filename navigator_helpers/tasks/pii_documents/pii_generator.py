@@ -6,10 +6,6 @@ import string
 from faker import Faker
 from tqdm import tqdm
 
-# Ensure cache directory exists
-def ensure_cache_dir():
-    if not os.path.exists("cache"):
-        os.makedirs("cache")
 
 # Generators with locale handling
 def generate_credit_card_numbers(n, locale="en_US"):
@@ -621,7 +617,6 @@ def generate_full_addresses(n, locale="en_US"):
 
 class PIIGenerator:
     def __init__(self, locales=None):
-        ensure_cache_dir()
         self.locales = locales if locales else ["en_US"]  # Default to en_US if no locales are provided
         self.fake_generators = [Faker(locale) for locale in self.locales]
         self.pii_types = {
