@@ -109,7 +109,7 @@ class PiiDocsPipeline(BasePipeline):
         # Print Domain and Topics table
         domain_table = Table(title="Contextual Tags", show_lines=True)
         domain_table.add_column("Domain", style="cyan")
-        domain_table.add_column("Topics", style="magenta")
+        domain_table.add_column("Document Types", style="magenta")
 
         for domain, topics in domain_and_doctypes.items():
             domain_table.add_row(domain, ", ".join(topics) if topics else "No topics defined")
