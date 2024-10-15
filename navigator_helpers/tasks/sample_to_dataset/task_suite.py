@@ -624,6 +624,7 @@ class SampleToDatasetTaskSuite:
         self,
         sample_dataset: pd.DataFrame,
         generated_seeds: dict,
+        num_examples_to_include: int = 5,
         dataset_context: str = "",
         system_prompt_type="cognition",
     ) -> dict:
@@ -690,9 +691,12 @@ class SampleToDatasetTaskSuite:
                     data_generation_prompt["prompt"] += f"\n{seed_emphasis}"
 
                     # Include a few examples in JSONL format. Make sure to escape { and }
+                    # Use min(num_examples_to_include, sample_dataset.shape[0]) in case there aren't enough records
                     format_emphasis = (
                         "Here are a few examples of the data format:\n "
-                        + sample_dataset.sample(n=5)
+                        + sample_dataset.sample(
+                            n=min(num_examples_to_include, sample_dataset.shape[0])
+                        )
                         .to_json(orient="records", lines=True)
                         .replace("{", "{{")
                         .replace("}", "}}")
