@@ -305,7 +305,8 @@ class SampleToDatasetTaskSuite:
         deduped_seeds = []
         for seed in all_seeds:
             column_name = seed.get("column_name")
-            if column_name not in seen_seeds and column_name is not None:
+            # redundancy: in additiont to deduping, remove columns that are the same as in the original dataset
+            if column_name not in seen_seeds and column_name not in sample_dataset.columns and column_name is not None:
                 seen_seeds.add(column_name)
                 deduped_seeds.append(seed)
 
@@ -347,12 +348,6 @@ class SampleToDatasetTaskSuite:
 
                 if is_valid_ranked_data_seeds:
                     columns = ranked_data_seeds.get("columns", [])
-                    # redundancy: remove columns that are the same as in the original dataset
-                    columns = [
-                        col
-                        for col in columns
-                        if col["column_name"] not in sample_dataset.columns
-                    ]
                     sorted_columns = sorted(
                         columns, key=lambda col: -int(col.get("quality_rank", 0))
                     )
@@ -381,10 +376,25 @@ class SampleToDatasetTaskSuite:
                     print(
                         f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
-                    # TODO: possibly fall back onto unranked seeds
-                    raise RuntimeError(
-                        f"Failed to rank data seeds after {MAX_RETRIES} attempts"
-                    )
+                    unranked_columns = final_data_seeds.get("columns", [])
+                        
+                    # Set quality_rank to 0 for all columns and limit to max_num_seeds
+                    fallback_columns = []
+                    for column in unranked_columns[:max_num_seeds]:
+                        column_with_rank = column.copy()
+                        column_with_rank["quality_rank"] = 0
+                        fallback_columns.append(column_with_rank)
+                    
+                    final_ranked_data_seeds = {"columns": fallback_columns}
+                    
+                    if self.config.verbose:
+                        print("Falling back to unranked seeds with quality_rank set to 0")
+                        print(
+                            "------------------- Fallback Ranked Dataseeds  ------------"
+                        )
+                        pretty_print_json(final_ranked_data_seeds)
+                    
+                    return final_ranked_data_seeds
 
         # This line should never be reached due to the raise in the else clause above,
         # but it's here to satisfy the function's return type hint
