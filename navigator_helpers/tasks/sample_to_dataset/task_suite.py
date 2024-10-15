@@ -306,7 +306,11 @@ class SampleToDatasetTaskSuite:
         for seed in all_seeds:
             column_name = seed.get("column_name")
             # redundancy: in additiont to deduping, remove columns that are the same as in the original dataset
-            if column_name not in seen_seeds and column_name not in sample_dataset.columns and column_name is not None:
+            if (
+                column_name not in seen_seeds
+                and column_name not in sample_dataset.columns
+                and column_name is not None
+            ):
                 seen_seeds.add(column_name)
                 deduped_seeds.append(seed)
 
@@ -377,23 +381,25 @@ class SampleToDatasetTaskSuite:
                         f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
                     unranked_columns = final_data_seeds.get("columns", [])
-                        
+
                     # Set quality_rank to 0 for all columns and limit to max_num_seeds
                     fallback_columns = []
                     for column in unranked_columns[:max_num_seeds]:
                         column_with_rank = column.copy()
                         column_with_rank["quality_rank"] = 0
                         fallback_columns.append(column_with_rank)
-                    
+
                     final_ranked_data_seeds = {"columns": fallback_columns}
-                    
+
                     if self.config.verbose:
-                        print("Falling back to unranked seeds with quality_rank set to 0")
+                        print(
+                            "Falling back to unranked seeds with quality_rank set to 0"
+                        )
                         print(
                             "------------------- Fallback Ranked Dataseeds  ------------"
                         )
                         pretty_print_json(final_ranked_data_seeds)
-                    
+
                     return final_ranked_data_seeds
 
         # This line should never be reached due to the raise in the else clause above,
