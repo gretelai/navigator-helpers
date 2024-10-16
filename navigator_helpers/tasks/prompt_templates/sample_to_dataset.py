@@ -30,7 +30,7 @@ in your output
     - 'sensor_brand' (representing brands or manufacturers of sensors)
     - 'data_granularity' (representing frequency of data collection, such as hourly, daily, or monthly)
   </example_2>
-</examples
+</examples>
 
 Provide data seeds as new columns in a dataset. DO NOT include columns from the
 original dataset provided in <schema></schema> tags.
@@ -153,7 +153,6 @@ Follow the JSON format below. DO NOT write any code to perform the ranking.
             "example_values": [examples of the data seed provided as a python list],
             "quality_rank": "rank of the attribute based on quality",
             "all_values": [generated diverse, rich, relevant values provided as a python list]
-            ""
         }},
         {{
             "column_name": "name of column",
