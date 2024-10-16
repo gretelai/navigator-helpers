@@ -49,6 +49,49 @@ class SampleToDatasetConfig:
     model_tags: Tuple[str] = ("llama-3.1-8b",)
 
 
+# Define the ExampleDataSeedModel for pydantic validation
+class ExampleDataSeedColumnModel(BaseModel):
+    column_name: str
+    description: str
+    example_values: List[Union[str, int, bool]]
+
+
+class ExampleDataSeedModel(BaseModel):
+    columns: List[ExampleDataSeedColumnModel]
+
+
+# Define the RankedDataSeedModel for pydantic validation
+class RankedDataSeedColumnModel(BaseModel):
+    column_name: str
+    description: str
+    example_values: List[Union[str, int, bool]]
+    quality_rank: Union[str, int, float]
+
+
+class RankedDataSeedModel(BaseModel):
+    columns: List[RankedDataSeedColumnModel]
+
+
+# Define the DatasetModel for pydantic validation
+class DatasetDescriptionColumnModel(BaseModel):
+    column_name: str
+    description: str
+
+
+class DatasetDescriptionModel(BaseModel):
+    description: str
+    columns: List[DatasetDescriptionColumnModel]
+
+
+class DatasetModel(BaseModel):
+    dataset_description: DatasetDescriptionModel
+
+
+# Define the PromptModel for pydantic validation
+class PromptModel(BaseModel):
+    prompt: str
+
+
 class SampleToDatasetTaskSuite:
     """A suite of tasks for generating synthetic datasets from sample data."""
 
@@ -260,16 +303,6 @@ class SampleToDatasetTaskSuite:
                     sample_dataset, dataset_context, system_prompt_type
                 )
 
-                # Define the model for individual column entries
-                class ExampleDataSeedColumnModel(BaseModel):
-                    column_name: str
-                    description: str
-                    example_values: List[Union[str, int, bool]]
-
-                # Define the model for the entire structure
-                class ExampleDataSeedModel(BaseModel):
-                    columns: List[ExampleDataSeedColumnModel]
-
                 is_valid_data_seeds, validation_result = validate_json_with_pydantic(
                     ExampleDataSeedModel, data_seeds
                 )
@@ -328,17 +361,6 @@ class SampleToDatasetTaskSuite:
         if self.config.verbose:
             print("------------------- Dataseed crowd-ranking prompt ------------")
             print(dataseed_crowd_ranking_prompt)
-
-        # Define the model for individual column entries
-        class RankedDataSeedColumnModel(BaseModel):
-            column_name: str
-            description: str
-            example_values: List[Union[str, int, bool]]
-            quality_rank: Union[str, int, float]
-
-        # Define the model for the entire structure
-        class RankedDataSeedModel(BaseModel):
-            columns: List[RankedDataSeedColumnModel]
 
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
@@ -571,18 +593,6 @@ class SampleToDatasetTaskSuite:
             print("------------------- Dataset description prompt ------------")
             print(dataset_description_prompt)
 
-        # Define the data model
-        class ColumnSchemaModel(BaseModel):
-            column_name: str
-            description: str
-
-        class DatasetDescriptionModel(BaseModel):
-            description: str
-            columns: List[ColumnSchemaModel]
-
-        class DatasetModel(BaseModel):
-            dataset_description: DatasetDescriptionModel
-
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
             try:
@@ -664,10 +674,6 @@ class SampleToDatasetTaskSuite:
         if self.config.verbose:
             print("------------------- Proto data generation prompt ------------")
             print(proto_data_generation_prompt)
-
-        # Define the data model
-        class PromptModel(BaseModel):
-            prompt: str
 
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
