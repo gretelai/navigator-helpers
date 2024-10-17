@@ -1,0 +1,10 @@
+- litellm_params:
+    api_base: https://api.gretel.ai
+    api_key: os.environ/GRETEL_PROD_API_KEY
+    model: gretelai/gpt-mistral-nemo-2407
+  model_name: gretelai-mistral-nemo-2407
+  tags:
+  - open_license
+  - nl
+  - judge
+  - code

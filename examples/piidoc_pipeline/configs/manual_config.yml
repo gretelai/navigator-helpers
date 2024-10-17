@@ -1,0 +1,25 @@
+doc_lang: pii_doc
+llm_suite_type: open_license
+
+
+domain_and_doctypes: 
+    Healthcare: 
+        - Appointment Scheduling
+        - Patient Consent Form
+        - Medical History Form
+        - Insurance Claim
+        - Medical Bill Statement
+    Legal Documents: 
+        - Contract
+        - Contract
+        - Agreement
+        - Service Level Agreement
+        - Non-Disclosure Agreement
+    Financial Services:
+        - Loan Application Form
+        - Credit Report
+        - Insurance Policy
+        - Bank Statement
+        - Investment Statement
+    
+entity_validation: true

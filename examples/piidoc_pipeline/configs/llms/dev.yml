@@ -1,0 +1,11 @@
+- model_name: gretelai/gpt-mistral-nemo-2407
+  litellm_params:
+    model: openai/gretelai/gpt-mistral-nemo-2407
+    base_url: https://llmproxy.dev.gretel.cloud/v1/
+    extra_headers:
+      Authorization: os.environ/GRETEL_DEV_API_KEY
+  tags:
+  - open_license
+  - nl
+  - code
+  - judge
