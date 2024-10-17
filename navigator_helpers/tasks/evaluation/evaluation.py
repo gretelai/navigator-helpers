@@ -179,7 +179,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
 
         # Calculate the percentage of unique values in each column
         cardinality = {
-            col: self.dataset[col].nunique() / len(self.dataset)
+            col: self.dataset[col].nunique()
             for col in self.dataset.columns
         }
         return cardinality
