@@ -144,25 +144,6 @@ class PiiDocsTaskSuite(BaseTaskSuite):  # Now inherits from BaseTaskSuite
         )
         return response.strip('"')
 
-    # def validate_entities(self, text: str, entities: list) -> str:
-    #     missing_entities = []
-
-    #     # Check if each entity is present in the text
-    #     for entity in entities:
-    #         entity_value = entity['entity']
-    #         entity_types = entity['types']
-    #         if entity_value not in text:
-    #             # Append the entity types to the missing_entities list
-    #             missing_entities.extend(entity_types)
-
-    #     # If all entities are found, return "valid"
-    #     if not missing_entities:
-    #         return "passed"
-    #     else:
-    #         # Return a message showing the entities that are not found
-    #         missing_entities_str = ", ".join(missing_entities)
-    #         return f"Missing entities: {missing_entities_str}"
-
     def validate_entities(self, text: str, entities: list) -> str:
         missing_entities = []
         overused_entities = []
