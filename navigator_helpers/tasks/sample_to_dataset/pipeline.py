@@ -81,9 +81,13 @@ class Sample2DataSetPipeline:
             f"🚀 Starting the sample-to-dataset synthetic data generation pipeline"
         )
 
+        logger.info(f"🧹 Pre-processing sample dataset")
+        clean_sample_dataset = self.tasks.preprocess_sample_dataset(sample_dataset)
+        logger.info(f"  |-- 👀 Peeking at the sample dataset columns: {list(clean_sample_dataset.columns)}")
+
         logger.info(f"🧠 Crowdsourcing relevant data seed types using Cognition")
         seed_names = self.tasks.crowdsource_data_seeds(
-            sample_dataset,
+            clean_sample_dataset,
             dataset_context=dataset_context,
             system_prompt_type=system_prompt_type,
             crowd_size=crowd_size,
@@ -101,7 +105,7 @@ class Sample2DataSetPipeline:
 
         logger.info(f"🌱 Crafting and seeding the data generation prompt")
         data_generation_prompt = self.tasks.generate_data_generation_prompt(
-            sample_dataset,
+            clean_sample_dataset,
             generated_seeds,
             dataset_context=dataset_context,
             system_prompt_type=system_prompt_type,
@@ -112,7 +116,7 @@ class Sample2DataSetPipeline:
         )
         num_seeds = math.ceil(num_records / num_records_per_seed)
         generated_data_df, generated_data_w_seeds_df = self.tasks.generate_data(
-            sample_dataset,
+            clean_sample_dataset,
             data_generation_prompt,
             seed_permutations[0:num_seeds],
             num_records_per_seed,

@@ -170,7 +170,6 @@ JSON goes here
 </json>
 """
 
-
 DATASET_DESCRIPTION_PROMPT_TEMPLATE = """
 You are an expert data practioner, skilled in critically evaluating data and
 leveraging expertise across various domains, including data analysis, data
@@ -300,4 +299,34 @@ This is the output format you have to follow:
 
 Reread the instructions before proceeding, paying attention to format
 in examples: {data_generation_prompt}
+"""
+
+DATASET_SCHEMA_PREPROCESSING_PROMPT_TEMPLATE = """
+You are an expert data practioner, skilled in critically evaluating data and
+leveraging expertise across various domains, including data analysis, data
+engineering, and a general understanding of programming concepts.
+
+Examine a list of column names provided in the <schema></schema> tags below.
+<schema>
+{sampled_dataset_column_list}
+</schema>
+
+Fix formatting of these column names so that they:
+1. appear in lower case. Example: "FIRST_name" -> "first_name"
+2. use snake_case. Example: "Last Name" -> "last_name"
+3. do not use special non-alpha-numeric characters (e.g., no punctuation/parantheses). Example: "Annual Income ($)" -> "annual_income"
+4. avoid leading numbers. If a column starts with a number, add a prefix or rephrase. Example: "2023 Revenue" -> "revenue_2023"
+
+Follow the exact JSON format below. Do not add any other keys to JSON.
+DO NOT WRITE ANY CODE TO FIX FORMATTING. RETURN JUST DATA ITSELF.
+
+#### JSON FORMAT TO FOLLOW
+{{
+  "fixed_schema": [fixed column names provided as a python list]
+}}
+
+This is the output format you have to follow:
+<json>
+  JSON goes here
+</json>
 """

@@ -24,6 +24,7 @@ from navigator_helpers.tasks.prompt_templates.sample_to_dataset import (
     DATASEED_REVERSE_ENG_PROMPT_TEMPLATE,
     DATASET_DESCRIPTION_PROMPT_TEMPLATE,
     JSONL_DATA_GENERATION_PROMPT_TEMPLATE,
+    DATASET_SCHEMA_PREPROCESSING_PROMPT_TEMPLATE,
 )
 from navigator_helpers.tasks.prompt_templates.system_prompts import (
     COGNITION_SYSTEM_PROMPT,
@@ -91,6 +92,9 @@ class DatasetModel(BaseModel):
 class PromptModel(BaseModel):
     prompt: str
 
+# Define the DatasetSchemaPreprocessingModel for pydantic validation
+class DatasetSchemaPreprocessingModel(BaseModel):
+    fixed_schema: List[str]
 
 class SampleToDatasetTaskSuite:
     """A suite of tasks for generating synthetic datasets from sample data."""
@@ -895,3 +899,78 @@ class SampleToDatasetTaskSuite:
             generated_data_w_seeds_df = pd.DataFrame()
 
         return generated_data_df, generated_data_w_seeds_df
+
+
+    def preprocess_sample_dataset(
+            self,
+            sample_dataset: pd.DataFrame,
+            system_prompt_type: str = "cognition",
+            num_samples: int = 25
+        ) -> pd.DataFrame:
+        """
+        Preprocess the sample dataset by fixing the schema and sampling a limited number of records.
+
+        Args:
+            sample_dataset (pd.DataFrame): The sample dataset to preprocess.
+            system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+            num_samples (int, optional): Number of samples to keep. Defaults to 25.
+
+        Returns:
+            pd.DataFrame: A preprocessed DataFrame with fixed schema and limited samples.
+
+        Raises:
+            RuntimeError: If schema fixing fails after multiple attempts.
+        """
+        if num_samples > 50:
+            self.logger.warning("num_samples exceeds 50. Limiting to 50 random records.")
+            num_samples = 50
+
+        self.logger.info(f"  |-- 🪚 Trimming dataset to min(25, sample_size) = {min(sample_dataset.shape[0], 25)} records")
+        # If a big dataframe is passed, make sure to sample without replacement
+        if sample_dataset.shape[0] > num_samples:
+            sample_dataset = sample_dataset.sample(n=num_samples, replace=False).reset_index(drop=True)
+
+        data_schema = list(sample_dataset.columns)
+        dataset_schema_preprocessing_prompt = DATASET_SCHEMA_PREPROCESSING_PROMPT_TEMPLATE.format(
+            sampled_dataset_column_list=str(data_schema),
+        )
+        if self.config.verbose:
+            print("------------------- Dataset schema pre-processing prompt ------------")
+            print(dataset_schema_preprocessing_prompt)
+
+        self.logger.info("  |-- 🧽 Scrubbing the dataset schema")
+        MAX_RETRIES = 3
+        for attempt in range(MAX_RETRIES):
+            try:
+                _, fixed_data_schema = self.execute_prompt(
+                    dataset_schema_preprocessing_prompt, system_prompt_type
+                )
+                is_valid_fixed_schema, validation_result = (
+                    validate_json_with_pydantic(DatasetSchemaPreprocessingModel, fixed_data_schema)
+                )
+
+                if is_valid_fixed_schema:
+                    fixed_schema = fixed_data_schema.get("fixed_schema", [])
+                    if len(fixed_schema) != len(data_schema):
+                        raise ValueError("Fixed schema length doesn't match original schema.")
+
+                    if self.config.verbose:
+                        print("------------------- Generated fixed schema  ------------")
+                        pretty_print_json(fixed_data_schema)
+                    
+                    # Create a new DataFrame with renamed columns
+                    return pd.DataFrame(sample_dataset.values, columns=fixed_schema)
+                else:
+                    raise ValueError(f"Invalid fixed schema: {validation_result}")
+
+            except Exception as e:
+                if attempt < MAX_RETRIES - 1 and self.config.verbose:
+                    print(f"Schema fixing attempt {attempt + 1} failed: {str(e)}. Retrying ...")
+                else:
+                    print(f"Schema fixing failed after {MAX_RETRIES} attempts. Last error: {str(e)}")
+                    print("Falling back to the original data_schema")
+                    return sample_dataset
+
+        # This line should never be reached due to the return in the else clause above,
+        # but it's here to satisfy the function's return type hint
+        return pd.DataFrame()
