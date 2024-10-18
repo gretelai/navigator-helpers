@@ -83,7 +83,9 @@ class Sample2DataSetPipeline:
 
         logger.info(f"🧹 Pre-processing sample dataset")
         clean_sample_dataset = self.tasks.preprocess_sample_dataset(sample_dataset)
-        logger.info(f"  |-- 👀 Peeking at the sample dataset columns: {list(clean_sample_dataset.columns)}")
+        logger.info(
+            f"  |-- 👀 Peeking at the sample dataset columns: {list(clean_sample_dataset.columns)}"
+        )
 
         logger.info(f"🧠 Crowdsourcing relevant data seed types using Cognition")
         seed_names = self.tasks.crowdsource_data_seeds(
