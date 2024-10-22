@@ -407,6 +407,7 @@ class SampleToDatasetTaskSuite:
 
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
+            ranked_data_seeds = {}
             try:
                 _, ranked_data_seeds = self.execute_prompt(
                     dataseed_crowd_ranking_prompt, system_prompt_type
