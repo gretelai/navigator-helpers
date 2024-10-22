@@ -6,7 +6,7 @@ import logging
 import random
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import autogen
 import pandas as pd
@@ -239,12 +239,36 @@ class SampleToDatasetTaskSuite:
         """Execute a prompt with cognition."""
         return self.execute_prompt(user_prompt, "cognition")
 
+    def normalize_to_keyed_list(self, data: Optional[Union[dict, list]], key: str = "columns") -> dict:
+        """
+        Normalizes input data into a dictionary with a specified key containing a list.
+        Converts various input formats into a standard {"key": [items]} structure.
+        
+        Args:
+            data: Input that could be None, a list of items, or a dict that may or may not have the specified key
+            key (str): The key under which the list should be stored. Defaults to "columns"
+        
+        Returns:
+            dict: Normalized dictionary in the format {key: [items]}
+        
+        Examples:
+            >>> normalize_to_keyed_list(None, "items")
+            {"items": []}
+            >>> normalize_to_keyed_list([1, 2, 3], "values")
+            {"values": [1, 2, 3]}
+        """
+        if data is None:
+            return {key: []}
+        elif isinstance(data, list):
+            return {key: data}
+        return data
+                               
     def extract_data_seeds_in_one_shot(
         self,
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
         system_prompt_type: str = "cognition",
-    ) -> Tuple[str, Union[dict, list]]:
+    ) -> Tuple[str, dict]:
         """
         Extract data seeds from a sample dataset in one shot.
 
@@ -255,6 +279,7 @@ class SampleToDatasetTaskSuite:
 
         Returns:
             Tuple[str, dict]: A tuple containing the extracted thinking and data seeds.
+                             The data seeds will always be a dict with a 'columns' key.
         """
         data_jsonl = sample_dataset.to_json(orient="records", lines=True)
         data_schema = str(list(sample_dataset.columns))
@@ -269,6 +294,8 @@ class SampleToDatasetTaskSuite:
             print(dataseed_prompt)
 
         thinking, data_seeds = self.execute_prompt(dataseed_prompt, system_prompt_type)
+        # do defensive normalization
+        data_seeds = self.normalize_to_keyed_list(data_seeds, "columns")
 
         return thinking, data_seeds
 
@@ -276,12 +303,13 @@ class SampleToDatasetTaskSuite:
         self,
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
-        crowd_size=3,
-        max_num_seeds=3,
-        system_prompt_type="cognition",
+        crowd_size: int = 3,
+        max_num_seeds: int = 3,
+        system_prompt_type: str = "cognition",
+        max_workers: int = 4
     ) -> dict:
         """
-        Perform crowd-sourcing by executing the dataseed extraction prompt multiple times,
+        Perform crowd-sourcing by executing the dataseed extraction prompt multiple times in parallel,
         and generating a deduped and ranked list of high-quality data seeds.
 
         Args:
@@ -290,6 +318,8 @@ class SampleToDatasetTaskSuite:
             crowd_size (int, optional): Number of times to run the user prompt. Defaults to 3.
             max_num_seeds (int, optional): Maximum number of seeds to return. Defaults to 3.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+            max_workers (int, optional): Maximum number of worker threads. Defaults to None (ThreadPoolExecutor default).
+                                        If provided, it will be capped at crowd_size.
 
         Returns:
             dict: A dictionary containing the ranked data seeds.
@@ -299,10 +329,7 @@ class SampleToDatasetTaskSuite:
             RuntimeError: If ranking fails after multiple attempts.
         """
 
-        # Collect data seeds from crowd_size runs of execute_prompt_w_cognition
-        data_seeds_list = []
-        self.logger.info(f"  |-- Crowd size: {crowd_size}")
-        for i in range(crowd_size):
+        def extract_data_seeds_worker(i: int) -> List[Dict[str, Any]]:
             self.logger.info(f"  |-- 🫡 assistant opinion {i+1}")
             try:
                 _, data_seeds = self.extract_data_seeds_in_one_shot(
@@ -313,38 +340,39 @@ class SampleToDatasetTaskSuite:
                     ExampleDataSeedModel, data_seeds
                 )
                 if is_valid_data_seeds:
-                    columns = data_seeds.get("columns", None)
-                    data_seeds_list.append(columns)
+                    return data_seeds.get("columns", [])
                 elif self.config.verbose:
                     print(
                         f"Warning: data_seeds failed pydantic validation at crowd iteration {i+1}: {validation_result}"
                     )
             except Exception as e:
-                if self.config.verbose:
-                    print(f"Failed to extract data seeds at crowd iteration {i+1}: {e}")
+                # if self.config.verbose:
+                print(f"Failed to extract data seeds at crowd iteration {i+1}: {e}")
+                print(data_seeds)
+            return []
+
+        # Determine the effective number of workers
+        effective_workers = min(max_workers, crowd_size) if max_workers is not None else crowd_size
+
+        # Use ThreadPoolExecutor for parallel execution
+        with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            future_to_worker = {executor.submit(extract_data_seeds_worker, i): i for i in range(crowd_size)}
+            data_seeds_list = []
+            for future in concurrent.futures.as_completed(future_to_worker):
+                data_seeds_list.extend(future.result())
 
         if not data_seeds_list:
             raise ValueError(
                 "All attempts returned None or missing 'columns', cannot proceed."
             )
 
-        # Flatten the list of all data seeds (since each dataset_schema contains a "columns" list)
-        all_seeds = []
-        for seeds in data_seeds_list:
-            if isinstance(seeds, list):  # Ensure schema is a list of columns
-                all_seeds.extend(seeds)
-            else:
-                print(
-                    f"Warning: Expected list, but got {type(seeds)} for a list of data seeds"
-                )
-
         self.logger.info(f"  |-- 🧐 examining, deduping and ranking seed types")
         # Dedupe seeds
         seen_seeds = set()
         deduped_seeds = []
-        for seed in all_seeds:
+        for seed in data_seeds_list:
             column_name = seed.get("column_name")
-            # redundancy: in additiont to deduping, remove columns that are the same as in the original dataset
+            # redundancy: in addition to deduping, remove columns that are the same as in the original dataset
             if (
                 column_name not in seen_seeds
                 and column_name not in sample_dataset.columns
@@ -374,6 +402,9 @@ class SampleToDatasetTaskSuite:
                 _, ranked_data_seeds = self.execute_prompt(
                     dataseed_crowd_ranking_prompt, system_prompt_type
                 )
+                # do defensive normalization
+                ranked_data_seeds = self.normalize_to_keyed_list(ranked_data_seeds, "columns")
+                    
                 is_valid_ranked_data_seeds, validation_result = (
                     validate_json_with_pydantic(RankedDataSeedModel, ranked_data_seeds)
                 )
@@ -408,6 +439,10 @@ class SampleToDatasetTaskSuite:
                     print(
                         f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
+                    print(ranked_data_seeds)
+                    print(
+                        "Falling back to unranked seeds with quality_rank set to 0"
+                    )
                     unranked_columns = final_data_seeds.get("columns", [])
 
                     # Set quality_rank to 0 for all columns and limit to max_num_seeds
@@ -420,9 +455,6 @@ class SampleToDatasetTaskSuite:
                     final_ranked_data_seeds = {"columns": fallback_columns}
 
                     if self.config.verbose:
-                        print(
-                            "Falling back to unranked seeds with quality_rank set to 0"
-                        )
                         print(
                             "------------------- Fallback Ranked Dataseeds  ------------"
                         )
