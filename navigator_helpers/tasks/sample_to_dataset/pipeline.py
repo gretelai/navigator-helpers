@@ -82,7 +82,7 @@ class Sample2DataSetPipeline:
         )
 
         logger.info(f"🧹 Pre-processing sample dataset")
-        clean_sample_dataset = self.tasks.preprocess_sample_dataset(sample_dataset)
+        clean_sample_dataset, _ = self.tasks.preprocess_sample_dataset(sample_dataset)
         logger.info(
             f"  |-- 👀 Peeking at the sample dataset columns: {list(clean_sample_dataset.columns)}"
         )

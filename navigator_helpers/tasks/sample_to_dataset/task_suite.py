@@ -952,18 +952,20 @@ class SampleToDatasetTaskSuite:
         sample_dataset: pd.DataFrame,
         system_prompt_type: str = "cognition",
         num_samples: int = 25,
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, Dict[str, Dict[str, str]]]:
         """
         Preprocess the sample dataset by fixing the schema and sampling a limited number of records.
-
+        
         Args:
             sample_dataset (pd.DataFrame): The sample dataset to preprocess.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
             num_samples (int, optional): Number of samples to keep. Defaults to 25.
-
+        
         Returns:
-            pd.DataFrame: A preprocessed DataFrame with fixed schema and limited samples.
-
+            Tuple[pd.DataFrame, Dict[str, str]]: A tuple containing:
+                - preprocessed DataFrame with fixed schema and limited samples
+                - dictionary mapping original column names to new column names
+        
         Raises:
             RuntimeError: If schema fixing fails after multiple attempts.
         """
@@ -972,7 +974,7 @@ class SampleToDatasetTaskSuite:
                 "num_samples exceeds 50. Limiting to 50 random records."
             )
             num_samples = 50
-
+        
         self.logger.info(
             f"  |-- 🪚 Trimming dataset to min(25, sample_size) = {min(sample_dataset.shape[0], 25)} records"
         )
@@ -981,7 +983,7 @@ class SampleToDatasetTaskSuite:
             sample_dataset = sample_dataset.sample(
                 n=num_samples, replace=False
             ).reset_index(drop=True)
-
+        
         data_schema = list(sample_dataset.columns)
         dataset_schema_preprocessing_prompt = (
             DATASET_SCHEMA_PREPROCESSING_PROMPT_TEMPLATE.format(
@@ -993,7 +995,7 @@ class SampleToDatasetTaskSuite:
                 "------------------- Dataset schema pre-processing prompt ------------"
             )
             print(dataset_schema_preprocessing_prompt)
-
+        
         self.logger.info("  |-- 🧽 Scrubbing the dataset schema")
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
@@ -1004,25 +1006,42 @@ class SampleToDatasetTaskSuite:
                 is_valid_fixed_schema, validation_result = validate_json_with_pydantic(
                     DatasetSchemaPreprocessingModel, fixed_data_schema
                 )
-
+                
                 if is_valid_fixed_schema:
                     fixed_schema = fixed_data_schema.get("fixed_schema", [])
                     if len(fixed_schema) != len(data_schema):
                         raise ValueError(
                             "Fixed schema length doesn't match original schema."
                         )
-
+                    
                     if self.config.verbose:
                         print(
                             "------------------- Generated fixed schema  ------------"
                         )
                         pretty_print_json(fixed_data_schema)
-
+                    
+                    # Create a mapping between original and new column names
+                    column_mapping = {
+                        old_col: new_col
+                        for old_col, new_col in zip(data_schema, fixed_schema)
+                    }
+                    
+                    # Also create reverse mapping for convenience
+                    reverse_mapping = {new_col: old_col for old_col, new_col in column_mapping.items()}
+                    
                     # Create a new DataFrame with renamed columns
-                    return pd.DataFrame(sample_dataset.values, columns=fixed_schema)
+                    processed_df = pd.DataFrame(sample_dataset.values, columns=fixed_schema)
+                    
+                    # Create a combined mapping dictionary with both forward and reverse mappings
+                    mapping_dict = {
+                        "original_to_new": column_mapping,
+                        "new_to_original": reverse_mapping
+                    }
+                    
+                    return processed_df, mapping_dict
                 else:
                     raise ValueError(f"Invalid fixed schema: {validation_result}")
-
+            
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
                     print(
@@ -1033,8 +1052,13 @@ class SampleToDatasetTaskSuite:
                         f"Schema fixing failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
                     print("Falling back to the original data_schema")
-                    return sample_dataset
-
+                    # Return original dataset with identity mapping
+                    identity_mapping = {
+                        "original_to_new": {col: col for col in data_schema},
+                        "new_to_original": {col: col for col in data_schema}
+                    }
+                    return sample_dataset, identity_mapping
+        
         # This line should never be reached due to the return in the else clause above,
         # but it's here to satisfy the function's return type hint
-        return pd.DataFrame()
+        return pd.DataFrame(), {"original_to_new": {}, "new_to_original": {}}
