@@ -411,9 +411,16 @@ class SampleToDatasetTaskSuite:
 
                 if is_valid_ranked_data_seeds:
                     columns = ranked_data_seeds.get("columns", [])
+                    # second redundancy: filter out columns that already exist in sample_dataset
+                    filtered_columns = [
+                        col for col in columns 
+                        if col.get("column_name") not in sample_dataset.columns
+                    ]
                     sorted_columns = sorted(
-                        columns, key=lambda col: -int(col.get("quality_rank", 0))
+                        filtered_columns, 
+                        key=lambda col: -int(col.get("quality_rank", 0))
                     )
+                    # Take only top N from the filtered and sorted list
                     top_n_columns = sorted_columns[:max_num_seeds]
 
                     # Create a new dictionary with the top N columns
@@ -445,9 +452,15 @@ class SampleToDatasetTaskSuite:
                     )
                     unranked_columns = final_data_seeds.get("columns", [])
 
+                    # Filter out columns that already exist in sample_dataset before taking max_num_seeds
+                    filtered_unranked = [
+                        col for col in unranked_columns
+                        if col.get("column_name") not in sample_dataset.columns
+                    ]
+
                     # Set quality_rank to 0 for all columns and limit to max_num_seeds
                     fallback_columns = []
-                    for column in unranked_columns[:max_num_seeds]:
+                    for column in filtered_unranked[:max_num_seeds]:
                         column_with_rank = column.copy()
                         column_with_rank["quality_rank"] = 0
                         fallback_columns.append(column_with_rank)
