@@ -239,18 +239,20 @@ class SampleToDatasetTaskSuite:
         """Execute a prompt with cognition."""
         return self.execute_prompt(user_prompt, "cognition")
 
-    def normalize_to_keyed_list(self, data: Optional[Union[dict, list]], key: str = "columns") -> dict:
+    def normalize_to_keyed_list(
+        self, data: Optional[Union[dict, list]], key: str = "columns"
+    ) -> dict:
         """
         Normalizes input data into a dictionary with a specified key containing a list.
         Converts various input formats into a standard {"key": [items]} structure.
-        
+
         Args:
             data: Input that could be None, a list of items, or a dict that may or may not have the specified key
             key (str): The key under which the list should be stored. Defaults to "columns"
-        
+
         Returns:
             dict: Normalized dictionary in the format {key: [items]}
-        
+
         Examples:
             >>> normalize_to_keyed_list(None, "items")
             {"items": []}
@@ -262,7 +264,7 @@ class SampleToDatasetTaskSuite:
         elif isinstance(data, list):
             return {key: data}
         return data
-                               
+
     def extract_data_seeds_in_one_shot(
         self,
         sample_dataset: pd.DataFrame,
@@ -306,7 +308,7 @@ class SampleToDatasetTaskSuite:
         crowd_size: int = 3,
         max_num_seeds: int = 3,
         system_prompt_type: str = "cognition",
-        max_workers: int = 4
+        max_workers: int = 4,
     ) -> dict:
         """
         Perform crowd-sourcing by executing the dataseed extraction prompt multiple times in parallel,
@@ -352,11 +354,18 @@ class SampleToDatasetTaskSuite:
             return []
 
         # Determine the effective number of workers
-        effective_workers = min(max_workers, crowd_size) if max_workers is not None else crowd_size
+        effective_workers = (
+            min(max_workers, crowd_size) if max_workers is not None else crowd_size
+        )
 
         # Use ThreadPoolExecutor for parallel execution
-        with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
-            future_to_worker = {executor.submit(extract_data_seeds_worker, i): i for i in range(crowd_size)}
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=effective_workers
+        ) as executor:
+            future_to_worker = {
+                executor.submit(extract_data_seeds_worker, i): i
+                for i in range(crowd_size)
+            }
             data_seeds_list = []
             for future in concurrent.futures.as_completed(future_to_worker):
                 data_seeds_list.extend(future.result())
@@ -403,8 +412,10 @@ class SampleToDatasetTaskSuite:
                     dataseed_crowd_ranking_prompt, system_prompt_type
                 )
                 # do defensive normalization
-                ranked_data_seeds = self.normalize_to_keyed_list(ranked_data_seeds, "columns")
-                    
+                ranked_data_seeds = self.normalize_to_keyed_list(
+                    ranked_data_seeds, "columns"
+                )
+
                 is_valid_ranked_data_seeds, validation_result = (
                     validate_json_with_pydantic(RankedDataSeedModel, ranked_data_seeds)
                 )
@@ -413,12 +424,13 @@ class SampleToDatasetTaskSuite:
                     columns = ranked_data_seeds.get("columns", [])
                     # second redundancy: filter out columns that already exist in sample_dataset
                     filtered_columns = [
-                        col for col in columns 
+                        col
+                        for col in columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
                     sorted_columns = sorted(
-                        filtered_columns, 
-                        key=lambda col: -int(col.get("quality_rank", 0))
+                        filtered_columns,
+                        key=lambda col: -int(col.get("quality_rank", 0)),
                     )
                     # Take only top N from the filtered and sorted list
                     top_n_columns = sorted_columns[:max_num_seeds]
@@ -447,14 +459,13 @@ class SampleToDatasetTaskSuite:
                         f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
                     print(ranked_data_seeds)
-                    print(
-                        "Falling back to unranked seeds with quality_rank set to 0"
-                    )
+                    print("Falling back to unranked seeds with quality_rank set to 0")
                     unranked_columns = final_data_seeds.get("columns", [])
 
                     # Filter out columns that already exist in sample_dataset before taking max_num_seeds
                     filtered_unranked = [
-                        col for col in unranked_columns
+                        col
+                        for col in unranked_columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
 
@@ -955,17 +966,17 @@ class SampleToDatasetTaskSuite:
     ) -> Tuple[pd.DataFrame, Dict[str, Dict[str, str]]]:
         """
         Preprocess the sample dataset by fixing the schema and sampling a limited number of records.
-        
+
         Args:
             sample_dataset (pd.DataFrame): The sample dataset to preprocess.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
             num_samples (int, optional): Number of samples to keep. Defaults to 25.
-        
+
         Returns:
             Tuple[pd.DataFrame, Dict[str, str]]: A tuple containing:
                 - preprocessed DataFrame with fixed schema and limited samples
                 - dictionary mapping original column names to new column names
-        
+
         Raises:
             RuntimeError: If schema fixing fails after multiple attempts.
         """
@@ -974,7 +985,7 @@ class SampleToDatasetTaskSuite:
                 "num_samples exceeds 50. Limiting to 50 random records."
             )
             num_samples = 50
-        
+
         self.logger.info(
             f"  |-- 🪚 Trimming dataset to min(25, sample_size) = {min(sample_dataset.shape[0], 25)} records"
         )
@@ -983,7 +994,7 @@ class SampleToDatasetTaskSuite:
             sample_dataset = sample_dataset.sample(
                 n=num_samples, replace=False
             ).reset_index(drop=True)
-        
+
         data_schema = list(sample_dataset.columns)
         dataset_schema_preprocessing_prompt = (
             DATASET_SCHEMA_PREPROCESSING_PROMPT_TEMPLATE.format(
@@ -995,7 +1006,7 @@ class SampleToDatasetTaskSuite:
                 "------------------- Dataset schema pre-processing prompt ------------"
             )
             print(dataset_schema_preprocessing_prompt)
-        
+
         self.logger.info("  |-- 🧽 Scrubbing the dataset schema")
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
@@ -1006,42 +1017,46 @@ class SampleToDatasetTaskSuite:
                 is_valid_fixed_schema, validation_result = validate_json_with_pydantic(
                     DatasetSchemaPreprocessingModel, fixed_data_schema
                 )
-                
+
                 if is_valid_fixed_schema:
                     fixed_schema = fixed_data_schema.get("fixed_schema", [])
                     if len(fixed_schema) != len(data_schema):
                         raise ValueError(
                             "Fixed schema length doesn't match original schema."
                         )
-                    
+
                     if self.config.verbose:
                         print(
                             "------------------- Generated fixed schema  ------------"
                         )
                         pretty_print_json(fixed_data_schema)
-                    
+
                     # Create a mapping between original and new column names
                     column_mapping = {
                         old_col: new_col
                         for old_col, new_col in zip(data_schema, fixed_schema)
                     }
-                    
+
                     # Also create reverse mapping for convenience
-                    reverse_mapping = {new_col: old_col for old_col, new_col in column_mapping.items()}
-                    
+                    reverse_mapping = {
+                        new_col: old_col for old_col, new_col in column_mapping.items()
+                    }
+
                     # Create a new DataFrame with renamed columns
-                    processed_df = pd.DataFrame(sample_dataset.values, columns=fixed_schema)
-                    
+                    processed_df = pd.DataFrame(
+                        sample_dataset.values, columns=fixed_schema
+                    )
+
                     # Create a combined mapping dictionary with both forward and reverse mappings
                     mapping_dict = {
                         "original_to_new": column_mapping,
-                        "new_to_original": reverse_mapping
+                        "new_to_original": reverse_mapping,
                     }
-                    
+
                     return processed_df, mapping_dict
                 else:
                     raise ValueError(f"Invalid fixed schema: {validation_result}")
-            
+
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
                     print(
@@ -1055,10 +1070,10 @@ class SampleToDatasetTaskSuite:
                     # Return original dataset with identity mapping
                     identity_mapping = {
                         "original_to_new": {col: col for col in data_schema},
-                        "new_to_original": {col: col for col in data_schema}
+                        "new_to_original": {col: col for col in data_schema},
                     }
                     return sample_dataset, identity_mapping
-        
+
         # This line should never be reached due to the return in the else clause above,
         # but it's here to satisfy the function's return type hint
         return pd.DataFrame(), {"original_to_new": {}, "new_to_original": {}}
