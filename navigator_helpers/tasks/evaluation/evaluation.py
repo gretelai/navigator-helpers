@@ -155,6 +155,9 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         cosine_sim = cosine_similarity(overall_vectors)
         np.fill_diagonal(cosine_sim, 0)
         cosine_sim[np.tril_indices(cosine_sim.shape[0])] = 0
+        # Semantically unique pairs are those that are close enough (cosine similarity > 0.85 for now),
+        # but not exactly identical (cosine similarity < 1.0)
+        # TODO: Explore a better threshold for semantic uniqueness
         non_semantically_unique_ids = np.where((cosine_sim > 0.85) & (cosine_sim < 1.0))
         non_semantically_unique_ids = list(
             zip(non_semantically_unique_ids[0], non_semantically_unique_ids[1])
