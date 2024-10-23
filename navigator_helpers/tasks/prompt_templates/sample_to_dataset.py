@@ -97,7 +97,7 @@ so that the data is rich, diverse and high-quality.
 
 Based on the comparison, create a deduplicated and ranked list of data seeds. First,
 make sure to prune the list to remove duplicate, similar and/or irrelevant data seeds.
-Second, rank the ramining list based on relevance,
+Second, rank the remaining list based on relevance,
 clarity, and diversity of the attributes, as they pertain to the dataset.
 Use a three-point scale from 1-3 (1 for low, 2 for medium, 3 for high quality).
 Return the data seed list, starting from highest to lowest quality.
@@ -186,7 +186,7 @@ below. Note the schema of the dataset provided in he <schema></schema> tags.
 {sampled_dataset_column_list}
 </schema>
 
-Provide a comprehensive description of the dataset, highlighting it's focus,
+Provide a comprehensive description of the dataset, highlighting its focus,
 structure, formatting, and the most likely use-case and/or intent.
 
 You MUST clearly state the name of each column in the dataset in the description.
