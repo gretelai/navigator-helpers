@@ -181,10 +181,7 @@ class BaseEvaluationTaskSuite(BaseTaskSuite):
         """
 
         # Calculate the percentage of unique values in each column
-        cardinality = {
-            col: self.dataset[col].nunique() / len(self.dataset)
-            for col in self.dataset.columns
-        }
+        cardinality = {col: self.dataset[col].nunique() for col in self.dataset.columns}
         return cardinality
 
     def simpson_diversity_index(self, data: dict):
