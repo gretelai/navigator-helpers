@@ -88,7 +88,7 @@ class Sample2DataSetPipeline:
         )
 
         logger.info(f"🧠 Crowdsourcing relevant data seed types using Cognition")
-        seed_names = self.tasks.crowdsource_data_seeds(
+        seed_names = self.tasks.crowdsource_data_seed_types(
             clean_sample_dataset,
             dataset_context=dataset_context,
             system_prompt_type=system_prompt_type,

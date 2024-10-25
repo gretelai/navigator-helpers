@@ -301,7 +301,7 @@ class SampleToDatasetTaskSuite:
 
         return thinking, data_seeds
 
-    def crowdsource_data_seeds(
+    def crowdsource_data_seed_types(
         self,
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
