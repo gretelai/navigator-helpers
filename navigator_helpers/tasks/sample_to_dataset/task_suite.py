@@ -306,19 +306,19 @@ class SampleToDatasetTaskSuite:
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
         crowd_size: int = 3,
-        max_num_seeds: int = 3,
+        max_num_seed_types: int = 3,
         system_prompt_type: str = "cognition",
         max_workers: int = 4,
     ) -> dict:
         """
         Perform crowd-sourcing by executing the dataseed extraction prompt multiple times in parallel,
-        and generating a deduped and ranked list of high-quality data seeds.
+        and generating a deduped and ranked list of high-quality data seed types.
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
             dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             crowd_size (int, optional): Number of times to run the user prompt. Defaults to 3.
-            max_num_seeds (int, optional): Maximum number of seeds to return. Defaults to 3.
+            max_num_seed_types (int, optional): Maximum number of seed types to return. Defaults to 3.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
             max_workers (int, optional): Maximum number of worker threads. Defaults to None (ThreadPoolExecutor default).
                                         If provided, it will be capped at crowd_size.
@@ -434,7 +434,7 @@ class SampleToDatasetTaskSuite:
                         key=lambda col: -int(col.get("quality_rank", 0)),
                     )
                     # Take only top N from the filtered and sorted list
-                    top_n_columns = sorted_columns[:max_num_seeds]
+                    top_n_columns = sorted_columns[:max_num_seed_types]
 
                     # Create a new dictionary with the top N columns
                     final_ranked_data_seeds = {"columns": top_n_columns}
@@ -463,16 +463,16 @@ class SampleToDatasetTaskSuite:
                     print("Falling back to unranked seeds with quality_rank set to 0")
                     unranked_columns = final_data_seeds.get("columns", [])
 
-                    # Filter out columns that already exist in sample_dataset before taking max_num_seeds
+                    # Filter out columns that already exist in sample_dataset before taking max_num_seed_types
                     filtered_unranked = [
                         col
                         for col in unranked_columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
 
-                    # Set quality_rank to 0 for all columns and limit to max_num_seeds
+                    # Set quality_rank to 0 for all columns and limit to max_num_seed_types
                     fallback_columns = []
-                    for column in filtered_unranked[:max_num_seeds]:
+                    for column in filtered_unranked[:max_num_seed_types]:
                         column_with_rank = column.copy()
                         column_with_rank["quality_rank"] = 0
                         fallback_columns.append(column_with_rank)

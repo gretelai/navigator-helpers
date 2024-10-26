@@ -57,7 +57,7 @@ class Sample2DataSetPipeline:
         max_workers: int = 4,
         system_prompt_type: str = "cognition",
         crowd_size: int = 3,
-        max_num_seeds: int = 3,
+        max_num_seed_types: int = 3,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Run the sample-to-dataset pipeline to generate synthetic data.
@@ -69,6 +69,8 @@ class Sample2DataSetPipeline:
             num_records_per_seed (int, optional): Number of records to generate per seed. Defaults to 5.
             max_workers (int, optional): Maximum number of parallel workers. Defaults to 4.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+            crowd_size (int, optional): Size of the model crowd to source seed types. Defaults to 3.
+            max_num_seed_types (int, optional): Maximum number of seed types to source. Defaults to 3.
 
         Returns:
             tuple: A tuple containing two DataFrames:
@@ -93,7 +95,7 @@ class Sample2DataSetPipeline:
             dataset_context=dataset_context,
             system_prompt_type=system_prompt_type,
             crowd_size=crowd_size,
-            max_num_seeds=max_num_seeds,
+            max_num_seed_types=max_num_seed_types,
         )
         logger.info(f"  |-- 👀 Peeking at the data seed types: {seed_names}")
 
