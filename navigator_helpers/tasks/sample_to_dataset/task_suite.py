@@ -339,8 +339,8 @@ class SampleToDatasetTaskSuite:
                     sample_dataset, dataset_context, system_prompt_type
                 )
 
-                is_valid_data_seed_columns, validation_result = validate_json_with_pydantic(
-                    ExampleDataSeedModel, data_seed_columns
+                is_valid_data_seed_columns, validation_result = (
+                    validate_json_with_pydantic(ExampleDataSeedModel, data_seed_columns)
                 )
                 if is_valid_data_seed_columns:
                     return data_seed_columns.get("columns", [])
@@ -396,15 +396,19 @@ class SampleToDatasetTaskSuite:
         data_schema = str(list(sample_dataset.columns))
 
         # Format the reflection prompt with the filtered seeds
-        dataseed_crowd_filtering_prompt = DATASEED_COLUMN_CROWD_FILTERING_PROMPT_TEMPLATE.format(
-            sampled_dataset_jsonl=data_jsonl,
-            dataset_context_str=dataset_context,
-            sampled_dataset_column_list=data_schema,
-            num_columns=max_num_seed_columns,
-            data_seeds=json.dumps(final_data_seed_columns, indent=2),
+        dataseed_crowd_filtering_prompt = (
+            DATASEED_COLUMN_CROWD_FILTERING_PROMPT_TEMPLATE.format(
+                sampled_dataset_jsonl=data_jsonl,
+                dataset_context_str=dataset_context,
+                sampled_dataset_column_list=data_schema,
+                num_columns=max_num_seed_columns,
+                data_seeds=json.dumps(final_data_seed_columns, indent=2),
+            )
         )
         if self.config.verbose:
-            print("------------------- Dataseed column crowd-filtering prompt ------------")
+            print(
+                "------------------- Dataseed column crowd-filtering prompt ------------"
+            )
             print(dataseed_crowd_filtering_prompt)
 
         MAX_RETRIES = 3
@@ -420,7 +424,9 @@ class SampleToDatasetTaskSuite:
                 )
 
                 is_valid_filtered_data_seed_columns, validation_result = (
-                    validate_json_with_pydantic(FilteredDataSeedModel, filtered_data_seed_columns)
+                    validate_json_with_pydantic(
+                        FilteredDataSeedModel, filtered_data_seed_columns
+                    )
                 )
 
                 if is_valid_filtered_data_seed_columns:
@@ -433,11 +439,11 @@ class SampleToDatasetTaskSuite:
                     ]
                     # Sort with include: True at front
                     sorted_columns = sorted(
-                        filtered_columns, 
-                        key = lambda c: not str2bool(c.get("include", False))
+                        filtered_columns,
+                        key=lambda c: not str2bool(c.get("include", False)),
                     )
                     # Take only top N from the filtered and sorted list
-                    # If the LLM followed the instructions, this will be exactly 
+                    # If the LLM followed the instructions, this will be exactly
                     # the columns with include: True
                     top_n_columns = sorted_columns[:max_num_seed_columns]
 
@@ -453,7 +459,9 @@ class SampleToDatasetTaskSuite:
 
                     return final_filtered_data_seed_columns
                 else:
-                    raise ValueError(f"Invalid filtered data seeds: {validation_result}")
+                    raise ValueError(
+                        f"Invalid filtered data seeds: {validation_result}"
+                    )
 
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
@@ -679,7 +687,9 @@ class SampleToDatasetTaskSuite:
                         pretty_print_json(dataset_description)
                     return dataset_description
                 else:
-                    raise ValueError(f"Invalid dataset description: {validation_result}")
+                    raise ValueError(
+                        f"Invalid dataset description: {validation_result}"
+                    )
 
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
