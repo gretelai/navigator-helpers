@@ -19,7 +19,7 @@ from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates.sample_to_dataset import (
     DATA_GENERATION_PROMPT_TEMPLATE,
-    DATASEED_CROWD_RANKING_PROMPT_TEMPLATE,
+    DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE,
     DATASEED_GENERATION_PROMPT_TEMPLATE,
     DATASEED_REVERSE_ENG_PROMPT_TEMPLATE,
     DATASET_DESCRIPTION_PROMPT_TEMPLATE,
@@ -265,7 +265,7 @@ class SampleToDatasetTaskSuite:
             return {key: data}
         return data
 
-    def extract_data_seeds_in_one_shot(
+    def extract_data_seed_columns_in_one_shot(
         self,
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
@@ -301,24 +301,24 @@ class SampleToDatasetTaskSuite:
 
         return thinking, data_seeds
 
-    def crowdsource_data_seed_types(
+    def crowdsource_data_seed_columns(
         self,
         sample_dataset: pd.DataFrame,
         dataset_context: str = "",
         crowd_size: int = 3,
-        max_num_seed_types: int = 3,
+        max_num_seed_columns: int = 3,
         system_prompt_type: str = "cognition",
         max_workers: int = 4,
     ) -> dict:
         """
         Perform crowd-sourcing by executing the dataseed extraction prompt multiple times in parallel,
-        and generating a deduped and ranked list of high-quality data seed types.
+        and generating a deduped and ranked list of high-quality data seed column headers.
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
             dataset_context (str, optional): Dataset context beyond the sample. Defaults to ''
             crowd_size (int, optional): Number of times to run the user prompt. Defaults to 3.
-            max_num_seed_types (int, optional): Maximum number of seed types to return. Defaults to 3.
+            max_num_seed_columns (int, optional): Maximum number of seed columns to return. Defaults to 3.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
             max_workers (int, optional): Maximum number of worker threads. Defaults to None (ThreadPoolExecutor default).
                                         If provided, it will be capped at crowd_size.
@@ -331,26 +331,26 @@ class SampleToDatasetTaskSuite:
             RuntimeError: If ranking fails after multiple attempts.
         """
 
-        def extract_data_seeds_worker(i: int) -> List[Dict[str, Any]]:
+        def extract_data_seed_columns_worker(i: int) -> List[Dict[str, Any]]:
             self.logger.info(f"  |-- 🫡 assistant opinion {i+1}")
             try:
-                _, data_seeds = self.extract_data_seeds_in_one_shot(
+                _, data_seed_columns = self.extract_data_seed_columns_in_one_shot(
                     sample_dataset, dataset_context, system_prompt_type
                 )
 
-                is_valid_data_seeds, validation_result = validate_json_with_pydantic(
-                    ExampleDataSeedModel, data_seeds
+                is_valid_data_seed_columns, validation_result = validate_json_with_pydantic(
+                    ExampleDataSeedModel, data_seed_columns
                 )
-                if is_valid_data_seeds:
-                    return data_seeds.get("columns", [])
+                if is_valid_data_seed_columns:
+                    return data_seed_columns.get("columns", [])
                 elif self.config.verbose:
                     print(
-                        f"Warning: data_seeds failed pydantic validation at crowd iteration {i+1}: {validation_result}"
+                        f"Warning: extract_data_seed_columns_worker failed pydantic validation at crowd iteration {i+1}: {validation_result}"
                     )
             except Exception as e:
                 # if self.config.verbose:
                 print(f"Failed to extract data seeds at crowd iteration {i+1}: {e}")
-                print(data_seeds)
+                print(data_seed_columns)
             return []
 
         # Determine the effective number of workers
@@ -363,66 +363,66 @@ class SampleToDatasetTaskSuite:
             max_workers=effective_workers
         ) as executor:
             future_to_worker = {
-                executor.submit(extract_data_seeds_worker, i): i
+                executor.submit(extract_data_seed_columns_worker, i): i
                 for i in range(crowd_size)
             }
-            data_seeds_list = []
+            data_seed_columns_list = []
             for future in concurrent.futures.as_completed(future_to_worker):
-                data_seeds_list.extend(future.result())
+                data_seed_columns_list.extend(future.result())
 
-        if not data_seeds_list:
+        if not data_seed_columns_list:
             raise ValueError(
                 "All attempts returned None or missing 'columns', cannot proceed."
             )
 
         self.logger.info(f"  |-- 🧐 examining, deduping and ranking seed types")
         # Dedupe seeds
-        seen_seeds = set()
-        deduped_seeds = []
-        for seed in data_seeds_list:
+        seen_seed_columns = set()
+        deduped_seed_column_list = []
+        for seed in data_seed_columns_list:
             column_name = seed.get("column_name")
             # redundancy: in addition to deduping, remove columns that are the same as in the original dataset
             if (
-                column_name not in seen_seeds
+                column_name not in seen_seed_columns
                 and column_name not in sample_dataset.columns
                 and column_name is not None
             ):
-                seen_seeds.add(column_name)
-                deduped_seeds.append(seed)
+                seen_seed_columns.add(column_name)
+                deduped_seed_column_list.append(seed)
 
-        final_data_seeds = {"columns": deduped_seeds}
+        final_data_seed_columns = {"columns": deduped_seed_column_list}
         data_jsonl = sample_dataset.to_json(orient="records", lines=True)
         data_schema = str(list(sample_dataset.columns))
 
         # Format the reflection prompt with the ranked seeds
-        dataseed_crowd_ranking_prompt = DATASEED_CROWD_RANKING_PROMPT_TEMPLATE.format(
+        dataseed_crowd_ranking_prompt = DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE.format(
             sampled_dataset_jsonl=data_jsonl,
             dataset_context_str=dataset_context,
             sampled_dataset_column_list=data_schema,
-            data_seeds=json.dumps(final_data_seeds, indent=2),
+            data_seeds=json.dumps(final_data_seed_columns, indent=2),
         )
         if self.config.verbose:
-            print("------------------- Dataseed crowd-ranking prompt ------------")
+            print("------------------- Dataseed column crowd-ranking prompt ------------")
             print(dataseed_crowd_ranking_prompt)
 
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
-            ranked_data_seeds = {}
+            ranked_data_seed_columns = {}
             try:
-                _, ranked_data_seeds = self.execute_prompt(
+                _, ranked_data_seed_columns = self.execute_prompt(
                     dataseed_crowd_ranking_prompt, system_prompt_type
                 )
                 # do defensive normalization
-                ranked_data_seeds = self.normalize_to_keyed_list(
-                    ranked_data_seeds, "columns"
+                ranked_data_seed_columns = self.normalize_to_keyed_list(
+                    ranked_data_seed_columns, "columns"
                 )
 
-                is_valid_ranked_data_seeds, validation_result = (
-                    validate_json_with_pydantic(RankedDataSeedModel, ranked_data_seeds)
+                is_valid_ranked_data_seed_columns, validation_result = (
+                    validate_json_with_pydantic(RankedDataSeedModel, ranked_data_seed_columns)
                 )
 
-                if is_valid_ranked_data_seeds:
-                    columns = ranked_data_seeds.get("columns", [])
+                if is_valid_ranked_data_seed_columns:
+                    columns = ranked_data_seed_columns.get("columns", [])
                     # second redundancy: filter out columns that already exist in sample_dataset
                     filtered_columns = [
                         col
@@ -434,19 +434,19 @@ class SampleToDatasetTaskSuite:
                         key=lambda col: -int(col.get("quality_rank", 0)),
                     )
                     # Take only top N from the filtered and sorted list
-                    top_n_columns = sorted_columns[:max_num_seed_types]
+                    top_n_columns = sorted_columns[:max_num_seed_columns]
 
                     # Create a new dictionary with the top N columns
-                    final_ranked_data_seeds = {"columns": top_n_columns}
+                    final_ranked_data_seed_columns = {"columns": top_n_columns}
 
                     if self.config.verbose:
                         print(f"Success on ranking attempt {attempt+1}")
                         print(
                             "------------------- Generated Ranked Dataseeds  ------------"
                         )
-                        pretty_print_json(final_ranked_data_seeds)
+                        pretty_print_json(final_ranked_data_seed_columns)
 
-                    return final_ranked_data_seeds
+                    return final_ranked_data_seed_columns
                 else:
                     raise ValueError(f"Invalid ranked data seeds: {validation_result}")
 
@@ -459,33 +459,33 @@ class SampleToDatasetTaskSuite:
                     print(
                         f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
-                    print(ranked_data_seeds)
+                    print(ranked_data_seed_columns)
                     print("Falling back to unranked seeds with quality_rank set to 0")
                     unranked_columns = final_data_seeds.get("columns", [])
 
-                    # Filter out columns that already exist in sample_dataset before taking max_num_seed_types
+                    # Filter out columns that already exist in sample_dataset before taking max_num_seed_columns
                     filtered_unranked = [
                         col
                         for col in unranked_columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
 
-                    # Set quality_rank to 0 for all columns and limit to max_num_seed_types
+                    # Set quality_rank to 0 for all columns and limit to max_num_seed_columns
                     fallback_columns = []
-                    for column in filtered_unranked[:max_num_seed_types]:
+                    for column in filtered_unranked[:max_num_seed_columns]:
                         column_with_rank = column.copy()
                         column_with_rank["quality_rank"] = 0
                         fallback_columns.append(column_with_rank)
 
-                    final_ranked_data_seeds = {"columns": fallback_columns}
+                    final_ranked_data_seed_columns = {"columns": fallback_columns}
 
                     if self.config.verbose:
                         print(
                             "------------------- Fallback Ranked Dataseeds  ------------"
                         )
-                        pretty_print_json(final_ranked_data_seeds)
+                        pretty_print_json(final_ranked_data_seed_columns)
 
-                    return final_ranked_data_seeds
+                    return final_ranked_data_seed_columns
 
         # This line should never be reached due to the raise in the else clause above,
         # but it's here to satisfy the function's return type hint

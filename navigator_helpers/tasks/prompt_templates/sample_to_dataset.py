@@ -72,7 +72,7 @@ This is the output format you have to follow:
 </json>
 """
 
-DATASEED_CROWD_RANKING_PROMPT_TEMPLATE = """
+DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE = """
 You are an expert data practioner, skilled in critically evaluating data and
 leveraging expertise across various domains, including data analysis, data
 engineering, and a general understanding of programming concepts.
