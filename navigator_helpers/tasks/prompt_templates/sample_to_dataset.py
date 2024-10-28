@@ -6,35 +6,39 @@ engineering, and a general understanding of programming concepts.
 Examine the dataset provided in JSONL format inside the <dataset></dataset> tags
 below. Note the schema of the dataset provided in the <schema></schema> tags.
 
-Then reverse-engineer the dataset and think through which specific data seeds
-could be used if such a dataset were to be generated from scratch so that the
-data is rich, diverse and high-quality.
+Your goal is to help a data practioner colleague generate new examples from this 
+dataset from scratch. To do this, you will define a number of specific data seed 
+categories used to describe new samples from the dataset. Your colleague will 
+choose a random value from each category and use the combination to generate a 
+new sample. Define data seed categories such that the resulting samples are rich, 
+diverse and high-quality. 
 
-Here are a few examples to better explain what data seeds are. Don't use these
+Here are a few examples to better explain what data seed categories are. Don't use these
 in your output
 <examples>
-  <example_1> A product review dataset with 'product_name' and 'review_text' columns could have the following columns as data seeds:
-    - 'category' (representing categories like electronics, clothing, food, etc.)
-    - 'reviewer_demographics' (representing factors like age, gender, location)
-    - 'sentiment' (representing sentiments such as positive, neutral, negative)
-    - 'product_price_range' (representing price ranges like low, medium, high)
-    - 'purchase_channel' (representing online store, physical store, mobile app)
-    - 'review_length' (representing the length of the review: short, medium, long)
+  <example_1> 
+    A product review dataset with 'product_name' and 'review_text' columns could have the following categories as data seeds:
+    - 'product_type' (values like electronics, clothing, food, etc.)
+    - 'reviewer_age' (values like mid-20s, late-40s, early-60s)
+    - 'sentiment' (values such as positive, neutral, negative)
+    - 'product_price_range' (values like low, medium, high)
+    - 'purchase_channel' (values like online store, physical store, mobile app)
+    - 'review_length' (values representing the length of the review: short, medium, long)
   </example_1>
   <example_2>
-    A dataset for environmental sensor readings with 'timestamp' and 'reading_value' columns could have the following columns as data seeds:
-    - 'sensor_type' (representing things like temperature, humidity, CO2 levels, etc.)
-    - 'location' (representing different geographical locations or zones)
-    - 'weather_conditions' (representing variables like sunny, rainy, cloudy)
-    - 'altitude' (representing different altitude ranges, such as sea level, mid-altitude, high-altitude)
-    - 'sensor_brand' (representing brands or manufacturers of sensors)
-    - 'data_granularity' (representing frequency of data collection, such as hourly, daily, or monthly)
+    A dataset for environmental sensor readings with 'timestamp' and 'reading_value' columns could have the following categories as data seeds:
+    - 'sensor_type' (values like temperature, humidity, CO2 levels, etc.)
+    - 'location' (values representing different geographical locations or zones)
+    - 'weather_conditions' (values like sunny, rainy, cloudy)
+    - 'altitude' (values representing different altitude ranges, such as sea level, mid-altitude, high-altitude)
+    - 'sensor_brand' (values representing brands or manufacturers of sensors)
+    - 'data_granularity' (values representing frequency of data collection, such as hourly, daily, or monthly)
   </example_2>
 </examples>
 
-Provide data seeds as new columns in a dataset. DO NOT include columns from the
+Provide data seed categories as new columns in a dataset. DO NOT include columns from the
 original dataset provided in <schema></schema> tags.
-New column names should be succinct and descriptive.
+New categories (column names) should be succinct and descriptive.
 DO NOT reference generic terms like seed, data in new column names.
 DO NOT include any answers or questions in data seeds.
 MAKE SURE TO USE SNAKE CASE IN COLUMN NAMES.
