@@ -268,3 +268,8 @@ def create_dataframe_from_jsonl(jsonl_string: Union[dict, list, str]) -> pd.Data
         # If any exception occurs during processing, log it and return an empty DataFrame
         print(f"An error occurred: {str(e)}")
         return pd.DataFrame()
+
+def str2bool(v: Union[str, bool]):
+    if type(v) is str:
+        return v.lower() in ("yes", "true", "True", "t", "1")
+    return v

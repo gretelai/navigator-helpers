@@ -19,7 +19,7 @@ from navigator_helpers.llms.base import LLMRegistry
 from navigator_helpers.logs import get_logger, SIMPLE_LOG_FORMAT
 from navigator_helpers.tasks.prompt_templates.sample_to_dataset import (
     DATA_GENERATION_PROMPT_TEMPLATE,
-    DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE,
+    DATASEED_COLUMN_CROWD_FILTERING_PROMPT_TEMPLATE,
     DATASEED_GENERATION_PROMPT_TEMPLATE,
     DATASEED_REVERSE_ENG_PROMPT_TEMPLATE,
     DATASET_DESCRIPTION_PROMPT_TEMPLATE,
@@ -32,6 +32,7 @@ from navigator_helpers.tasks.prompt_templates.system_prompts import (
 )
 from navigator_helpers.tasks.sample_to_dataset.utils import (
     create_dataframe_from_jsonl,
+    str2bool,
     extract_json,
     extract_output,
     extract_thinking,
@@ -61,16 +62,16 @@ class ExampleDataSeedModel(BaseModel):
     columns: List[ExampleDataSeedColumnModel]
 
 
-# Define the RankedDataSeedModel for pydantic validation
-class RankedDataSeedColumnModel(BaseModel):
+# Define the FilteredDataSeedColumnModel for pydantic validation
+class FilteredDataSeedColumnModel(BaseModel):
     column_name: str
     description: str
     example_values: List[Union[str, int, bool]]
-    quality_rank: Union[str, int, float]
+    include: Optional[Union[str, int, bool]]
 
 
-class RankedDataSeedModel(BaseModel):
-    columns: List[RankedDataSeedColumnModel]
+class FilteredDataSeedModel(BaseModel):
+    columns: List[FilteredDataSeedColumnModel]
 
 
 # Define the DatasetModel for pydantic validation
@@ -312,7 +313,7 @@ class SampleToDatasetTaskSuite:
     ) -> dict:
         """
         Perform crowd-sourcing by executing the dataseed extraction prompt multiple times in parallel,
-        and generating a deduped and ranked list of high-quality data seed column headers.
+        and generating a deduped and filtered list of high-quality data seed column headers.
 
         Args:
             sample_dataset (pd.DataFrame): The sample dataset.
@@ -324,11 +325,11 @@ class SampleToDatasetTaskSuite:
                                         If provided, it will be capped at crowd_size.
 
         Returns:
-            dict: A dictionary containing the ranked data seeds.
+            dict: A dictionary containing the filtered data seeds.
 
         Raises:
             ValueError: If all attempts to extract data seeds fail.
-            RuntimeError: If ranking fails after multiple attempts.
+            RuntimeError: If filtering fails after multiple attempts.
         """
 
         def extract_data_seed_columns_worker(i: int) -> List[Dict[str, Any]]:
@@ -375,7 +376,7 @@ class SampleToDatasetTaskSuite:
                 "All attempts returned None or missing 'columns', cannot proceed."
             )
 
-        self.logger.info(f"  |-- 🧐 examining, deduping and ranking seed types")
+        self.logger.info(f"  |-- 🧐 examining, deduping and filtering seed types")
         # Dedupe seeds
         seen_seed_columns = set()
         deduped_seed_column_list = []
@@ -394,98 +395,102 @@ class SampleToDatasetTaskSuite:
         data_jsonl = sample_dataset.to_json(orient="records", lines=True)
         data_schema = str(list(sample_dataset.columns))
 
-        # Format the reflection prompt with the ranked seeds
-        dataseed_crowd_ranking_prompt = DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE.format(
+        # Format the reflection prompt with the filtered seeds
+        dataseed_crowd_filtering_prompt = DATASEED_COLUMN_CROWD_FILTERING_PROMPT_TEMPLATE.format(
             sampled_dataset_jsonl=data_jsonl,
             dataset_context_str=dataset_context,
             sampled_dataset_column_list=data_schema,
+            num_columns=max_num_seed_columns,
             data_seeds=json.dumps(final_data_seed_columns, indent=2),
         )
         if self.config.verbose:
-            print("------------------- Dataseed column crowd-ranking prompt ------------")
-            print(dataseed_crowd_ranking_prompt)
+            print("------------------- Dataseed column crowd-filtering prompt ------------")
+            print(dataseed_crowd_filtering_prompt)
 
         MAX_RETRIES = 3
         for attempt in range(MAX_RETRIES):
-            ranked_data_seed_columns = {}
+            filtered_data_seed_columns = {}
             try:
-                _, ranked_data_seed_columns = self.execute_prompt(
-                    dataseed_crowd_ranking_prompt, system_prompt_type
+                _, filtered_data_seed_columns = self.execute_prompt(
+                    dataseed_crowd_filtering_prompt, system_prompt_type
                 )
                 # do defensive normalization
-                ranked_data_seed_columns = self.normalize_to_keyed_list(
-                    ranked_data_seed_columns, "columns"
+                filtered_data_seed_columns = self.normalize_to_keyed_list(
+                    filtered_data_seed_columns, "columns"
                 )
 
-                is_valid_ranked_data_seed_columns, validation_result = (
-                    validate_json_with_pydantic(RankedDataSeedModel, ranked_data_seed_columns)
+                is_valid_filtered_data_seed_columns, validation_result = (
+                    validate_json_with_pydantic(FilteredDataSeedModel, filtered_data_seed_columns)
                 )
 
-                if is_valid_ranked_data_seed_columns:
-                    columns = ranked_data_seed_columns.get("columns", [])
+                if is_valid_filtered_data_seed_columns:
+                    columns = filtered_data_seed_columns.get("columns", [])
                     # second redundancy: filter out columns that already exist in sample_dataset
                     filtered_columns = [
                         col
                         for col in columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
+                    # Sort with include: True at front
                     sorted_columns = sorted(
-                        filtered_columns,
-                        key=lambda col: -int(col.get("quality_rank", 0)),
+                        filtered_columns, 
+                        key = lambda c: not str2bool(c.get("include", False))
                     )
                     # Take only top N from the filtered and sorted list
+                    # If the LLM followed the instructions, this will be exactly 
+                    # the columns with include: True
                     top_n_columns = sorted_columns[:max_num_seed_columns]
 
                     # Create a new dictionary with the top N columns
-                    final_ranked_data_seed_columns = {"columns": top_n_columns}
+                    final_filtered_data_seed_columns = {"columns": top_n_columns}
 
                     if self.config.verbose:
-                        print(f"Success on ranking attempt {attempt+1}")
+                        print(f"Success on filtering attempt {attempt+1}")
                         print(
-                            "------------------- Generated Ranked Dataseeds  ------------"
+                            "------------------- Generated Filtered Dataseeds  ------------"
                         )
-                        pretty_print_json(final_ranked_data_seed_columns)
+                        pretty_print_json(final_filtered_data_seed_columns)
 
-                    return final_ranked_data_seed_columns
+                    return final_filtered_data_seed_columns
                 else:
-                    raise ValueError(f"Invalid ranked data seeds: {validation_result}")
+                    raise ValueError(f"Invalid filtered data seeds: {validation_result}")
 
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
                     print(
-                        f"Ranking attempt {attempt + 1} failed: {str(e)}. Retrying ..."
+                        f"Filtering attempt {attempt + 1} failed: {str(e)}. Retrying ..."
                     )
                 else:
                     print(
-                        f"Ranking failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
+                        f"Filtering failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
-                    print(ranked_data_seed_columns)
-                    print("Falling back to unranked seeds with quality_rank set to 0")
-                    unranked_columns = final_data_seeds.get("columns", [])
+                    print(filtered_data_seed_columns)
+                    print(f"Falling back to first {max_num_seed_columns}")
+                    unfiltered_columns = final_data_seeds.get("columns", [])
 
                     # Filter out columns that already exist in sample_dataset before taking max_num_seed_columns
-                    filtered_unranked = [
+                    deduped_unfiltered = [
                         col
-                        for col in unranked_columns
+                        for col in unfiltered_columns
                         if col.get("column_name") not in sample_dataset.columns
                     ]
 
-                    # Set quality_rank to 0 for all columns and limit to max_num_seed_columns
+                    # Set include to False for all columns and limit to max_num_seed_columns
                     fallback_columns = []
-                    for column in filtered_unranked[:max_num_seed_columns]:
-                        column_with_rank = column.copy()
-                        column_with_rank["quality_rank"] = 0
-                        fallback_columns.append(column_with_rank)
+                    for column in deduped_unfiltered[:max_num_seed_columns]:
+                        column_with_include = column.copy()
+                        column_with_include["include"] = True
+                        fallback_columns.append(column_with_include)
 
-                    final_ranked_data_seed_columns = {"columns": fallback_columns}
+                    final_filtered_data_seed_columns = {"columns": fallback_columns}
 
                     if self.config.verbose:
                         print(
-                            "------------------- Fallback Ranked Dataseeds  ------------"
+                            "------------------- Fallback Filtered Dataseeds  ------------"
                         )
-                        pretty_print_json(final_ranked_data_seed_columns)
+                        pretty_print_json(final_filtered_data_seed_columns)
 
-                    return final_ranked_data_seed_columns
+                    return final_filtered_data_seed_columns
 
         # This line should never be reached due to the raise in the else clause above,
         # but it's here to satisfy the function's return type hint
@@ -646,7 +651,7 @@ class SampleToDatasetTaskSuite:
         data_jsonl = sample_dataset.to_json(orient="records", lines=True)
         data_schema = str(list(sample_dataset.columns))
 
-        # Format the reflection prompt with the ranked seeds
+        # Format the reflection prompt with the seeds
         dataset_description_prompt = DATASET_DESCRIPTION_PROMPT_TEMPLATE.format(
             sampled_dataset_jsonl=data_jsonl,
             dataset_context_str=dataset_context,
@@ -674,7 +679,7 @@ class SampleToDatasetTaskSuite:
                         pretty_print_json(dataset_description)
                     return dataset_description
                 else:
-                    raise ValueError(f"Invalid ranked data seeds: {validation_result}")
+                    raise ValueError(f"Invalid dataset description: {validation_result}")
 
             except Exception as e:
                 if attempt < MAX_RETRIES - 1 and self.config.verbose:
@@ -682,11 +687,8 @@ class SampleToDatasetTaskSuite:
                         f"Dataset description attempt {attempt + 1} failed: {str(e)}, {dataset_description} Retrying ..."
                     )
                 else:
-                    print(
-                        f"Dataset description generation failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
-                    )
                     raise RuntimeError(
-                        f"Failed to rank data seeds after {MAX_RETRIES} attempts"
+                        f"Dataset description generation failed after {MAX_RETRIES} attempts. Last error: {str(e)}"
                     )
 
         # This line should never be reached due to the raise in the else clause above,

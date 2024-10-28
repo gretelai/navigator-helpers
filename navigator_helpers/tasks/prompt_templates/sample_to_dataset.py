@@ -76,7 +76,7 @@ This is the output format you have to follow:
 </json>
 """
 
-DATASEED_COLUMN_CROWD_RANKING_PROMPT_TEMPLATE = """
+DATASEED_COLUMN_CROWD_FILTERING_PROMPT_TEMPLATE = """
 You are an expert data practioner, skilled in critically evaluating data and
 leveraging expertise across various domains, including data analysis, data
 engineering, and a general understanding of programming concepts.
@@ -92,20 +92,24 @@ below. Note the schema of the dataset in the <schema></schema> tags.
 {sampled_dataset_column_list}
 </schema>
 
-Then examine and compare ALL data seeds inside the <data_seeds></data_seeds>
-tags that could be used if such a dataset were to be generated from scratch
-so that the data is rich, diverse and high-quality.
+Your goal is to help a data practioner colleague generate new examples from this 
+dataset from scratch. To do this, your colleague will choose a random value from 
+each of a number of data seed categories. The full list of possible data seed 
+categories is listed below. Your task is to filter this list to the best {num_columns}
+categories for generating new data samples that are rich, diverse and high-quality.
 <data_seeds>
 {data_seeds}
 </data_seeds>
 
-Based on the comparison, create a deduplicated and ranked list of data seeds. First,
-make sure to prune the list to remove duplicate, similar and/or irrelevant data seeds.
-Second, rank the remaining list based on relevance,
-clarity, and diversity of the attributes, as they pertain to the dataset.
-Use a three-point scale from 1-3 (1 for low, 2 for medium, 3 for high quality).
-Return the data seed list, starting from highest to lowest quality.
-Follow the JSON format below. DO NOT write any code to perform the ranking.
+Consider which {num_columns} categories are most likely to lead to high-quality
+data samples. Choose unique categories that describe different aspects of the data,
+with values that can be combined independently to create new samples. Proceed by 
+first choosing the single best category, then the best category to combine with it,
+and so on, until you have selected the best {num_columns} categories. Consider ALL 
+data seed categories in making your selection of the best {num_columns} categories.
+
+Follow the JSON format below. Return the data seed categories with "include": true 
+for the {num_columns} categories you have chosen.
 
 #### JSON FORMAT TO FOLLOW
 {{
@@ -115,13 +119,13 @@ Follow the JSON format below. DO NOT write any code to perform the ranking.
             "column_name": "name_of_column_in_snake_case",
             "description": "data description",
             "example_values": [examples of the data seed provided as a python list],
-            "quality_rank": "rank of the attribute based on quality"
+            "include": true or false
         }},
         {{
             "column_name": "name_of_column_in_snake_case",
             "description": "data description",
             "example_values": [examples of the data seed provided as a python list],
-            "quality_rank": "rank of the attribute based on quality"
+            "include": true or false
         }}
     ]
 }}
@@ -145,7 +149,7 @@ DO NOT use "etc." as a value.
 {data_seeds}
 </data_seeds>
 
-Follow the JSON format below. DO NOT write any code to perform the ranking.
+Follow the JSON format below.
 
 #### JSON FORMAT TO FOLLOW
 {{
@@ -155,14 +159,12 @@ Follow the JSON format below. DO NOT write any code to perform the ranking.
             "column_name": "name_of_column_in_snake_case",
             "description": "data description",
             "example_values": [examples of the data seed provided as a python list],
-            "quality_rank": "rank of the attribute based on quality",
             "all_values": [generated diverse, rich, relevant values provided as a python list]
         }},
         {{
             "column_name": "name of column",
             "description": "data description",
             "example_values": [examples of the data seed provided as a python list],
-            "quality_rank": "rank of the attribute based on quality",
             "all_values": [generated diverse, rich, relevant values provided as a python list]
         }}
     ]
@@ -270,7 +272,7 @@ Don't use these examples in your output.
     should represent readings from {{sensor_type}} type sensors produced
     by {{sensor_brand}} in {{weather_conditions}} conditions.
   </example_2>
-</examples
+</examples>
 
 Follow the exact JSON format below. Do not add any other keys to JSON.
 DO NOT write any code to generate the prompt
