@@ -57,7 +57,7 @@ class Sample2DataSetPipeline:
         max_workers: int = 4,
         system_prompt_type: str = "cognition",
         crowd_size: int = 3,
-        max_num_seeds: int = 3,
+        max_num_seed_columns: int = 3,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Run the sample-to-dataset pipeline to generate synthetic data.
@@ -69,6 +69,8 @@ class Sample2DataSetPipeline:
             num_records_per_seed (int, optional): Number of records to generate per seed. Defaults to 5.
             max_workers (int, optional): Maximum number of parallel workers. Defaults to 4.
             system_prompt_type (str, optional): Type of system prompt to use. Defaults to 'cognition'.
+            crowd_size (int, optional): Size of the model crowd to source seed columns. Defaults to 3.
+            max_num_seed_columns (int, optional): Maximum number of seed columns to source. Defaults to 3.
 
         Returns:
             tuple: A tuple containing two DataFrames:
@@ -87,15 +89,15 @@ class Sample2DataSetPipeline:
             f"  |-- 👀 Peeking at the sample dataset columns: {list(clean_sample_dataset.columns)}"
         )
 
-        logger.info(f"🧠 Crowdsourcing relevant data seed types using Cognition")
-        seed_names = self.tasks.crowdsource_data_seeds(
+        logger.info(f"🧠 Crowdsourcing relevant data seed columns using Cognition")
+        seed_names = self.tasks.crowdsource_data_seed_columns(
             clean_sample_dataset,
             dataset_context=dataset_context,
             system_prompt_type=system_prompt_type,
             crowd_size=crowd_size,
-            max_num_seeds=max_num_seeds,
+            max_num_seed_columns=max_num_seed_columns,
         )
-        logger.info(f"  |-- 👀 Peeking at the data seed types: {seed_names}")
+        logger.info(f"  |-- 👀 Peeking at the data seed columns: {seed_names}")
 
         logger.info(f"🏗️ Constructing a rich set of data seeds")
         generated_seeds = self.tasks.generate_data_seeds(
