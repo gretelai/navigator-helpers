@@ -99,20 +99,17 @@ Update the sample YAML template below and return a valid YAML format and object 
 """
 
 EXAMPLE_YAML = """
+# Generator configuration
 api_key: prompt
 llm_model: gretelai/gpt-auto
 log_level: INFO
 use_reflection: true
 output_filename: synthetic_data.jsonl
-evolutionary_generations: 1
+evol_generations: 1
 num_examples: 10 
 generation_strategy: record
 
-generation_instructions: |
-  Provide a clear and concise overview of the desired dataset. Specify the required data structure, context, and content diversity. Include any relevant constraints or guidelines for generating synthetic examples.
-  Example Output: 
-  (Provide a sample output format for guidance on how the data should appear, ensuring it matches the described schema and context.)
-
+# Data model definition
 fields:
   - name: field_1
     type: str
@@ -128,11 +125,24 @@ fields:
       Detail how to use appropriate contextual information to inform the generation of this field's content, ensuring relevance and diversity.
       Stress that any contextual information should be integrated into this field's values, **not used to create additional fields**.
 
-  - name: field_N
-    type: [field_type]
-    description: |
-      Provide a detailed description of `field_N` as per the task requirements.
-      Include instructions on how to incorporate any relevant contextual information.
+generation_instructions: |
+  Provide a clear and concise overview of the desired dataset. Specify the required data structure, context, and content diversity. Include any relevant constraints or guidelines for generating synthetic examples.
+  Example Output: 
+  (Provide a sample output format for guidance on how the data should appear, ensuring it matches the described schema and context.)
 
-# Note: No Fields should be included unless explicitly mentioned in the task.
+# Contextual tags
+contextual_tags:
+  tags:
+    - name: tag_1
+      values:
+        - value1
+        - value2
+        - value3
+    - name: tag_2
+      values:
+        - value1
+        - value2
+        - value3
+
+# Note: Include only the fields and sections explicitly mentioned in the task.
 """
